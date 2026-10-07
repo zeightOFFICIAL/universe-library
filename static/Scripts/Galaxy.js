@@ -76,7 +76,6 @@ const BACKDROP = {
     halo: 110000,
     gas: 10000,
     knots: 3600,
-    dust: 9000,
     // the named catalogue in DEEP_SKY carries the real, known objects; this is the
     // anonymous filler that keeps the rest of the disk from looking empty, so it
     // stays sparse - enough to say "these are everywhere", not enough to crowd
@@ -251,6 +250,15 @@ class Layer {
 }
 
 const VERTEX_SHADER = /* glsl */ `
+    // erf(x) ~ tanh(1.2x), built from exp because GLSL ES 1.00 - which is what a
+    // ShaderMaterial compiles as - has neither, and clamped because exp of a large
+    // positive argument is an infinity and infinity over infinity is a NaN, which
+    // renders as nothing at all
+    float erfB(float x) {
+        float e = exp(-2.4 * clamp(x, -8.0, 8.0));
+        return (1.0 - e) / (1.0 + e);
+    }
+
     attribute float aSize;
     attribute float aAlpha;
     uniform float uScale;
@@ -260,6 +268,8 @@ const VERTEX_SHADER = /* glsl */ `
     uniform float uAttenuate;
     uniform float uGain;
     uniform float uExtinction;
+    uniform float uLane;
+    uniform float uLaneHeight;
     varying vec3 vColor;
     varying float vAlpha;
     varying float vExtinction;
@@ -274,6 +284,51 @@ const VERTEX_SHADER = /* glsl */ `
          */
         vExtinction = mix(uExtinction, 1.0, smoothstep(0.55, 2.4, abs(position.y)));
         float dist = -mv.z;
+
+        /*
+         * The dust lane, integrated per star instead of drawn.
+         *
+         * Sprites were tried at every size and strength and they always came out as
+         * clouds and stains: a round sprite is a blob, and no number of blobs is a
+         * smooth lane. Extinction is not an object anyway - it is what happens to
+         * light on its way here - so each star works out for itself how much dust
+         * its own sight line crossed and dims accordingly. That is smooth by
+         * construction, has nothing to stain with, and costs no fill at all.
+         *
+         * The dust is a gaussian slab of scale height uLaneHeight about the plane,
+         * and the column along the ray from the star to the camera has a closed form
+         * (the difference of two error functions, tanh standing in for erf). Near
+         * the plane that form blows up as the ray turns parallel to the slab, so it
+         * is capped by the straight-line estimate - density at the midpoint times
+         * path length - which is the honest bound.
+         */
+        float lane = 1.0;
+        float vTau = 0.0;
+        if (uLane > 0.0) {
+            vec3 toEye = cameraPosition - position;
+            float len = max(length(toEye), 0.001);
+            float k = 0.7071 / uLaneHeight;
+            float dyAbs = abs(cameraPosition.y - position.y);
+            float midY = 0.5 * (position.y + cameraPosition.y);
+            /*
+             * Mean density along the ray, times path length. Writing it as a mean
+             * rather than integrating in t is what keeps it stable: for a sight line
+             * running along the plane - which is every sight line in the view this
+             * exists for - the difference of the two error functions and the height
+             * difference both go to zero together, and dividing one by the other
+             * keeps the limit. Dividing by a clamped direction cosine instead, as the
+             * first version did, silently threw the column away exactly edge-on.
+             */
+            float rhoMid = exp(-midY * midY * k * k);
+            float rhoErf = uLaneHeight * 1.2533 * abs(erfB(position.y * k) - erfB(cameraPosition.y * k)) / max(dyAbs, 0.001);
+            float rho = mix(rhoMid, min(rhoErf, 1.0), smoothstep(0.02, 0.12, dyAbs));
+            float column = len * rho;
+            // no dust outside the disk that holds it
+            float rMid = length(0.5 * (position.xz + cameraPosition.xz));
+            column *= 1.0 - smoothstep(42.0, 58.0, rMid);
+            vTau = -uLane * column;
+            lane = exp(vTau);
+        }
         float size = mix(aSize, aSize * uScale / dist, uAttenuate);
         float alpha = aAlpha;
         // keep sub-pixel points as dim 1px points instead of losing them
@@ -282,7 +337,16 @@ const VERTEX_SHADER = /* glsl */ `
             size = 1.0;
         }
         gl_PointSize = clamp(size, uMinSize, uMaxSize);
-        vColor = color;
+        /*
+         * Transmission is per channel, and that is the whole point: extinction at
+         * A_V = 1 passes about 0.50 of the red and 0.30 of the blue, so starlight
+         * behind the lane goes dim *and* warm. Multiplying the colour rather than
+         * the alpha gets both at once, and additive light times a transmission is
+         * exactly the right arithmetic. Three exponentials rather than one exp and
+         * two pows: this runs on every one of 2.3M vertices every frame, and a pow
+         * is two transcendentals wearing one name.
+         */
+        vColor = color * vec3(exp(0.75 * vTau), lane, exp(1.32 * vTau));
         vAlpha = min(alpha * uGain, 1.0) * smoothstep(uNearFade * 0.25, uNearFade, dist) * vExtinction;
         gl_Position = projectionMatrix * mv;
     }
@@ -314,8 +378,8 @@ const FRAGMENT_SHADER = /* glsl */ `
     }
 `;
 
-function pointsMaterial({ maxSize, minSize = 1, nearFade = 0.02, sharpness = 16, attenuate = 1, ring = false, blending = THREE.AdditiveBlending }) {
-    return new THREE.ShaderMaterial({
+function pointsMaterial({ maxSize, minSize = 1, nearFade = 0.02, sharpness = 16, attenuate = 1, ring = false, lane = false, blending = THREE.AdditiveBlending }) {
+    const material = new THREE.ShaderMaterial({
         uniforms: {
             uScale: { value: 1 },
             uMaxSize: { value: maxSize },
@@ -327,6 +391,8 @@ function pointsMaterial({ maxSize, minSize = 1, nearFade = 0.02, sharpness = 16,
             uGain: { value: 1 },
             uTint: { value: new THREE.Color(1, 1, 1) },
             uExtinction: { value: 1 },
+            uLane: { value: lane ? DUST.laneDepth : 0 },
+            uLaneHeight: { value: DUST.laneHeight },
             uRing: { value: ring ? 1 : 0 },
         },
         vertexShader: VERTEX_SHADER,
@@ -336,6 +402,7 @@ function pointsMaterial({ maxSize, minSize = 1, nearFade = 0.02, sharpness = 16,
         depthWrite: false,
         blending,
     });
+    return material;
 }
 
 function glowSprite(color, size, opacity = 1) {
@@ -614,7 +681,6 @@ function buildGalaxyFromImage(image) {
     const stars = new Layer(BACKDROP.stars + BACKDROP.thickDisk + BACKDROP.halo);
     const gas = new Layer(BACKDROP.gas + BACKDROP.cirrus + BACKDROP.interArm);
     const knots = new Layer(BACKDROP.knots);
-    const dust = new Layer(BACKDROP.dust);
     const color = new THREE.Color();
 
     const centre = (sampler.n - 1) / 2;
@@ -808,39 +874,6 @@ function buildGalaxyFromImage(image) {
         stars.add(p, color, 1.2 + Math.pow(rand(), 3) * 1.8, 0.0075 + Math.pow(rand(), 3) * 0.05);
     }
 
-    /*
-     * Dust lanes. Sampled from the dim pixels that sit just off the bright arms and
-     * drawn with normal blending, which is the only way to darken an additive scene.
-     * They are faded out from far away and brought in on approach, where they give
-     * the gaps between the arms an edge instead of just being empty.
-     */
-    let dustTries = 0;
-    while (dust.count < BACKDROP.dust && dustTries < BACKDROP.dust * 80) {
-        dustTries++;
-        const index = sampler.pick();
-        const c = pixelColor(sampler, index);
-        const peak = Math.max(c.r, c.g, c.b);
-        if (peak > 0.3 || peak < 0.06) continue;
-        const r = pixelToPlane(index, sampler.n, p);
-        if (r < 4 || r > 52) continue;
-        // lanes sit on the inner edge of an arm: keep the samples where brightness
-        // is still rising outwards, and only a few of those on the far side
-        const dix = index % sampler.n;
-        const diy = (index / sampler.n) | 0;
-        let drx = dix - (sampler.n - 1) / 2;
-        let dry = diy - (sampler.n - 1) / 2;
-        const drl = Math.hypot(drx, dry) || 1;
-        drx /= drl;
-        dry /= drl;
-        const dSlope =
-            sampler.lum(Math.round(dix + drx * 3), Math.round(diy + dry * 3)) -
-            sampler.lum(Math.round(dix - drx * 3), Math.round(diy - dry * 3));
-        if (dSlope <= 0 && rand() < 0.72) continue;
-        p.y += gauss() * (0.1 + 0.008 * r);
-        color.setRGB(0.02, 0.014, 0.012);
-        dust.add(p, color, 18 + rand() * 26, 0.06 + rand() * 0.1);
-    }
-
     // star-forming regions: the artwork paints them pink, so pick the pink pixels
     let tries = 0;
     while (knots.count < BACKDROP.knots && tries < BACKDROP.knots * 60) {
@@ -854,7 +887,7 @@ function buildGalaxyFromImage(image) {
         knots.add(p, color, 1.8 + rand() * 3.0, 0.16 + rand() * 0.26);
     }
 
-    return { stars, gas, knots, dust, scattered };
+    return { stars, gas, knots, scattered };
 }
 
 function buildBackdropStars() {
@@ -1234,6 +1267,11 @@ const DUST = {
     opticalDepth: 0.5,
     steps: 24,
     clipHeight: 10, // beyond this the disk contributes nothing worth sampling
+    // the lane the stars themselves are seen through: thinner and weaker than the
+    // column used for background galaxies, because it has to read as a lane rather
+    // than as an eclipse. laneDepth is the optical depth per unit of mid-plane column
+    laneHeight: 0.34,
+    laneDepth: 0.016,
 };
 const DUST_SAMPLE = new THREE.Vector3();
 const DUST_SEGMENT = new THREE.Vector3();
@@ -1485,7 +1523,14 @@ class GalaxyView {
         this.controls.dampingFactor = 0.08;
         this.controls.minDistance = 0.8;
         this.controls.maxDistance = PIVOT.maxDistance;
-        this.controls.maxPolarAngle = THREE.MathUtils.degToRad(88);
+        /*
+         * Close enough to the plane to see the dust lane cut the disk. At 88 degrees
+         * the sight line to the bulge passed a kiloparsec above a dust layer only a
+         * couple of hundred light years thick, so the lane could only ever appear
+         * beside the bright band instead of across it - which is what made it read
+         * as a smear rather than as dust in front of the galaxy.
+         */
+        this.controls.maxPolarAngle = THREE.MathUtils.degToRad(89.6);
         this.controls.screenSpacePanning = false;
         this.controls.zoomSpeed = 1.2;
         this.controls.autoRotate = true;
@@ -1528,10 +1573,9 @@ class GalaxyView {
 
     buildScene() {
         this.materials = {
-            stars: pointsMaterial({ maxSize: 5.5, minSize: 1.2, nearFade: 0.08, sharpness: 23 }),
-            gas: pointsMaterial({ maxSize: 900, nearFade: 7, sharpness: 2.5 }),
-            knots: pointsMaterial({ maxSize: 12, nearFade: 0.6, sharpness: 9 }),
-            dust: pointsMaterial({ maxSize: 320, nearFade: 2.5, sharpness: 2.2, blending: THREE.NormalBlending }),
+            stars: pointsMaterial({ maxSize: 5.5, minSize: 1.2, nearFade: 0.08, sharpness: 23, lane: true }),
+            gas: pointsMaterial({ maxSize: 900, nearFade: 7, sharpness: 2.5, lane: true }),
+            knots: pointsMaterial({ maxSize: 12, nearFade: 0.6, sharpness: 9, lane: true }),
             scattered: pointsMaterial({ maxSize: 11, minSize: 2.7, nearFade: 0.3, sharpness: 6 }),
             backdropStars: pointsMaterial({ maxSize: 4, sharpness: 18, attenuate: 0 }),
             // softer falloff than a star, so these read as small fuzzy patches
@@ -1626,7 +1670,7 @@ class GalaxyView {
             this.scatteredPoints.renderOrder = 8;
             this.scatteredPoints.frustumCulled = false;
             this.scene.add(this.scatteredPoints);
-            for (const [key, order] of [["gas", 1], ["stars", 2], ["dust", 3], ["knots", 4]]) {
+            for (const [key, order] of [["gas", 1], ["stars", 2], ["knots", 3]]) {
                 const points = new THREE.Points(galaxy[key].geometry(), this.materials[key]);
                 points.renderOrder = order;
                 points.frustumCulled = false;
@@ -2047,10 +2091,23 @@ class GalaxyView {
          */
         // how far the camera sits above the disk's plane, 0 edge-on and 1 overhead
         const elevation = Math.abs(this.camera.position.y - target.y) / Math.max(cameraDistance, 0.001);
+        /*
+         * The lane costs ~1.4ms of vertex work across 2.3M points, and more than a
+         * few degrees off the plane the column is so short that it changes nothing -
+         * so it is switched off there rather than computed and thrown away. The
+         * branch is on a uniform, which makes it genuinely free, and the fade is
+         * wide enough that nothing pops. Edge-on it is free anyway: the stars it
+         * dims produce fragments that fall under the discard threshold, and that
+         * saving pays for the arithmetic.
+         */
+        const laneDepth = DUST.laneDepth * (1 - smoothstep(0.18, 0.3, elevation));
+        for (const key of ["stars", "gas", "knots"]) {
+            this.materials[key].uniforms.uLane.value = laneDepth;
+        }
+
         const closeness = 1 - smoothstep(15, 60, cameraDistance);
         this.materials.stars.uniforms.uMaxSize.value = THREE.MathUtils.lerp(6.0, 4.8, closeness);
         this.materials.gas.uniforms.uMaxSize.value = THREE.MathUtils.lerp(900, 240, closeness);
-        this.materials.dust.uniforms.uMaxSize.value = THREE.MathUtils.lerp(320, 130, closeness);
 
         const closeGain = 1 - smoothstep(10, 80, cameraDistance);
         this.materials.stars.uniforms.uGain.value = 1 + 5.6 * closeGain;
@@ -2130,16 +2187,6 @@ class GalaxyView {
             this.scatteredPoints.visible = local < 0.999;
             this.materials.scattered.uniforms.uOpacity.value = 1 - local;
         }
-        /*
-         * Dust lanes are a close-up cue, so they come in as the camera approaches.
-         * Edge-on they are the whole depth of the disk stacked along the line of
-         * sight, which paints a black seam across the middle of the galaxy, so they
-         * thin out as the view flattens - but not to nothing, because a dark lane
-         * cutting an edge-on disk is the most recognisable thing about one.
-         */
-        this.materials.dust.uniforms.uOpacity.value =
-            (0.55 + 0.45 * (1 - smoothstep(18, 65, cameraDistance))) *
-            Math.max(smoothstep(0.1, 0.42, elevation), 0.5);
         this.galaxyGroup.group.visible = true;
         /*
          * A photograph on a flat plane has no thickness, so edge-on it degenerates
