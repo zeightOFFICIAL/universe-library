@@ -57,13 +57,22 @@ const BACKDROP = {
     rotation: THREE.MathUtils.degToRad(16),
     size: GALAXY_RADIUS * 2.3,
     opacity: 0.62,
-    slices: 1,
-    halfThickness: 1.6,
-    blur: 4.0,
-    twist: THREE.MathUtils.degToRad(1.6),
+    /*
+     * Five sheets, not the eleven that failed twice: blurred harder the further from
+     * the mid-plane, spun and tilted apart, and torn into patches by noise. The
+     * mid-plane sheet is left sharp and whole and carries the structure.
+     */
+    slices: 5,
+    halfThickness: 2.1,
+    blur: 4.5,
+    tear: 0.62,
+    warp: THREE.MathUtils.degToRad(2.6),
+    twist: THREE.MathUtils.degToRad(3.2),
     sampleSize: 448,
-    stars: 2100000,
+    stars: 2100000, // before flocculent thinning, which removes roughly a fifth
     thickDisk: 260000,
+    cirrus: 2000,
+    interArm: 3800,
     halo: 110000,
     gas: 10000,
     knots: 3600,
@@ -81,14 +90,19 @@ const BACKDROP = {
  * them. STAR_TINTS are blended into each sampled pixel colour.
  */
 const INTER_ARM_TINT = new THREE.Color(1.0, 0.72, 0.5);
+// young blue stars just outside an arm's dust lane, older warmer light inside it
+const ARM_OUTER_EDGE = new THREE.Color(0.58, 0.76, 1.0);
+const ARM_INNER_EDGE = new THREE.Color(1.0, 0.74, 0.56);
 const THICK_DISK_TINT = new THREE.Color(1.0, 0.78, 0.6);
+const CIRRUS_VIOLET = new THREE.Color(0.46, 0.4, 1.0);
+const CIRRUS_BLUE = new THREE.Color(0.3, 0.56, 1.0);
 const HALO_TINT = new THREE.Color(1.0, 0.87, 0.72);
 const WHITE = new THREE.Color(1, 1, 1);
 
 const STAR_TINTS = [
-    { color: new THREE.Color(0.62, 0.42, 1.0), weight: 0.42, amount: 0.5 },
+    { color: new THREE.Color(0.56, 0.5, 1.0), weight: 0.36, amount: 0.5 },
     { color: new THREE.Color(0.95, 0.52, 0.98), weight: 0.16, amount: 0.42 },
-    { color: new THREE.Color(0.55, 0.78, 1.0), weight: 0.24, amount: 0.34 },
+    { color: new THREE.Color(0.5, 0.74, 1.0), weight: 0.3, amount: 0.36 },
     { color: new THREE.Color(1.0, 0.97, 0.93), weight: 0.18, amount: 0.2 },
 ];
 
@@ -126,6 +140,9 @@ const PIVOT = {
 };
 
 const SCRATCH_VECTOR = new THREE.Vector3();
+const ORIGIN = new THREE.Vector3(0, 0, 0);
+// what starlight turns into behind a long column of dust: dimmer and much redder
+const EXTINCTION_RED = new THREE.Color(1.0, 0.42, 0.16);
 const RAYCASTER = new THREE.Raycaster();
 const GALACTIC_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
@@ -242,10 +259,20 @@ const VERTEX_SHADER = /* glsl */ `
     uniform float uNearFade;
     uniform float uAttenuate;
     uniform float uGain;
+    uniform float uExtinction;
     varying vec3 vColor;
     varying float vAlpha;
+    varying float vExtinction;
     void main() {
         vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        /*
+         * The dust lane is thin and the bulge sticks out well above and below it, so
+         * a star's extinction depends on its own height: the lane dims what lies
+         * behind it and leaves the rest alone. Dimming the bulge uniformly is what
+         * made it disappear edge-on instead of showing the bright bulge split by a
+         * dark lane that every edge-on spiral has.
+         */
+        vExtinction = mix(uExtinction, 1.0, smoothstep(0.55, 2.4, abs(position.y)));
         float dist = -mv.z;
         float size = mix(aSize, aSize * uScale / dist, uAttenuate);
         float alpha = aAlpha;
@@ -256,7 +283,7 @@ const VERTEX_SHADER = /* glsl */ `
         }
         gl_PointSize = clamp(size, uMinSize, uMaxSize);
         vColor = color;
-        vAlpha = min(alpha * uGain, 1.0) * smoothstep(uNearFade * 0.25, uNearFade, dist);
+        vAlpha = min(alpha * uGain, 1.0) * smoothstep(uNearFade * 0.25, uNearFade, dist) * vExtinction;
         gl_Position = projectionMatrix * mv;
     }
 `;
@@ -265,8 +292,10 @@ const FRAGMENT_SHADER = /* glsl */ `
     uniform float uSharpness;
     uniform float uOpacity;
     uniform float uRing;
+    uniform vec3 uTint;
     varying vec3 vColor;
     varying float vAlpha;
+    varying float vExtinction;
     void main() {
         // r2 is 0 at the centre and 1 at the sprite's edge; the window forces zero there
         float r2 = dot(gl_PointCoord - 0.5, gl_PointCoord - 0.5) * 4.0;
@@ -281,7 +310,7 @@ const FRAGMENT_SHADER = /* glsl */ `
             a = exp(-r2 * uSharpness) * (1.0 - r2) * vAlpha * uOpacity;
         }
         if (a < 0.002) discard;
-        gl_FragColor = vec4(vColor, a);
+        gl_FragColor = vec4(vColor * mix(uTint, vec3(1.0), vExtinction), a);
     }
 `;
 
@@ -296,6 +325,8 @@ function pointsMaterial({ maxSize, minSize = 1, nearFade = 0.02, sharpness = 16,
             uSharpness: { value: sharpness },
             uOpacity: { value: 1 },
             uGain: { value: 1 },
+            uTint: { value: new THREE.Color(1, 1, 1) },
+            uExtinction: { value: 1 },
             uRing: { value: ring ? 1 : 0 },
         },
         vertexShader: VERTEX_SHADER,
@@ -362,18 +393,49 @@ const BACKDROP_FRAGMENT = /* glsl */ `
     uniform float uOpacity;
     uniform float uBias;
     uniform float uCoreFade;
+    uniform float uTear;
+    uniform float uNoiseScale;
+    uniform vec2 uNoiseOffset;
     varying vec2 vUv;
+
+    float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+    }
+
+    float valueNoise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        float a = hash(i);
+        float b = hash(i + vec2(1.0, 0.0));
+        float c = hash(i + vec2(0.0, 1.0));
+        float d = hash(i + vec2(1.0, 1.0));
+        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+    }
+
     void main() {
         vec3 c = texture2D(uMap, vUv, uBias).rgb;
         float radius = length(vUv - 0.5);
         float edge = 1.0 - smoothstep(0.42, 0.5, radius);
         /*
-         * The artwork paints a bulge and we now build one in 3D, so up close the two
+         * The artwork paints a bulge and we build one in 3D, so up close the two
          * stack and blow the centre out. Fade the painted one away as the camera
          * approaches and let the real geometry carry it; the outer disk stays.
          */
         float coreMask = 1.0 - smoothstep(0.04, 0.2, radius);
-        gl_FragColor = vec4(c * uOpacity * edge * (1.0 - uCoreFade * coreMask * 0.93), 1.0);
+
+        /*
+         * The tear mask is what makes a stack of copies work. Identical sheets offset
+         * in depth ghost against each other and read as colour fringing; breaking each
+         * off-plane sheet into patches with its own noise turns the same stack into
+         * something the eye accepts as depth. uTear is 0 on the mid-plane, so that one
+         * stays whole, and rises for the sheets further out.
+         */
+        float torn = valueNoise(vUv * uNoiseScale + uNoiseOffset);
+        torn = mix(torn, valueNoise(vUv * uNoiseScale * 2.7 + uNoiseOffset.yx), 0.4);
+        float tearMask = uTear <= 0.001 ? 1.0 : smoothstep(uTear - 0.22, uTear + 0.22, torn);
+
+        gl_FragColor = vec4(c * uOpacity * edge * tearMask * (1.0 - uCoreFade * coreMask * 0.93), 1.0);
     }
 `;
 
@@ -403,6 +465,10 @@ function buildBackdropVolume(texture) {
                 uCoreFade: { value: 0 },
                 // mid-plane stays sharp, outer slices blur out into haze
                 uBias: { value: Math.pow(Math.abs(t), 0.75) * BACKDROP.blur },
+                // and they are torn into patches, harder the further out they sit
+                uTear: { value: Math.pow(Math.abs(t), 0.8) * BACKDROP.tear },
+                uNoiseScale: { value: 3.5 + rand() * 4.5 },
+                uNoiseOffset: { value: new THREE.Vector2(rand() * 40, rand() * 40) },
             },
             vertexShader: BACKDROP_VERTEX,
             fragmentShader: BACKDROP_FRAGMENT,
@@ -412,11 +478,17 @@ function buildBackdropVolume(texture) {
             side: THREE.DoubleSide,
         });
         material.userData.weight = weights[i] / total;
+        material.userData.offset = t;
         const mesh = new THREE.Mesh(geometry, material);
         mesh.position.z = t * BACKDROP.halfThickness;
-        // a touch of spin and scale per slice, so no two copies line up edge to edge
+        /*
+         * Spin, tilt and scale each sheet a little differently, so no two ever line
+         * up edge to edge. The tilt doubles as the disk's warp: the Milky Way's outer
+         * disk really does bend up on one side and down on the other.
+         */
         mesh.rotation.z = t * BACKDROP.twist;
-        const shrink = 1 - 0.1 * Math.pow(Math.abs(t), 1.4);
+        mesh.rotation.x = t * BACKDROP.warp;
+        const shrink = 1 - 0.08 * Math.pow(Math.abs(t), 1.4);
         mesh.scale.set(shrink, shrink, 1);
         mesh.renderOrder = -1;
         group.add(mesh);
@@ -426,6 +498,35 @@ function buildBackdropVolume(texture) {
 }
 
 /* ---------- star field sampled from the backdrop ---------- */
+
+/*
+ * Cheap 2D value noise. The artwork's arms are smooth and continuous; real arms are
+ * flocculent - branched, broken, feathered - so this is used to carve the sampled
+ * stars into patches and to drag some of them sideways out of the arm.
+ */
+function hash2(x, y) {
+    const h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453123;
+    return h - Math.floor(h);
+}
+
+function valueNoise2(x, y) {
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+    const fx = x - ix;
+    const fy = y - iy;
+    const ux = fx * fx * (3 - 2 * fx);
+    const uy = fy * fy * (3 - 2 * fy);
+    const a = hash2(ix, iy);
+    const b = hash2(ix + 1, iy);
+    const c = hash2(ix, iy + 1);
+    const d = hash2(ix + 1, iy + 1);
+    return (a * (1 - ux) + b * ux) * (1 - uy) + (c * (1 - ux) + d * ux) * uy;
+}
+
+// two octaves is enough texture, and this runs two million times per build
+function flocculence(x, z) {
+    return 0.62 * valueNoise2(x * 0.4, z * 0.4) + 0.38 * valueNoise2(x * 1.15 + 31.7, z * 1.15 - 12.3);
+}
 
 function imageSampler(image, n) {
     const canvas = document.createElement("canvas");
@@ -461,7 +562,15 @@ function imageSampler(image, n) {
         return lo;
     };
 
-    return { pixels, n, pick, total: sum };
+    // luminance lookup, clamped at the edges, used to read the slope across an arm
+    const lum = (ix, iy) => {
+        const x = ix < 0 ? 0 : ix >= n ? n - 1 : ix;
+        const y = iy < 0 ? 0 : iy >= n ? n - 1 : iy;
+        const i = (y * n + x) * 4;
+        return (0.25 * pixels[i] + 0.6 * pixels[i + 1] + 0.15 * pixels[i + 2]) / 255;
+    };
+
+    return { pixels, n, pick, lum, total: sum };
 }
 
 /*
@@ -503,19 +612,44 @@ function buildGalaxyFromImage(image) {
     const scattered = buildScatteredDeepSky(sampler);
     const p = new THREE.Vector3();
     const stars = new Layer(BACKDROP.stars + BACKDROP.thickDisk + BACKDROP.halo);
-    const gas = new Layer(BACKDROP.gas);
+    const gas = new Layer(BACKDROP.gas + BACKDROP.cirrus + BACKDROP.interArm);
     const knots = new Layer(BACKDROP.knots);
     const dust = new Layer(BACKDROP.dust);
     const color = new THREE.Color();
 
+    const centre = (sampler.n - 1) / 2;
     for (let i = 0; i < BACKDROP.stars; i++) {
         const index = sampler.pick();
         const c = pixelColor(sampler, index);
         const peak = Math.max(c.r, c.g, c.b);
         if (peak < 0.04) continue;
         const r = pixelToPlane(index, sampler.n, p);
+
+        /*
+         * Flocculence. The artwork's arms are smooth ribbons; real ones are broken
+         * and branched. A noise field thins the sample in a spatially correlated way
+         * - so it carves patches and gaps rather than random speckle - and drags a
+         * few stars sideways out of the arm, which is what reads as a spur.
+         */
+        const floc = flocculence(p.x, p.z);
+        const inDisk = r > 7;
+        if (inDisk && rand() > 0.45 + 0.85 * floc) continue;
+        if (inDisk && rand() < 0.12) {
+            const radial = Math.hypot(p.x, p.z) || 1;
+            const push = (floc - 0.5) * 3.6;
+            p.x += (-p.z / radial) * push;
+            p.z += (p.x / radial) * push;
+        }
         // thin disk, thickening into a round bulge towards the centre
-        const sigma = 0.13 + 0.019 * r + 2.2 * Math.exp(-r / 2.6);
+        /*
+         * Disks flare: the further out you go, the thicker the layer of stars gets.
+         * Without it the outer disk reads as a sheet of paper, which is exactly where
+         * the flatness showed most.
+         */
+        // a real disk flares, but gently: too much and the rim reads as a vertical
+        // spray rather than a disk that thickens
+        const flare = 0.011 * Math.pow(Math.max(r - 26, 0), 1.2);
+        const sigma = 0.13 + 0.019 * r + flare + 2.2 * Math.exp(-r / 2.6);
         p.y += gauss() * sigma;
         // keep the pixel's hue, then pull it towards one of the house tints. The
         // bulge keeps the artwork's warm gold: violet over gold mixes to mud.
@@ -526,6 +660,27 @@ function buildGalaxyFromImage(image) {
         // a second cue for telling arm from gap up close: the sparse stars between
         // the arms are the old, redder population, the arms keep the blue-violet
         if (peak < 0.42) color.lerp(INTER_ARM_TINT, (0.42 - peak) * 1.6 * smoothstep(3.5, 11, r));
+
+        /*
+         * Arms are not symmetric across their width. Gas piles up on the inner edge,
+         * where the dust lane sits, and the young blue stars appear just outside it.
+         * Reading the brightness slope along the radius tells us which edge a star
+         * landed on - and because it comes from the artwork itself, the colouring
+         * lands on the real arms rather than on a skeleton that might not match.
+         */
+        const ix = index % sampler.n;
+        const iy = (index / sampler.n) | 0;
+        let rx = ix - centre;
+        let ry = iy - centre;
+        const rl = Math.hypot(rx, ry) || 1;
+        rx /= rl;
+        ry /= rl;
+        const slope =
+            sampler.lum(Math.round(ix + rx * 3), Math.round(iy + ry * 3)) -
+            sampler.lum(Math.round(ix - rx * 3), Math.round(iy - ry * 3));
+        const armEdge = smoothstep(6, 13, r) * smoothstep(0.12, 0.45, peak);
+        if (slope < 0) color.lerp(ARM_OUTER_EDGE, Math.min(-slope * 2.4, 0.5) * armEdge);
+        else color.lerp(ARM_INNER_EDGE, Math.min(slope * 1.9, 0.38) * armEdge);
         /*
          * A wide size spread is what sells a star field: mostly small points with a
          * rare bright one among them. A tighter distribution of the same count reads
@@ -540,7 +695,14 @@ function buildGalaxyFromImage(image) {
          * solid rather than as something you can see through. Raising alpha instead
          * just makes it glow, which is not the same thing.
          */
-        const alpha = (0.008 + Math.pow(rand(), 3) * 0.0725) * (0.35 + 0.65 * peak);
+        /*
+         * Out towards the rim the artwork dims, and because star brightness follows
+         * the pixel it samples, the stars dim with it and the disk dissolves rather
+         * than ending. Lift them back with radius so the outskirts stay a star field:
+         * fewer stars out there, but each one still reads as a star.
+         */
+        const rimLift = 1 + 1.35 * smoothstep(18, 46, r);
+        const alpha = (0.008 + Math.pow(rand(), 3) * 0.0725) * (0.35 + 0.65 * peak) * rimLift;
         stars.add(p, color, size, alpha);
     }
 
@@ -552,6 +714,70 @@ function buildGalaxyFromImage(image) {
         p.y += gauss() * (0.45 + 0.016 * r + 1.6 * Math.exp(-r / 3));
         color.setRGB(c.r, c.g, c.b).lerp(STAR_TINTS[0].color, (0.3 + rand() * 0.2) * smoothstep(4, 12, r));
         gas.add(p, color, 26 + rand() * 40, 0.008 + rand() * 0.012);
+    }
+
+    /*
+     * Cirrus. The space between the outer arms is not empty and should not render as
+     * black: faint dust catching starlight fills it. Sampled from the outer disk and
+     * pushed hard towards violet and blue, at a size and opacity that only registers
+     * as a wash behind the stars. This is what gives the outskirts a floor to sit on
+     * instead of fading into the background.
+     */
+    /*
+     * Clouds come in complexes, not in an even sprinkle. Each sprite is placed near
+     * a drifting centre rather than independently, so the rim builds up into a few
+     * dozen ragged banks with empty sky between them - which is what the eye reads
+     * as cloud. An even distribution of the same sprites reads as film grain.
+     */
+    const cloud = { pos: new THREE.Vector3(), spread: 1, life: 0 };
+    for (let i = 0; i < BACKDROP.cirrus; i++) {
+        if (cloud.life <= 0) {
+            // start a new bank somewhere in the outer disk
+            let tries = 0;
+            do {
+                const index = sampler.pick();
+                const r = pixelToPlane(index, sampler.n, cloud.pos);
+                cloud.radius = r;
+                tries++;
+            } while ((cloud.radius < 16 || cloud.radius > 54) && tries < 40);
+            cloud.pos.y += gauss() * (0.5 + 0.03 * cloud.radius);
+            cloud.spread = 1.2 + rand() * 4.5;
+            cloud.life = 20 + Math.floor(rand() * 60);
+            cloud.violet = rand() < 0.35;
+        }
+        cloud.life--;
+        p.copy(cloud.pos);
+        p.x += gauss() * cloud.spread;
+        p.z += gauss() * cloud.spread;
+        p.y += gauss() * cloud.spread * 0.35;
+        // denser and bluer at the heart of a bank, wispier at its edges
+        const core = Math.exp(-(p.distanceToSquared(cloud.pos)) / (2 * cloud.spread * cloud.spread));
+        color.setRGB(0.7, 0.75, 1.0).lerp(cloud.violet ? CIRRUS_VIOLET : CIRRUS_BLUE, 0.55 + rand() * 0.3);
+        gas.add(p, color, 30 + rand() * 54, (0.003 + rand() * 0.005) * (0.5 + core));
+    }
+
+    /*
+     * Backfill for the gaps between the arms, and this is a different sampling
+     * problem to everything else here. Stars follow brightness^2.2, so the gaps are
+     * deliberately starved of them - that is what makes the arms read - but it also
+     * leaves those regions as flat grey with nothing behind the few stars that are
+     * there. So instead of drawing from the brightness CDF, which would land on the
+     * arms again, pick pixels uniformly and keep only the dim ones: that is exactly
+     * the inter-arm space and the dust lanes. It reaches further in than the rim
+     * cirrus, because the gaps close to the core need it most.
+     */
+    let interArmTries = 0;
+    while (gas.count < BACKDROP.gas + BACKDROP.cirrus + BACKDROP.interArm && interArmTries < BACKDROP.interArm * 40) {
+        interArmTries++;
+        const index = Math.floor(rand() * sampler.n * sampler.n);
+        const c = pixelColor(sampler, index);
+        const peak = Math.max(c.r, c.g, c.b);
+        if (peak < 0.02 || peak > 0.3) continue;
+        const r = pixelToPlane(index, sampler.n, p);
+        if (r < 5 || r > 52) continue;
+        p.y += gauss() * (0.4 + 0.02 * r);
+        color.setRGB(c.r, c.g, c.b).lerp(rand() < 0.3 ? CIRRUS_VIOLET : CIRRUS_BLUE, 0.6 + rand() * 0.25);
+        gas.add(p, color, 27 + rand() * 46, 0.0065 + rand() * 0.009);
     }
 
     /*
@@ -597,6 +823,19 @@ function buildGalaxyFromImage(image) {
         if (peak > 0.3 || peak < 0.06) continue;
         const r = pixelToPlane(index, sampler.n, p);
         if (r < 4 || r > 52) continue;
+        // lanes sit on the inner edge of an arm: keep the samples where brightness
+        // is still rising outwards, and only a few of those on the far side
+        const dix = index % sampler.n;
+        const diy = (index / sampler.n) | 0;
+        let drx = dix - (sampler.n - 1) / 2;
+        let dry = diy - (sampler.n - 1) / 2;
+        const drl = Math.hypot(drx, dry) || 1;
+        drx /= drl;
+        dry /= drl;
+        const dSlope =
+            sampler.lum(Math.round(dix + drx * 3), Math.round(diy + dry * 3)) -
+            sampler.lum(Math.round(dix - drx * 3), Math.round(diy - dry * 3));
+        if (dSlope <= 0 && rand() < 0.72) continue;
         p.y += gauss() * (0.1 + 0.008 * r);
         color.setRGB(0.02, 0.014, 0.012);
         dust.add(p, color, 18 + rand() * 26, 0.06 + rand() * 0.1);
@@ -710,7 +949,7 @@ function buildCore() {
         // denser towards the middle
         const pull = 0.35 + 0.65 * Math.pow(rand(), 0.45);
         color.copy(rand() < 0.55 ? gold : amber).lerp(cream, Math.pow(rand(), 2) * 0.5);
-        points.add(place(along * pull, across * pull, height * pull), color, 1.1 + Math.pow(rand(), 3) * 1.9, 0.02 + Math.pow(rand(), 2) * 0.09);
+        points.add(place(along * pull, across * pull, height * pull), color, 1.1 + Math.pow(rand(), 3) * 1.9, 0.03 + Math.pow(rand(), 2) * 0.15);
     }
 
     // the X: the peanut bulge's four diagonal lobes, a real feature of barred galaxies
@@ -721,7 +960,7 @@ function buildCore() {
         const along = armSign * t * A * 0.85 + gauss() * 0.5;
         const height = upSign * t * C * 0.85 + gauss() * 0.35;
         color.copy(amber).lerp(gold, rand());
-        points.add(place(along, gauss() * 0.7, height), color, 1.1 + Math.pow(rand(), 3) * 1.6, 0.02 + Math.pow(rand(), 2) * 0.08);
+        points.add(place(along, gauss() * 0.7, height), color, 1.1 + Math.pow(rand(), 3) * 1.6, 0.03 + Math.pow(rand(), 2) * 0.13);
     }
 
     // the nuclear star cluster: millions of stars inside a few light-years, drawn as
@@ -785,12 +1024,14 @@ function buildCore() {
     }
 
     const shells = [
-        glowSprite(new THREE.Color(1.0, 0.88, 0.7), 2.6, 0.2),
-        glowSprite(new THREE.Color(0.95, 0.72, 0.45), 7.5, 0.12),
+        glowSprite(new THREE.Color(1.0, 0.88, 0.7), 3.0, 0.3),
+        glowSprite(new THREE.Color(0.95, 0.72, 0.45), 8.5, 0.17),
         glowSprite(new THREE.Color(0.55, 0.42, 0.62), 16, 0.06),
     ];
     for (const shell of shells) {
         shell.renderOrder = 6;
+        shell.userData.baseOpacity = shell.material.opacity;
+        shell.userData.baseColor = shell.material.color.clone();
         group.add(shell);
     }
     return { group, material, shells, shellMaterial, shellRadius: CORE_SHELL_RADIUS, holeMaterial, holePoints };
@@ -963,7 +1204,7 @@ function buildGalaxies(galaxies, backgroundImages, baseUrl, pole, manager) {
     const quads = [];
     for (let i = 0; i < 30 && backgroundImages.length; i++) {
         const image = backgroundImages[Math.floor(rand() * backgroundImages.length)];
-        const quad = orientedGalaxyQuad(baseUrl + image, 45 + rand() * 170, 0.42 + rand() * 0.5, manager);
+        const quad = orientedGalaxyQuad(baseUrl + image, 45 + rand() * 170, 0.22 + rand() * 0.3, manager);
         const dir = new THREE.Vector3(gauss(), gauss() * 0.7, gauss()).normalize();
         quad.position.copy(dir.multiplyScalar(600 + rand() * 1700));
         quad.renderOrder = 9;
@@ -1003,7 +1244,7 @@ const DUST_SEGMENT = new THREE.Vector3();
  * layer under 2 kly thick and report no dust at all, which is exactly what the
  * first attempt did.
  */
-function dustColumn(from, to) {
+function dustColumn(from, to, bulgeWeight = DUST.bulgeWeight) {
     DUST_SEGMENT.copy(to).sub(from);
     const length = DUST_SEGMENT.length();
     if (length < 1e-4) return 0;
@@ -1047,7 +1288,7 @@ function dustColumn(from, to) {
         const radial = 1 - smoothstep(DUST.radius * 0.55, DUST.radius, radius);
         // plus the bulge, which is why we cannot see the galactic centre in visible light
         const fromCentre = DUST_SAMPLE.length();
-        const bulge = DUST.bulgeWeight * Math.exp(-(fromCentre * fromCentre) / (2 * DUST.bulgeSigma * DUST.bulgeSigma));
+        const bulge = bulgeWeight * Math.exp(-(fromCentre * fromCentre) / (2 * DUST.bulgeSigma * DUST.bulgeSigma));
         weight += vertical * radial + bulge;
     }
     return (weight / DUST.steps) * (t1 - t0) * length;
@@ -1804,6 +2045,8 @@ class GalaxyView {
          * tighten as the camera approaches. This is the cheapest lever on the worst
          * case - the core close-up - and it leaves the wide view untouched.
          */
+        // how far the camera sits above the disk's plane, 0 edge-on and 1 overhead
+        const elevation = Math.abs(this.camera.position.y - target.y) / Math.max(cameraDistance, 0.001);
         const closeness = 1 - smoothstep(15, 60, cameraDistance);
         this.materials.stars.uniforms.uMaxSize.value = THREE.MathUtils.lerp(6.0, 4.8, closeness);
         this.materials.gas.uniforms.uMaxSize.value = THREE.MathUtils.lerp(900, 240, closeness);
@@ -1825,8 +2068,15 @@ class GalaxyView {
             const closeFade = smoothstep(2, 7, cameraDistance);
             // hand the bulge over to the 3D core as the camera comes in
             const coreFade = 1 - smoothstep(22, 65, cameraDistance);
+            /*
+             * The off-plane sheets exist to give the disk body from a distance. Up
+             * close the 3D star field does that job, and five full-screen quads is
+             * the most expensive thing in the frame, so the outer sheets bow out.
+             */
+            const sheetFade = 1 - closeness;
             for (const m of this.backdrop.materials) {
-                m.uniforms.uOpacity.value = BACKDROP.opacity * m.userData.weight * closeFade;
+                const sheet = m.userData.offset === 0 ? 1 : sheetFade;
+                m.uniforms.uOpacity.value = BACKDROP.opacity * m.userData.weight * closeFade * sheet;
                 m.uniforms.uCoreFade.value = coreFade;
             }
         }
@@ -1834,12 +2084,38 @@ class GalaxyView {
         this.arms.group.visible = this.layerState.arms !== false && local < 0.99;
         this.arms.material.opacity = 0.22 * (1 - local);
         this.core.shellMaterial.opacity = 0.3 * (1 - local) * (this.layerState.arms !== false ? 1 : 0);
+
         /*
-         * Individual black holes only make sense in a window: too far and they are
-         * sub-pixel, too close and the camera is inside the cloud, where 140 rings
-         * of fixed screen size cover everything. They live between roughly 8 and 46.
+         * The core obeys the same dust as everything else, which until now it did not:
+         * background galaxies were extinguished behind the disk while the galactic
+         * centre shone through it at full strength. Seen from above the plane the
+         * sight line barely clips the dust and the bulge is bright, as it is in any
+         * face-on galaxy; drop into the plane and the line runs the length of the
+         * disk, the bulge dims and reddens, and you get the reason the galactic
+         * centre is invisible to the naked eye from Earth. The bulge's own density is
+         * excluded from the column - we are looking at it, not through it.
          */
-        const holeFade = smoothstep(4, 9, cameraDistance) * (1 - smoothstep(18, 46, cameraDistance)) * (1 - local);
+        const coreColumn = dustColumn(this.camera.position, ORIGIN, 0);
+        // a gentler optical depth than the one used for background galaxies: we are
+        // looking at the bulge itself, and face-on it should read bright, the way a
+        // bulge does in any photograph of a face-on spiral
+        const coreLight = Math.exp(-DUST.opticalDepth * 0.6 * coreColumn);
+        // reddening only bites once the extinction is heavy, so a mild column tints
+        // rather than oranges the whole bulge
+        const reddening = Math.pow(1 - coreLight, 1.6);
+        this.core.material.uniforms.uExtinction.value = 0.1 + 0.9 * coreLight;
+        this.core.material.uniforms.uTint.value.copy(WHITE).lerp(EXTINCTION_RED, reddening);
+        for (const shell of this.core.shells) {
+            shell.material.opacity = shell.userData.baseOpacity * (0.1 + 0.9 * coreLight);
+            shell.material.color.copy(shell.userData.baseColor).lerp(EXTINCTION_RED, reddening * 0.85);
+        }
+        /*
+         * The black holes are a reward for going in, not part of the galaxy's wider
+         * look: they stay out of sight until the camera is well inside the bulge,
+         * and disappear again once it is inside the cloud itself, where rings of
+         * fixed screen size would cover everything. Visible roughly 5 to 24 units.
+         */
+        const holeFade = smoothstep(3, 7, cameraDistance) * (1 - smoothstep(13, 24, cameraDistance)) * (1 - local);
         this.core.holePoints.visible = holeFade > 0.01;
         this.core.holeMaterial.uniforms.uOpacity.value = holeFade;
         /*
@@ -1858,11 +2134,12 @@ class GalaxyView {
          * Dust lanes are a close-up cue, so they come in as the camera approaches.
          * Edge-on they are the whole depth of the disk stacked along the line of
          * sight, which paints a black seam across the middle of the galaxy, so they
-         * fade out as the view flattens towards the plane.
+         * thin out as the view flattens - but not to nothing, because a dark lane
+         * cutting an edge-on disk is the most recognisable thing about one.
          */
-        const elevation = Math.abs(this.camera.position.y - target.y) / Math.max(cameraDistance, 0.001);
         this.materials.dust.uniforms.uOpacity.value =
-            (0.3 + 0.7 * (1 - smoothstep(18, 65, cameraDistance))) * smoothstep(0.1, 0.42, elevation);
+            (0.55 + 0.45 * (1 - smoothstep(18, 65, cameraDistance))) *
+            Math.max(smoothstep(0.1, 0.42, elevation), 0.5);
         this.galaxyGroup.group.visible = true;
         /*
          * A photograph on a flat plane has no thickness, so edge-on it degenerates
@@ -1879,7 +2156,7 @@ class GalaxyView {
               * high floor for them - they sit far outside the disk, and a background
               * galaxy that vanishes entirely just reads as a hole in the sky.
               */
-            const transmission = Math.max(diskTransmission(this.camera.position, quad.position), 0.45);
+            const transmission = Math.max(diskTransmission(this.camera.position, quad.position), 0.22);
             quad.material.opacity = quad.userData.baseOpacity * smoothstep(0.05, 0.28, facing) * transmission;
         }
         /*
@@ -1900,7 +2177,14 @@ class GalaxyView {
             const levelMatches = marker.level === "local" ? local > 0.5 : local < 0.5;
             const layerOn = this.layerState[marker.layer] !== false;
             const behindDisk = marker.alias !== undefined && (this.galaxyTransmission?.[marker.alias] ?? 1) < 0.3;
-            const allowed = levelMatches && layerOn && !behindDisk;
+            /*
+             * Arm names lie along the arms, so as the disk flattens towards edge-on
+             * they all converge into one line and overlap each other. They also stop
+             * meaning anything there - you cannot tell one arm from another through
+             * the disk - so they bow out with the viewing angle.
+             */
+            const flatView = marker.tangent && elevation < 0.14;
+            const allowed = levelMatches && layerOn && !behindDisk && !flatView;
             if (marker.project(this.camera, this.width, this.height, allowed, cameraDistance)) candidates.push(marker);
             /*
              * The list reports what is drawn, so it ignores both label collisions and
