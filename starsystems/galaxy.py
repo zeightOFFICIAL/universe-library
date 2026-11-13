@@ -91,6 +91,11 @@ DEEP_SKY = [
 # the galaxy's real tilt. "inclination" and "pa" (position angle of the major axis,
 # from celestial north) are kept as a record of that tilt; "imageScale" says how
 # much wider than the galaxy its frame is, and "roll" spins the plane in place.
+# "brightness" scales a photograph's opacity. It exists because these are drawn at
+# invented distances: once M101 is pulled in from 20.9 Mly to 2.45, nothing is left
+# to say it is further away than Andromeda, and it was rendering brighter than any
+# Local Group member. The ladder restores that - satellites and the Local Group at
+# full strength, the 10-12 Mly group around half, the 20-30 Mly ones lower still.
 GALAXIES = [
     # no photograph reads as itself at this size, so it stays a diffuse glow
     {"name": "Sagittarius Dwarf", "alias": "SagDEG", "kind": "satellite", "type": "blob",
@@ -105,13 +110,52 @@ GALAXIES = [
      "inclination": 60.0, "pa": 45.0, "image": "smc.jpg", "imageScale": 1.8,
      "colors": ["#ffeccf", "#a8c8ff"]},
     {"name": "Andromeda Galaxy", "alias": "M31", "kind": "spiral", "type": "spiral",
-     "l": 121.17, "b": -21.57, "d": 2_537_000, "display": 1_250_000, "size": 152_000,
+     "l": 121.17, "b": -21.57, "d": 2_537_000, "display": 1_040_000, "size": 152_000,
      "inclination": 77.0, "pa": 38.0, "image": "m31.jpg", "imageScale": 1.9,
      "colors": ["#ffd9a0", "#a9c7ff"]},
     {"name": "Triangulum Galaxy", "alias": "M33", "kind": "spiral", "type": "spiral",
      "l": 133.61, "b": -31.33, "d": 2_730_000, "display": 1_550_000, "size": 60_000,
      "inclination": 56.0, "pa": 23.0, "image": "m33.jpg", "imageScale": 1.9,
      "colors": ["#ffe6bb", "#93b9ff"]},
+
+    # Beyond the Local Group. Every one of these is where it really is in the sky -
+    # l and b were computed from J2000 RA/Dec, same as everything else here - but
+    # none of them is at its real distance: at 10 to 30 million light years they
+    # would be far outside the scene, so they are drawn between 1.8 and 2.8 Mly,
+    # ordered so the nearer ones stay nearer. Their labels say "shown closer" and
+    # quote the true distance, which is the only honest way to do this.
+    {"name": "IC 342", "alias": "IC 342", "brightness": 0.55, "kind": "spiral", "type": "spiral",
+     "l": 138.17, "b": 10.58, "d": 10_700_000, "display": 1_800_000, "size": 75_000,
+     "inclination": 31.0, "pa": 37.0, "image": "ic342.jpg", "imageScale": 1.7,
+     "colors": ["#ffe7c4", "#9dc0ff"]},
+    {"name": "Sculptor Galaxy", "alias": "NGC 253", "brightness": 0.68, "kind": "spiral", "type": "spiral",
+     "l": 97.37, "b": -87.96, "d": 11_400_000, "display": 1_900_000, "size": 70_000,
+     "inclination": 72.0, "pa": 52.0, "image": "ngc253.jpg", "imageScale": 1.7,
+     "colors": ["#ffdca8", "#a6c3ff"]},
+    {"name": "Cigar Galaxy", "alias": "M82", "brightness": 0.72, "kind": "spiral", "type": "irregular",
+     "l": 141.41, "b": 40.57, "d": 11_500_000, "display": 2_000_000, "size": 37_000,
+     "inclination": 80.0, "pa": 65.0, "image": "m82.jpg", "imageScale": 1.8,
+     "colors": ["#ffd9b4", "#b7c6ff"]},
+    {"name": "Bode's Galaxy", "alias": "M81", "brightness": 0.53, "kind": "spiral", "type": "spiral",
+     "l": 142.09, "b": 40.90, "d": 11_700_000, "display": 2_100_000, "size": 90_000,
+     "inclination": 59.0, "pa": 157.0, "image": "m81.jpg", "imageScale": 1.8,
+     "colors": ["#ffe3bd", "#9fc2ff"]},
+    {"name": "Centaurus A", "alias": "NGC 5128", "brightness": 0.55, "kind": "elliptical", "type": "elliptical",
+     "l": 309.52, "b": 19.42, "d": 12_400_000, "display": 2_250_000, "size": 60_000,
+     "image": "cena.jpg", "imageScale": 1.9,
+     "colors": ["#ffdfb0", "#aec4ff"]},
+    {"name": "Pinwheel Galaxy", "alias": "M101", "brightness": 0.36, "kind": "spiral", "type": "spiral",
+     "l": 102.04, "b": 59.77, "d": 20_900_000, "display": 2_450_000, "size": 170_000,
+     "inclination": 18.0, "pa": 38.0, "image": "m101.jpg", "imageScale": 1.7,
+     "colors": ["#ffe9cc", "#9cc1ff"]},
+    {"name": "Whirlpool Galaxy", "alias": "M51", "brightness": 0.53, "kind": "spiral", "type": "spiral",
+     "l": 104.85, "b": 68.56, "d": 23_000_000, "display": 2_600_000, "size": 76_000,
+     "inclination": 20.0, "pa": 172.0, "image": "spiral1.jpg", "imageScale": 1.8,
+     "colors": ["#ffe4c2", "#a3c4ff"]},
+    {"name": "Sombrero Galaxy", "alias": "M104", "brightness": 0.71, "kind": "spiral", "type": "spiral",
+     "l": 298.46, "b": 51.15, "d": 29_300_000, "display": 2_800_000, "size": 49_000,
+     "inclination": 84.0, "pa": 90.0, "image": "spiral2.jpg", "imageScale": 1.9,
+     "colors": ["#ffeed8", "#b3c6ff"]},
 ]
 
 # Direction of the celestial north pole in galactic coordinates, which is what the
@@ -121,9 +165,16 @@ CELESTIAL_POLE_GALACTIC = {"l": 122.93192, "b": 27.12825}
 # Decorative far-field galaxies: real photographs on fixed, randomly oriented
 # planes - not billboards - scattered rather than placed, so they carry no names
 # and no distances.
-BACKGROUND_GALAXY_IMAGES = ["spiral1.jpg", "spiral2.jpg", "m33.jpg", "m31.jpg"]
+# The nameless far field. These are real galaxies too, but they are scenery: no
+# labels, no stated distances, arbitrary orientations. They are deliberately *not*
+# the images used for the named galaxies above - an anonymous copy of the Sombrero
+# floating past undercuts the labelled one.
+BACKGROUND_GALAXY_IMAGES = ["far1.jpg", "far2.jpg", "far3.jpg", "far4.jpg"]
 
 IMAGE_CREDITS = (
-    "Milky Way backdrop: NASA/JPL-Caltech (R. Hurt). Far-field galaxy images: "
-    "NASA/ESA Hubble, NASA/Spitzer, Adam Evans (CC BY 2.0)."
+    "Milky Way backdrop: NASA/JPL-Caltech (R. Hurt). Galaxy images: NASA/ESA Hubble "
+    "Heritage (STScI/AURA), NASA/JPL-Caltech (Spitzer, IC 342), SSRO/PROMPT/CTIO "
+    "(NGC 253, CC BY 4.0), ESO/MPIfR/NASA-CXC composite (Centaurus A, CC BY 4.0), "
+    "ESA/NASA (M101, CC BY 4.0), Adam Evans (M31, CC BY 2.0). Centaurus A combines "
+    "optical, submillimetre and X-ray data, so its jets are not a visible-light view."
 )

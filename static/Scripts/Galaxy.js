@@ -21,9 +21,20 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
  *            log-scaled distances, so a 4 ly and a 430 ly system both stay readable
  */
 
+/*
+ * Every colour in this file is authored display-referred - the number written is
+ * the number meant - and the only transform between the scene and the screen is the
+ * tone curve in the composite pass. three's colour management would otherwise
+ * linearise hex colours and then, because the scene now renders into an offscreen
+ * target rather than the canvas, never encode them back.
+ */
+THREE.ColorManagement.enabled = false;
+
 const DATA = JSON.parse(document.getElementById("GALAXY_DATA").textContent);
 const SUN = new THREE.Vector3(0, (DATA.sunHeight || 0) / 1000, DATA.sunDistance / 1000);
 
+// how far right of centre the galactic centre sits, as a fraction of the width
+const VIEW_SHIFT = 0.08;
 const GALAXY_RADIUS = 50;
 const ARM_PITCH = THREE.MathUtils.degToRad(12);
 const ARM_K = Math.tan(ARM_PITCH);
@@ -84,6 +95,27 @@ const BACKDROP = {
 };
 
 /*
+ * The bulge as a volume. The point cloud in buildCore() gives it grain, but grain is
+ * not glow: seen from any distance a bulge is the smooth light of billions of stars
+ * that do not resolve, and that is what was missing - close in, the centre of the
+ * galaxy rendered as a dark hole with ring glyphs floating in it.
+ *
+ * So the glow is built from a few hundred soft sprites laid out in the bulge's real
+ * shape - the boxy bar, the four lobes of the X, a tight nucleus - which, unlike one
+ * camera-facing sprite, has that shape from every direction: round from above,
+ * a peanut from the side. Sizes are world diameters in kly.
+ */
+const BULGE = {
+    body: 300,
+    lobes: 96,
+    nucleus: 44,
+    half: { along: 8.4, across: 3.6, height: 2.5 },
+    exponent: 2.6,
+    // sprite size units per kly of diameter: 900px tall, 50 degree lens, 80 units out
+    unit: 12.06,
+};
+
+/*
  * The backdrop is a blue-white photograph, but the 3D star field leans violet on
  * purpose: it is the house look, and it separates our stars from the artwork behind
  * them. STAR_TINTS are blended into each sampled pixel colour.
@@ -114,6 +146,54 @@ const LOCAL_DEEP_SKY_LY = 2500;
 
 const OVERVIEW = { target: new THREE.Vector3(0, 0, 0), distance: 85, polar: 0.9, azimuth: 0.45 };
 /*
+ * The opening shot, which is not the overview: the pivot sits out in the Orion Spur
+ * so the view looks outward along our own arm, the Milky Way filling the right of
+ * the frame with its core at the edge, and Andromeda hanging in open sky above the
+ * outer arm. (A screenshot's readout is enough to recover the pivot it was taken
+ * from: the two figures - distance from the core and from Sol - intersect at one
+ * point.)
+ *
+ * Composed on the golden divisions, 0.382 and 0.618. Andromeda sits on the
+ * upper-left golden intersection, at (0.42, 0.37), and the Milky Way's core holds
+ * the right of the frame, so the Local Group reads as a diagonal running down to
+ * Triangulum rather than as a row.
+ *
+ * **Clear sky means a dark background, not a clear dust column.** An earlier solve
+ * placed Andromeda at a better golden fit with `diskTransmission` at 0.98 - no dust
+ * in the way at all - and it still read badly, because it landed on the bright outer
+ * disk. Transmission only measures dust; it says nothing about the starlight already
+ * there. Candidates are now scored by rendering with Andromeda hidden and sampling
+ * the sky where it would sit: this one sits on a background of 21 out of 765.
+ *
+ * Nothing about that arrangement is invented. M31's direction is fixed data
+ * (l=121.17, b=-21.57, so it genuinely lies 21.6 degrees *below* the galactic
+ * plane, 459 units under it at the distance we draw it) and it is not touched here.
+ * Whether it appears above or below the disk is a property of where the camera
+ * stands, not of the sky: a sweep of 8,782 legal cameras put M31 above the galactic
+ * centre in 4,705 of them. This is one of those viewpoints.
+ *
+ * The numbers were solved for rather than eyeballed: a weighted search over the
+ * pivot, distance, elevation and azimuth, minimising where the core, the Sun, M31
+ * and M33 land on screen. Andromeda carries the most weight, which is what pulls it
+ * into the lower-left third - a diagonal rather than the row the first solution gave
+ * (M31 0.46, Sun 0.45, core 0.43, with M33's label falling off the left edge).
+ *
+ * **Composition is not the only constraint: Andromeda has to be in clear sky.** The
+ * best-composed camera of all put it behind the disk, where `diskTransmission()`
+ * cut it to 0.22 and the label suppression (below 0.3) removed its name entirely -
+ * so the prettiest frame on paper was the one where Andromeda was barely there. The
+ * search is therefore run in two passes: compose first, then place the camera for
+ * each of the best candidates, run a real frame and keep only those where M31's
+ * transmission stays above 0.85. This one sits at 0.98. If the field of view or
+ * VIEW_SHIFT changes, re-solve it the same way rather than nudging it.
+ */
+const START = {
+    target: new THREE.Vector3(6, 0, 28),
+    distance: 66,
+    polar: THREE.MathUtils.degToRad(60),
+    azimuth: 1.82,
+};
+/*
  * The camera orbits the Milky Way and stays there: panning moves the pivot only
  * within the disk, and the distance is capped. Besides keeping the view oriented,
  * this is what lets the galaxy photographs be flat planes - from anywhere inside
@@ -137,6 +217,51 @@ const PIVOT = {
     nearDistance: 22,
     maxDistance: GALAXY_RADIUS * 2 * 1.5, // 1.5 Milky Way diameters
 };
+
+/*
+ * Soft things - haze, the bulge's glow, the blurred off-plane sheets of the painting
+ * - hold no detail finer than a few pixels, and they are where the fill goes: a
+ * haze sprite is hundreds of pixels wide and there are sixteen thousand of them. So
+ * they live on their own layer and render into a half-resolution target, a quarter
+ * of the pixels for a result the eye cannot tell apart, and are added back before
+ * the bloom. Measured, haze alone was 5-12ms of the frame at full resolution.
+ */
+const SOFT_LAYER = 1;
+const SOFT_SCALE = 0.5;
+
+/*
+ * A small tiling noise texture for the haze. The wisps used to be computed in the
+ * fragment shader - two octaves of value noise, eight sines a pixel - which cost
+ * more than the haze itself. Two fetches from this do the same job.
+ */
+function noiseTexture(size = 128, cells = 16) {
+    const lattice = new Float32Array(cells * cells);
+    for (let i = 0; i < lattice.length; i++) lattice[i] = rand();
+    const data = new Uint8Array(size * size);
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const gx = (x / size) * cells;
+            const gy = (y / size) * cells;
+            const ix = Math.floor(gx);
+            const iy = Math.floor(gy);
+            const fx = gx - ix;
+            const fy = gy - iy;
+            const ux = fx * fx * (3 - 2 * fx);
+            const uy = fy * fy * (3 - 2 * fy);
+            // wrapped, so the texture tiles without a seam
+            const at = (cx, cy) => lattice[(cy % cells) * cells + (cx % cells)];
+            const value =
+                (at(ix, iy) * (1 - ux) + at(ix + 1, iy) * ux) * (1 - uy) + (at(ix, iy + 1) * (1 - ux) + at(ix + 1, iy + 1) * ux) * uy;
+            data[y * size + x] = Math.round(value * 255);
+        }
+    }
+    const texture = new THREE.DataTexture(data, size, size, THREE.RedFormat);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+    return texture;
+}
 
 const SCRATCH_VECTOR = new THREE.Vector3();
 const ORIGIN = new THREE.Vector3(0, 0, 0);
@@ -226,17 +351,20 @@ class Layer {
         this.colors = new Float32Array(capacity * 3);
         this.sizes = new Float32Array(capacity);
         this.alphas = new Float32Array(capacity);
+        // how much dust this point sits behind, read from the artwork's own lanes
+        this.dust = new Float32Array(capacity);
         this.count = 0;
         this.capacity = capacity;
     }
 
-    add(p, color, size, alpha) {
+    add(p, color, size, alpha, dust = 0) {
         if (this.count >= this.capacity) return;
         const i = this.count++;
         this.positions.set([p.x, p.y, p.z], i * 3);
         this.colors.set([color.r, color.g, color.b], i * 3);
         this.sizes[i] = size;
         this.alphas[i] = alpha;
+        this.dust[i] = dust;
     }
 
     geometry() {
@@ -245,11 +373,28 @@ class Layer {
         g.setAttribute("color", new THREE.BufferAttribute(this.colors.subarray(0, this.count * 3), 3));
         g.setAttribute("aSize", new THREE.BufferAttribute(this.sizes.subarray(0, this.count), 1));
         g.setAttribute("aAlpha", new THREE.BufferAttribute(this.alphas.subarray(0, this.count), 1));
+        g.setAttribute("aDust", new THREE.BufferAttribute(this.dust.subarray(0, this.count), 1));
         return g;
     }
 }
 
-const VERTEX_SHADER = /* glsl */ `
+/*
+ * The dust lane's maths, shared by the vertex shader (stars, one column each) and the
+ * fragment shader (soft sprites, one column per pixel).
+ *
+ * The dust is a gaussian slab about the plane, inside a cylinder the size of the
+ * disk. Two things have to be right for a lane to appear where it should:
+ *
+ * - The mean density between two heights has a closed form - the difference of two
+ *   error functions over the height difference - and it must be written as that
+ *   ratio, because along the plane both go to zero together and the ratio keeps the
+ *   limit that a clamped direction cosine throws away.
+ * - The sight line has to be clipped to the disk. Using the whole camera-to-star
+ *   distance with a cutoff at the midpoint, as this did at first, gives a far-side
+ *   star far too much dust and a near-side one none at all: seen from outside, the
+ *   near half of the disk shone straight through and filled the lane back in.
+ */
+const LANE_GLSL = /* glsl */ `
     // erf(x) ~ tanh(1.2x), built from exp because GLSL ES 1.00 - which is what a
     // ShaderMaterial compiles as - has neither, and clamped because exp of a large
     // positive argument is an infinity and infinity over infinity is a NaN, which
@@ -259,8 +404,34 @@ const VERTEX_SHADER = /* glsl */ `
         return (1.0 - e) / (1.0 + e);
     }
 
+    // mean dust density along a sight line that runs from height y0 to height y1
+    float laneDensity(float y0, float y1, float h) {
+        float k = 0.7071 / h;
+        float dyAbs = abs(y1 - y0);
+        float midY = 0.5 * (y0 + y1);
+        float rhoMid = exp(-midY * midY * k * k);
+        float rhoErf = h * 1.2533 * abs(erfB(y0 * k) - erfB(y1 * k)) / max(dyAbs, 0.001);
+        return mix(rhoMid, min(rhoErf, 1.0), smoothstep(0.02, 0.12, dyAbs));
+    }
+
+    // how much of the way from p to the camera lies inside the dusty disk
+    float insideDisk(vec2 p, vec2 eye) {
+        const float R = 50.0;
+        float c = dot(p, p) - R * R;
+        if (c > 0.0) return 0.0;
+        vec2 d = eye - p;
+        float a = max(dot(d, d), 0.000001);
+        float b = dot(p, d);
+        return clamp((-b + sqrt(max(b * b - a * c, 0.0))) / a, 0.0, 1.0);
+    }
+`;
+
+const VERTEX_SHADER = /* glsl */ `
+    ${LANE_GLSL}
+
     attribute float aSize;
     attribute float aAlpha;
+    attribute float aDust;
     uniform float uScale;
     uniform float uMaxSize;
     uniform float uMinSize;
@@ -270,9 +441,17 @@ const VERTEX_SHADER = /* glsl */ `
     uniform float uExtinction;
     uniform float uLane;
     uniform float uLaneHeight;
+    uniform float uArmDust;
+    uniform float uLaneFloor;
+    uniform float uSoft;
     varying vec3 vColor;
     varying float vAlpha;
     varying float vExtinction;
+    varying float vWorldY;
+    varying float vWorldSize;
+    varying float vLen;
+    varying float vInside;
+    varying float vSeed;
     void main() {
         vec4 mv = modelViewMatrix * vec4(position, 1.0);
         /*
@@ -304,29 +483,30 @@ const VERTEX_SHADER = /* glsl */ `
          */
         float lane = 1.0;
         float vTau = 0.0;
-        if (uLane > 0.0) {
-            vec3 toEye = cameraPosition - position;
-            float len = max(length(toEye), 0.001);
-            float k = 0.7071 / uLaneHeight;
-            float dyAbs = abs(cameraPosition.y - position.y);
-            float midY = 0.5 * (position.y + cameraPosition.y);
+        /*
+         * Away from the plane only the dusty stars need this, and they are about a
+         * tenth of the field - so the test earns its keep there. Near the plane the
+         * smooth lane applies to everything and the branch is taken anyway.
+         */
+        if (uLane > 0.0 || (uArmDust > 0.0 && aDust > 0.012)) {
+            float len = max(length(cameraPosition - position), 0.001);
+            // only the part of the sight line inside the disk has dust on it
+            float inside = insideDisk(position.xz, cameraPosition.xz);
+            float exitY = position.y + inside * (cameraPosition.y - position.y);
+            float column = len * inside * laneDensity(position.y, exitY, uLaneHeight);
             /*
-             * Mean density along the ray, times path length. Writing it as a mean
-             * rather than integrating in t is what keeps it stable: for a sight line
-             * running along the plane - which is every sight line in the view this
-             * exists for - the difference of the two error functions and the height
-             * difference both go to zero together, and dividing one by the other
-             * keeps the limit. Dividing by a clamped direction cosine instead, as the
-             * first version did, silently threw the column away exactly edge-on.
+             * Two depths over one column. uLane is the smooth slab, which only bites
+             * when the sight line runs along the plane; uArmDust is the structure,
+             * scaled by how much dust the artwork puts at this star, which bites
+             * from any angle because a lane is locally thick however short the path
+             * through it. They are gated in opposite directions - the slab near the
+             * plane, the structure away from it. The slab is modulated by the same
+             * dust map, so the lane is eaten unevenly along its length rather than
+             * being a clean bar.
              */
-            float rhoMid = exp(-midY * midY * k * k);
-            float rhoErf = uLaneHeight * 1.2533 * abs(erfB(position.y * k) - erfB(cameraPosition.y * k)) / max(dyAbs, 0.001);
-            float rho = mix(rhoMid, min(rhoErf, 1.0), smoothstep(0.02, 0.12, dyAbs));
-            float column = len * rho;
-            // no dust outside the disk that holds it
-            float rMid = length(0.5 * (position.xz + cameraPosition.xz));
-            column *= 1.0 - smoothstep(42.0, 58.0, rMid);
-            vTau = -uLane * column;
+            vTau = -(uLane * (0.6 + 0.8 * aDust) + uArmDust * aDust) * column;
+            // never to black: an opaque hole reads as a fault, not as dust
+            vTau = max(vTau, -uLaneFloor);
             lane = exp(vTau);
         }
         float size = mix(aSize, aSize * uScale / dist, uAttenuate);
@@ -337,6 +517,25 @@ const VERTEX_SHADER = /* glsl */ `
             size = 1.0;
         }
         gl_PointSize = clamp(size, uMinSize, uMaxSize);
+        /*
+         * Soft sprites - haze, the bulge's glow - are many times wider than the dust
+         * lane is thick, so dimming one from its centre either takes the whole
+         * sprite or none of it and the lane comes out as a vague grey band. They
+         * hand the fragment shader what it needs to work the column out per pixel
+         * instead: how long the sight line is, where the sprite sits, and how many
+         * kly of height its screen size stands for.
+         */
+        vWorldY = position.y;
+        vWorldSize = 0.0;
+        vLen = 0.0;
+        vInside = 0.0;
+        vSeed = 0.0;
+        if (uSoft > 0.5) {
+            vInside = insideDisk(position.xz, cameraPosition.xz);
+            vLen = length(cameraPosition - position) * vInside;
+            vWorldSize = gl_PointSize * dist * 0.0829 / uScale;
+            vSeed = fract(sin(dot(position.xz, vec2(12.9898, 78.233))) * 43758.5453);
+        }
         /*
          * Transmission is per channel, and that is the whole point: extinction at
          * A_V = 1 passes about 0.50 of the red and 0.30 of the blue, so starlight
@@ -357,9 +556,24 @@ const FRAGMENT_SHADER = /* glsl */ `
     uniform float uOpacity;
     uniform float uRing;
     uniform vec3 uTint;
+    uniform float uSoftLane;
+    uniform float uLaneHeight;
+    uniform float uUpY;
+    uniform float uCamY;
+    uniform float uCloud;
+    uniform sampler2D uNoise;
+    uniform float uLaneFloor;
     varying vec3 vColor;
     varying float vAlpha;
     varying float vExtinction;
+    varying float vWorldY;
+    varying float vWorldSize;
+    varying float vLen;
+    varying float vInside;
+    varying float vSeed;
+
+    ${LANE_GLSL}
+
     void main() {
         // r2 is 0 at the centre and 1 at the sprite's edge; the window forces zero there
         float r2 = dot(gl_PointCoord - 0.5, gl_PointCoord - 0.5) * 4.0;
@@ -373,12 +587,38 @@ const FRAGMENT_SHADER = /* glsl */ `
         } else {
             a = exp(-r2 * uSharpness) * (1.0 - r2) * vAlpha * uOpacity;
         }
+        /*
+         * Haze is not a pile of round balls. Each sprite carries its own patch of
+         * noise, fixed to the sprite so it never swims, which breaks its outline
+         * into wisps - and a few thousand overlapping wisps read as cloud where the
+         * same number of gaussians read as cotton wool.
+         */
+        if (uCloud > 0.0) {
+            vec2 q = gl_PointCoord * 0.17 + vSeed * vec2(3.7, 9.1);
+            float n = 0.62 * texture2D(uNoise, q).r + 0.38 * texture2D(uNoise, q * 2.7 + 0.37).r;
+            a *= mix(1.0, smoothstep(0.26, 0.74, n) * 1.9, uCloud);
+        }
         if (a < 0.002) discard;
-        gl_FragColor = vec4(vColor * mix(uTint, vec3(1.0), vExtinction), a);
+        vec3 color = vColor * mix(uTint, vec3(1.0), vExtinction);
+        /*
+         * The dust lane, per pixel. The same closed-form column the stars use, but
+         * evaluated at the height this fragment stands for rather than at the
+         * sprite's centre - which is what lets a lane a third of a kly thick cut
+         * cleanly through a glow several kly across.
+         */
+        if (uSoftLane > 0.0) {
+            float y = vWorldY + (0.5 - gl_PointCoord.y) * vWorldSize * uUpY;
+            float exitY = y + vInside * (uCamY - y);
+            float tau = max(-uSoftLane * vLen * laneDensity(y, exitY, uLaneHeight), -uLaneFloor);
+            color *= exp(tau * vec3(0.75, 1.0, 1.32));
+        }
+        gl_FragColor = vec4(color, a);
     }
 `;
 
-function pointsMaterial({ maxSize, minSize = 1, nearFade = 0.02, sharpness = 16, attenuate = 1, ring = false, lane = false, blending = THREE.AdditiveBlending }) {
+const NOISE_TEXTURE = noiseTexture();
+
+function pointsMaterial({ maxSize, minSize = 1, nearFade = 0.02, sharpness = 16, attenuate = 1, ring = false, lane = false, soft = false, cloud = 0, blending = THREE.AdditiveBlending }) {
     const material = new THREE.ShaderMaterial({
         uniforms: {
             uScale: { value: 1 },
@@ -393,7 +633,16 @@ function pointsMaterial({ maxSize, minSize = 1, nearFade = 0.02, sharpness = 16,
             uExtinction: { value: 1 },
             uLane: { value: lane ? DUST.laneDepth : 0 },
             uLaneHeight: { value: DUST.laneHeight },
+            uArmDust: { value: 0 },
+            uLaneFloor: { value: DUST.laneFloor },
             uRing: { value: ring ? 1 : 0 },
+            // soft sprites take the lane per fragment instead of per vertex
+            uSoft: { value: soft ? 1 : 0 },
+            uSoftLane: { value: 0 },
+            uUpY: { value: 1 },
+            uCamY: { value: 0 },
+            uCloud: { value: cloud },
+            uNoise: { value: NOISE_TEXTURE },
         },
         vertexShader: VERTEX_SHADER,
         fragmentShader: FRAGMENT_SHADER,
@@ -455,6 +704,10 @@ const BACKDROP_VERTEX = /* glsl */ `
  * it the stack is a row of identical sharp copies, and the repeated edges read as
  * colour fringing; blurring them turns the stack into haze around one sharp plane.
  */
+// a 1x1 stand-in, so the sampler is always bound even before the map exists
+const EMPTY_DUST = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
+EMPTY_DUST.needsUpdate = true;
+
 const BACKDROP_FRAGMENT = /* glsl */ `
     uniform sampler2D uMap;
     uniform float uOpacity;
@@ -463,6 +716,9 @@ const BACKDROP_FRAGMENT = /* glsl */ `
     uniform float uTear;
     uniform float uNoiseScale;
     uniform vec2 uNoiseOffset;
+    uniform sampler2D uDust;
+    uniform float uDustStrength;
+    uniform float uPlaneLane;
     varying vec2 vUv;
 
     float hash(vec2 p) {
@@ -502,6 +758,51 @@ const BACKDROP_FRAGMENT = /* glsl */ `
         torn = mix(torn, valueNoise(vUv * uNoiseScale * 2.7 + uNoiseOffset.yx), 0.4);
         float tearMask = uTear <= 0.001 ? 1.0 : smoothstep(uTear - 0.22, uTear + 0.22, torn);
 
+        /*
+         * The dust lanes, deepened.
+         *
+         * Extinguishing stars could never draw a lane here, and it took measuring to
+         * see why: in a tilted view almost none of the light in a lane comes from the
+         * star field. It comes from this painting. The stars are sampled from the
+         * same image, so they are already absent where it is dark - dimming the few
+         * that remain changed the frame by one and a half percent. Additive light
+         * cannot be hidden by anything drawn on top of it either; it can only not be
+         * emitted. So the lanes are taken out of the artwork itself, at the same
+         * places the star field reads them from, and with the same extinction law:
+         * blue goes first, which is why a dust lane is brown and not grey.
+         */
+        float dustHere = texture2D(uDust, vUv).r;
+        float dust = dustHere * uDustStrength;
+
+        /*
+         * The edge-on lane, and it has to live here for the same reason the arm
+         * lanes do. Seen along the plane, the bright band is mostly this painting,
+         * not the star field - so extinguishing stars dimmed the halo above and
+         * below while leaving the band itself alone, which is the exact opposite of
+         * a dust lane. Measured, the mid-plane came out *less* obscured than the
+         * wings at every strength.
+         *
+         * uPlaneLane is per sheet: full on the mid-plane sheet, which is where the
+         * dust is, and almost nothing on the ones a kiloparsec above and below it,
+         * which are in front of and behind the lane rather than behind it. The
+         * artwork's own lanes modulate it, so the band is eaten unevenly along its
+         * length the way a real one is, instead of being crossed by a clean bar.
+         */
+        float lane = uPlaneLane * (0.52 + 0.78 * dustHere);
+
+        /*
+         * Beer's law, not a linear subtraction, and the difference only shows at the
+         * dense end. Taking 1 - dust per channel clips: once the strength passes
+         * ~0.76 the blue channel hits zero and the lane stops getting redder as it
+         * gets darker - it flattens into a colourless hole, and raising the dust
+         * further does nothing but spread that hole. An exponential has no floor to
+         * hit, so a lane keeps reddening all the way down and the two absorbers -
+         * the arm dust and the edge-on lane - simply add their optical depths, which
+         * is what two absorbers in series actually do.
+         */
+        float tau = dust + lane;
+        c *= exp(-tau * vec3(0.75, 1.0, 1.32));
+
         gl_FragColor = vec4(c * uOpacity * edge * tearMask * (1.0 - uCoreFade * coreMask * 0.93), 1.0);
     }
 `;
@@ -536,6 +837,10 @@ function buildBackdropVolume(texture) {
                 uTear: { value: Math.pow(Math.abs(t), 0.8) * BACKDROP.tear },
                 uNoiseScale: { value: 3.5 + rand() * 4.5 },
                 uNoiseOffset: { value: new THREE.Vector2(rand() * 40, rand() * 40) },
+                // filled in once the star field has read the lanes out of the image
+                uDust: { value: EMPTY_DUST },
+                uDustStrength: { value: 0 },
+                uPlaneLane: { value: 0 },
             },
             vertexShader: BACKDROP_VERTEX,
             fragmentShader: BACKDROP_FRAGMENT,
@@ -546,6 +851,8 @@ function buildBackdropVolume(texture) {
         });
         material.userData.weight = weights[i] / total;
         material.userData.offset = t;
+        // the dust lane is thin: the mid-plane sheet is inside it, the others are not
+        material.userData.inLane = Math.exp(-(t * t) / (2 * 0.4 * 0.4));
         const mesh = new THREE.Mesh(geometry, material);
         mesh.position.z = t * BACKDROP.halfThickness;
         /*
@@ -558,6 +865,8 @@ function buildBackdropVolume(texture) {
         const shrink = 1 - 0.08 * Math.pow(Math.abs(t), 1.4);
         mesh.scale.set(shrink, shrink, 1);
         mesh.renderOrder = -1;
+        // the mid-plane sheet carries the structure; the others are haze
+        if (t !== 0) mesh.layers.set(SOFT_LAYER);
         group.add(mesh);
         materials.push(material);
     }
@@ -593,6 +902,144 @@ function valueNoise2(x, y) {
 // two octaves is enough texture, and this runs two million times per build
 function flocculence(x, z) {
     return 0.62 * valueNoise2(x * 0.4, z * 0.4) + 0.38 * valueNoise2(x * 1.15 + 31.7, z * 1.15 - 12.3);
+}
+
+/*
+ * A dust map read out of the backdrop painting.
+ *
+ * Andromeda's arms are threaded with dark lanes and ours were not, because the only
+ * dust we had was a smooth slab: structureless, and invisible unless the view was
+ * flat enough to look along it. The artwork already paints its lanes, so this finds
+ * them - a pixel much darker than its surroundings, inside a part of the image that
+ * is lit at all, is a lane - and hands each star a number saying how much dust it
+ * sits behind. Nothing is drawn: the number feeds the same per-star extinction the
+ * flat-view lane uses, so there is no sprite anywhere that could stain the frame.
+ */
+/*
+ * The same map as a texture, for the backdrop to darken itself with. The rows are
+ * flipped because a canvas counts them downwards and a texture coordinate counts
+ * them up; get this wrong and the lanes land on the wrong side of the galaxy, which
+ * is at least obvious.
+ */
+function dustTexture(map, n) {
+    const data = new Uint8Array(n * n);
+    for (let y = 0; y < n; y++) {
+        for (let x = 0; x < n; x++) data[(n - 1 - y) * n + x] = Math.round(map[y * n + x] * 255);
+    }
+    const texture = new THREE.DataTexture(data, n, n, THREE.RedFormat);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+    return texture;
+}
+
+function dustMapFrom(sampler, radius = 7) {
+    const n = sampler.n;
+    const lum = new Float32Array(n * n);
+    for (let y = 0; y < n; y++) {
+        for (let x = 0; x < n; x++) lum[y * n + x] = sampler.lum(x, y);
+    }
+    // separable box blur: the local background a lane is measured against
+    const tmp = new Float32Array(n * n);
+    const blur = new Float32Array(n * n);
+    const span = radius * 2 + 1;
+    for (let y = 0; y < n; y++) {
+        let acc = 0;
+        for (let x = -radius; x <= radius; x++) acc += lum[y * n + Math.min(n - 1, Math.max(0, x))];
+        for (let x = 0; x < n; x++) {
+            tmp[y * n + x] = acc / span;
+            const out = Math.min(n - 1, Math.max(0, x - radius));
+            const inn = Math.min(n - 1, Math.max(0, x + radius + 1));
+            acc += lum[y * n + inn] - lum[y * n + out];
+        }
+    }
+    for (let x = 0; x < n; x++) {
+        let acc = 0;
+        for (let y = -radius; y <= radius; y++) acc += tmp[Math.min(n - 1, Math.max(0, y)) * n + x];
+        for (let y = 0; y < n; y++) {
+            blur[y * n + x] = acc / span;
+            const out = Math.min(n - 1, Math.max(0, y - radius));
+            const inn = Math.min(n - 1, Math.max(0, y + radius + 1));
+            acc += tmp[inn * n + x] - tmp[out * n + x];
+        }
+    }
+
+    const dust = new Float32Array(n * n);
+    for (let i = 0; i < n * n; i++) {
+        const deficit = (blur[i] - lum[i]) / (blur[i] + 0.05);
+        /*
+         * Thresholded, and that is the whole difference between lanes and mud. By
+         * definition half of all pixels sit below their local mean, so taking the
+         * deficit as-is put a little dust on half the galaxy and dimmed the disk
+         * into a brown wash. Only a decided deficit is a lane; everything else is
+         * just the texture of the painting. The thresholds are not guesses: measured
+         * against the backdrop and weighted by where stars actually land, 0.045 is
+         * about the 66th percentile of the deficit and 0.17 the 98th, so roughly a
+         * sixth of the star field picks up some dust and a small fraction of that
+         * is a dense lane - which is how much of a spiral is in shadow.
+         */
+        dust[i] = smoothstep(0.045, 0.17, deficit) * smoothstep(0.05, 0.16, blur[i]);
+    }
+
+    /*
+     * Thresholding a painting pixel by pixel finds dust as isolated dots, and once
+     * the lanes were deep enough to see, that is what they looked like: strings of
+     * black beads along the arms. Real lanes are ribbons. So the map is smoothed
+     * along the local grain of the image and not across it - the structure tensor
+     * of the brightness says which way an arm runs at each pixel, and the dust is
+     * averaged a few pixels up and down that direction only. Beads on the same lane
+     * join up; neighbouring lanes stay separate.
+     */
+    const jxx = new Float32Array(n * n);
+    const jxy = new Float32Array(n * n);
+    const jyy = new Float32Array(n * n);
+    for (let y = 1; y < n - 1; y++) {
+        for (let x = 1; x < n - 1; x++) {
+            const i = y * n + x;
+            const gx = blur[i + 1] - blur[i - 1];
+            const gy = blur[i + n] - blur[i - n];
+            jxx[i] = gx * gx;
+            jxy[i] = gx * gy;
+            jyy[i] = gy * gy;
+        }
+    }
+    const boxed = (src) => {
+        const out = new Float32Array(n * n);
+        const R = 3;
+        for (let y = R; y < n - R; y++) {
+            for (let x = R; x < n - R; x++) {
+                let acc = 0;
+                for (let dy = -R; dy <= R; dy += 3) for (let dx = -R; dx <= R; dx += 3) acc += src[(y + dy) * n + x + dx];
+                out[y * n + x] = acc;
+            }
+        }
+        return out;
+    };
+    const sxx = boxed(jxx);
+    const sxy = boxed(jxy);
+    const syy = boxed(jyy);
+    const ribbons = new Float32Array(n * n);
+    const REACH = 5;
+    for (let y = REACH; y < n - REACH; y++) {
+        for (let x = REACH; x < n - REACH; x++) {
+            const i = y * n + x;
+            // the gradient points across the arm; a quarter turn from it runs along
+            const across = 0.5 * Math.atan2(2 * sxy[i], sxx[i] - syy[i]);
+            const ax = -Math.sin(across);
+            const ay = Math.cos(across);
+            let acc = 0;
+            let weight = 0;
+            for (let t = -REACH; t <= REACH; t++) {
+                const w = 1 - Math.abs(t) / (REACH + 1);
+                acc += dust[Math.round(y + ay * t) * n + Math.round(x + ax * t)] * w;
+                weight += w;
+            }
+            // a touch of gain: averaging along the lane fills the gaps between the
+            // beads but also takes the tops off them
+            ribbons[i] = Math.min(1, (acc / weight) * 1.35);
+        }
+    }
+    return ribbons;
 }
 
 function imageSampler(image, n) {
@@ -676,6 +1123,7 @@ function pickTint() {
 
 function buildGalaxyFromImage(image) {
     const sampler = imageSampler(image, BACKDROP.sampleSize);
+    const dustMap = dustMapFrom(sampler);
     const scattered = buildScatteredDeepSky(sampler);
     const p = new THREE.Vector3();
     const stars = new Layer(BACKDROP.stars + BACKDROP.thickDisk + BACKDROP.halo);
@@ -769,7 +1217,7 @@ function buildGalaxyFromImage(image) {
          */
         const rimLift = 1 + 1.35 * smoothstep(18, 46, r);
         const alpha = (0.008 + Math.pow(rand(), 3) * 0.0725) * (0.35 + 0.65 * peak) * rimLift;
-        stars.add(p, color, size, alpha);
+        stars.add(p, color, size, alpha, dustMap[index]);
     }
 
     for (let i = 0; i < BACKDROP.gas; i++) {
@@ -779,7 +1227,7 @@ function buildGalaxyFromImage(image) {
         if (r < 3.5) continue;
         p.y += gauss() * (0.45 + 0.016 * r + 1.6 * Math.exp(-r / 3));
         color.setRGB(c.r, c.g, c.b).lerp(STAR_TINTS[0].color, (0.3 + rand() * 0.2) * smoothstep(4, 12, r));
-        gas.add(p, color, 26 + rand() * 40, 0.008 + rand() * 0.012);
+        gas.add(p, color, 26 + rand() * 40, 0.008 + rand() * 0.012, dustMap[index]);
     }
 
     /*
@@ -882,12 +1330,18 @@ function buildGalaxyFromImage(image) {
         const c = pixelColor(sampler, index);
         if (!(c.r > 0.22 && c.r > c.b * 1.12 && c.r > c.g * 1.08)) continue;
         const r = pixelToPlane(index, sampler.n, p);
+        /*
+         * The painting's bulge is warm, so "pick the pink pixels" used to pick most
+         * of it and the galactic centre came out in a rash of star-forming regions.
+         * A bulge is old stars and very little gas: the knots belong to the arms.
+         */
+        if (r < 8.5 && rand() > smoothstep(5.5, 8.5, r) * 0.6) continue;
         p.y += gauss() * (0.12 + 0.006 * r);
         color.setRGB(Math.min(c.r * 1.2, 1), c.g * 0.85, c.b * 0.95);
-        knots.add(p, color, 1.8 + rand() * 3.0, 0.16 + rand() * 0.26);
+        knots.add(p, color, 1.8 + rand() * 3.0, 0.16 + rand() * 0.26, dustMap[index]);
     }
 
-    return { stars, gas, knots, scattered };
+    return { stars, gas, knots, scattered, dustTexture: dustTexture(dustMap, sampler.n) };
 }
 
 function buildBackdropStars() {
@@ -1070,6 +1524,63 @@ function buildCore() {
     return { group, material, shells, shellMaterial, shellRadius: CORE_SHELL_RADIUS, holeMaterial, holePoints };
 }
 
+/*
+ * The bulge's glow: soft sprites in the bulge's own shape. See BULGE.
+ */
+function buildBulgeGlow() {
+    const layer = new Layer(BULGE.body + BULGE.lobes + BULGE.nucleus);
+    const color = new THREE.Color();
+    const heart = new THREE.Color(1.0, 0.9, 0.7);
+    const gold = new THREE.Color(1.0, 0.76, 0.48);
+    const ember = new THREE.Color(1.0, 0.6, 0.36);
+    const p = new THREE.Vector3();
+    const barCos = Math.cos(BAR_ANGLE);
+    const barSin = Math.sin(BAR_ANGLE);
+    const place = (along, across, height) => p.set(along * barCos - across * barSin, height, along * barSin + across * barCos);
+    const { along: A, across: B, height: C } = BULGE.half;
+    const E = BULGE.exponent;
+
+    for (let i = 0; i < BULGE.body; i++) {
+        // a point inside the unit superball: flat-sided, which is what makes it boxy
+        let u = 0;
+        let v = 0;
+        let w = 0;
+        for (let tries = 0; tries < 16; tries++) {
+            u = rand() * 2 - 1;
+            v = rand() * 2 - 1;
+            w = rand() * 2 - 1;
+            if (Math.pow(Math.abs(u), E) + Math.pow(Math.abs(v), E) + Math.pow(Math.abs(w), E) <= 1) break;
+        }
+        // pulled towards the middle: a bulge is far denser at its heart than at its edge
+        const pull = Math.pow(rand(), 1.25);
+        const t = Math.hypot(u, v, w) * pull;
+        place(u * pull * A, v * pull * B, w * pull * C);
+        color.copy(heart).lerp(gold, smoothstep(0.0, 0.45, t)).lerp(ember, smoothstep(0.4, 1.1, t));
+        const diameter = 2.4 + 3.4 * t + rand() * 1.6;
+        layer.add(p, color, diameter * BULGE.unit, 0.03 + 0.085 * Math.pow(1 - Math.min(t, 1), 1.6));
+    }
+
+    // the X: the peanut's four diagonal lobes, which is what makes a barred bulge
+    // look pinched in the middle when it is seen from the side
+    for (let i = 0; i < BULGE.lobes; i++) {
+        const armSign = rand() < 0.5 ? 1 : -1;
+        const upSign = rand() < 0.5 ? 1 : -1;
+        const t = 0.3 + Math.pow(rand(), 0.85) * 0.85;
+        place(armSign * t * A * 0.78 + gauss() * 0.5, gauss() * 0.8, upSign * t * C * 0.95 + gauss() * 0.3);
+        color.copy(gold).lerp(ember, rand() * 0.7);
+        layer.add(p, color, (2.2 + rand() * 1.8) * BULGE.unit, 0.024 + rand() * 0.02);
+    }
+
+    // the nucleus: the nuclear star cluster and the disk around it, a small hard
+    // light at the very centre that the rest of the bulge is arranged around
+    for (let i = 0; i < BULGE.nucleus; i++) {
+        p.set(gauss() * 0.42, gauss() * 0.3, gauss() * 0.42);
+        color.copy(heart).lerp(WHITE, rand() * 0.45);
+        layer.add(p, color, (0.7 + rand() * 1.1) * BULGE.unit, 0.07 + rand() * 0.09);
+    }
+    return layer;
+}
+
 function buildArmOutlines() {
     const group = new THREE.Group();
     const material = new THREE.LineDashedMaterial({
@@ -1103,11 +1614,11 @@ function buildScatteredDeepSky(sampler) {
     const layer = new Layer(BACKDROP.scatteredDeepSky);
     const color = new THREE.Color();
     const p = new THREE.Vector3();
-    const nebula = new THREE.Color(DEEP_SKY_STYLE.nebula.color);
-    const open = new THREE.Color(DEEP_SKY_STYLE.open.color);
-    const globular = new THREE.Color(DEEP_SKY_STYLE.globular.color);
-    const remnant = new THREE.Color(DEEP_SKY_STYLE.remnant.color);
-    const planetary = new THREE.Color(DEEP_SKY_STYLE.planetary.color);
+    const nebula = new THREE.Color(DEEP_SKY_STYLE.nebula.color).convertSRGBToLinear();
+    const open = new THREE.Color(DEEP_SKY_STYLE.open.color).convertSRGBToLinear();
+    const globular = new THREE.Color(DEEP_SKY_STYLE.globular.color).convertSRGBToLinear();
+    const remnant = new THREE.Color(DEEP_SKY_STYLE.remnant.color).convertSRGBToLinear();
+    const planetary = new THREE.Color(DEEP_SKY_STYLE.planetary.color).convertSRGBToLinear();
     let tries = 0;
     while (layer.count < BACKDROP.scatteredDeepSky && tries < BACKDROP.scatteredDeepSky * 60) {
         tries++;
@@ -1141,7 +1652,7 @@ function buildScatteredDeepSky(sampler) {
 function buildDeepSky(objects) {
     const layer = new Layer(objects.length);
     // named landmarks are a touch quieter now that the whole disk is populated
-    for (const o of objects) layer.add(o.position, new THREE.Color(DEEP_SKY_STYLE[o.kind].color), DEEP_SKY_STYLE[o.kind].size * 0.5, 0.58);
+    for (const o of objects) layer.add(o.position, new THREE.Color(DEEP_SKY_STYLE[o.kind].color).convertSRGBToLinear(), DEEP_SKY_STYLE[o.kind].size * 0.5, 0.58);
     /*
       * Attenuated, so a nebula shrinks with distance like the galaxy around it
       * instead of taking over the picture when you pull away - but with a floor on
@@ -1174,7 +1685,7 @@ function skyNorth(direction, pole) {
 
 function galaxyPhoto(url, size, opacity, direction, pole, rollDeg = 0, manager) {
     const texture = new THREE.TextureLoader(manager).load(url);
-    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.colorSpace = THREE.NoColorSpace;
     const mesh = new THREE.Mesh(
         new THREE.PlaneGeometry(size, size),
         new THREE.MeshBasicMaterial({
@@ -1199,7 +1710,7 @@ function galaxyPhoto(url, size, opacity, direction, pole, rollDeg = 0, manager) 
 // they should face, and they fade as they turn edge-on because a plane has no depth
 function orientedGalaxyQuad(url, size, opacity, manager) {
     const texture = new THREE.TextureLoader(manager).load(url);
-    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.colorSpace = THREE.NoColorSpace;
     const mesh = new THREE.Mesh(
         new THREE.PlaneGeometry(size, size),
         new THREE.MeshBasicMaterial({
@@ -1224,7 +1735,7 @@ function buildGalaxies(galaxies, backgroundImages, baseUrl, pole, manager) {
         // the galaxy fills part of its frame, so the plane is wider than the galaxy
         const size = (g.size / 1000) * (g.imageScale || 1.5);
         const node = g.image
-            ? galaxyPhoto(`${baseUrl}${g.image}`, size, 0.95, direction, pole, g.roll || 0, manager)
+            ? galaxyPhoto(`${baseUrl}${g.image}`, size, 0.95 * (g.brightness ?? 1), direction, pole, g.roll || 0, manager)
             : glowSprite(new THREE.Color(g.colors ? g.colors[0] : "#ffe3c0"), size * 0.6, 0.32);
         node.position.copy(center);
         node.renderOrder = 9;
@@ -1235,11 +1746,15 @@ function buildGalaxies(galaxies, backgroundImages, baseUrl, pole, manager) {
     }
 
     const quads = [];
-    for (let i = 0; i < 30 && backgroundImages.length; i++) {
+    // 120 of them, at an opacity that keeps them legible. The first pass dimmed the
+    // far-field textures to stop one punching through the disk, and overshot: they
+    // went from too bright to barely there. The textures stay dim, the quads carry
+    // the strength, and the ceiling is still well under the named galaxies'.
+    for (let i = 0; i < 120 && backgroundImages.length; i++) {
         const image = backgroundImages[Math.floor(rand() * backgroundImages.length)];
-        const quad = orientedGalaxyQuad(baseUrl + image, 45 + rand() * 170, 0.22 + rand() * 0.3, manager);
+        const quad = orientedGalaxyQuad(baseUrl + image, 40 + rand() * 150, 0.32 + rand() * 0.42, manager);
         const dir = new THREE.Vector3(gauss(), gauss() * 0.7, gauss()).normalize();
-        quad.position.copy(dir.multiplyScalar(600 + rand() * 1700));
+        quad.position.copy(dir.multiplyScalar(560 + rand() * 1800));
         quad.renderOrder = 9;
         quad.userData.baseOpacity = quad.material.opacity;
         group.add(quad);
@@ -1271,7 +1786,29 @@ const DUST = {
     // column used for background galaxies, because it has to read as a lane rather
     // than as an eclipse. laneDepth is the optical depth per unit of mid-plane column
     laneHeight: 0.34,
-    laneDepth: 0.016,
+    // the lane's strength on the soft layers, relative to the stars
+    softLane: 1.0,
+    /*
+     * Retuned for HDR. These were raised step by step to cut through a band that
+     * was clipping at two and a half times white, where a lane that only halved the
+     * light did not show at all. Nothing clips now, so a lane that takes four fifths
+     * of the mid-plane is already a dark lane.
+     */
+    laneDepth: 0.1,
+    laneFloor: 2.3,
+    // the arm lanes: far stronger per unit column, because a lane is dense
+    armDepth: 5.18,
+    /*
+     * How deeply the artwork's own lanes are darkened; this is the one that shows.
+     * It is an optical depth now, not a fraction, so the number jumped when the law
+     * became exponential: matching the old linear curve at a typical lane (dust 0.3)
+     * needs 1.72, and 2.1 is that plus the 20% asked for. At a dense lane it gives
+     * transmission 0.12 instead of the old hard zero - darker in practice, and still
+     * coloured, which the clipped version could not be.
+     */
+    backdropDepth: 2.1,
+    // and how hard the mid-plane sheet is cut when the disk is seen edge-on
+    planeLaneDepth: 1.3,
 };
 const DUST_SAMPLE = new THREE.Vector3();
 const DUST_SEGMENT = new THREE.Vector3();
@@ -1374,7 +1911,7 @@ function buildLocal(systems, structures) {
     const dots = new Layer(systems.length);
     for (const s of systems) {
         drops.push(s.position, new THREE.Vector3(s.position.x, SUN.y, s.position.z));
-        dots.add(s.position, new THREE.Color(s.color), 10, 1);
+        dots.add(s.position, new THREE.Color(s.color).convertSRGBToLinear(), 10, 1);
     }
     group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(drops), lineMaterial));
     const dotMaterial = pointsMaterial({ maxSize: 14, sharpness: 10, attenuate: 0 });
@@ -1384,6 +1921,296 @@ function buildLocal(systems, structures) {
 }
 
 /* ---------- labels ---------- */
+
+/* ---------- HDR: float target, bloom, tone curve ---------- */
+
+/*
+ * Everything in this scene is additive light, and until now it was added straight
+ * into an 8-bit canvas. That clips: the core and the edge-on band are two to three
+ * times over the ceiling, so they came out as flat white with no shape inside, the
+ * dust lanes had to be cranked absurdly high to cut through light that was already
+ * clipped, and at the other end any contribution under half a level - most single
+ * stars - rounded to nothing at all.
+ *
+ * So the scene renders into a half-float target, where a pixel can simply be
+ * brighter than white, and one pass at the end decides how that maps to a screen:
+ * a shoulder that rolls highlights off instead of clipping them, the way film and
+ * every astrophotograph does. Bloom comes from the same buffer - light that is
+ * genuinely bright spills a little, which is what makes a core read as a light
+ * source rather than as a white shape.
+ *
+ * It costs less than it sounds. Measured at 2.3 megapixels the scene takes the same
+ * time into a half-float target as into the canvas (the frame is bound by its 2.3M
+ * vertices, not by fill), and the whole post chain is a handful of small passes.
+ */
+const FULLSCREEN_VERTEX = /* glsl */ `
+    varying vec2 vUv;
+    void main() {
+        vUv = uv;
+        gl_Position = vec4(position.xy, 0.0, 1.0);
+    }
+`;
+
+const BLOOM_DOWN_FRAGMENT = /* glsl */ `
+    uniform sampler2D tSource;
+    uniform vec2 uTexel;
+    uniform float uPrefilter;
+    uniform float uThreshold;
+    uniform float uKnee;
+    varying vec2 vUv;
+
+    // soft-knee bright pass: nothing below the threshold, everything above it, and
+    // a quadratic ramp between so the cut never shows as an edge
+    vec3 bright(vec3 c) {
+        float l = max(c.r, max(c.g, c.b));
+        float soft = clamp(l - uThreshold + uKnee, 0.0, 2.0 * uKnee);
+        soft = soft * soft / (4.0 * uKnee + 0.0001);
+        return c * max(soft, l - uThreshold) / max(l, 0.0001);
+    }
+
+    void main() {
+        vec3 a = texture2D(tSource, vUv + uTexel * vec2(-1.0, -1.0)).rgb;
+        vec3 b = texture2D(tSource, vUv + uTexel * vec2(1.0, -1.0)).rgb;
+        vec3 c = texture2D(tSource, vUv + uTexel * vec2(-1.0, 1.0)).rgb;
+        vec3 d = texture2D(tSource, vUv + uTexel * vec2(1.0, 1.0)).rgb;
+        vec3 e = texture2D(tSource, vUv).rgb;
+        if (uPrefilter > 0.5) {
+            /*
+             * The first step is weighted by 1 / (1 + brightness). A star is a
+             * pixel or two wide, so without this a single bright one dominates its
+             * whole neighbourhood and the bloom flickers as the camera moves and
+             * stars cross texel boundaries.
+             */
+            a = bright(a); b = bright(b); c = bright(c); d = bright(d); e = bright(e);
+            float wa = 1.0 / (1.0 + max(a.r, max(a.g, a.b)));
+            float wb = 1.0 / (1.0 + max(b.r, max(b.g, b.b)));
+            float wc = 1.0 / (1.0 + max(c.r, max(c.g, c.b)));
+            float wd = 1.0 / (1.0 + max(d.r, max(d.g, d.b)));
+            float we = 4.0 / (1.0 + max(e.r, max(e.g, e.b)));
+            gl_FragColor = vec4((a * wa + b * wb + c * wc + d * wd + e * we) / (wa + wb + wc + wd + we), 1.0);
+        } else {
+            gl_FragColor = vec4((a + b + c + d + e * 4.0) * 0.125, 1.0);
+        }
+    }
+`;
+
+const BLOOM_UP_FRAGMENT = /* glsl */ `
+    uniform sampler2D tSource;
+    uniform vec2 uTexel;
+    uniform float uWeight;
+    varying vec2 vUv;
+    void main() {
+        // 3x3 tent
+        vec3 sum = texture2D(tSource, vUv).rgb * 4.0;
+        sum += texture2D(tSource, vUv + uTexel * vec2(-1.0, 0.0)).rgb * 2.0;
+        sum += texture2D(tSource, vUv + uTexel * vec2(1.0, 0.0)).rgb * 2.0;
+        sum += texture2D(tSource, vUv + uTexel * vec2(0.0, -1.0)).rgb * 2.0;
+        sum += texture2D(tSource, vUv + uTexel * vec2(0.0, 1.0)).rgb * 2.0;
+        sum += texture2D(tSource, vUv + uTexel * vec2(-1.0, -1.0)).rgb;
+        sum += texture2D(tSource, vUv + uTexel * vec2(1.0, -1.0)).rgb;
+        sum += texture2D(tSource, vUv + uTexel * vec2(-1.0, 1.0)).rgb;
+        sum += texture2D(tSource, vUv + uTexel * vec2(1.0, 1.0)).rgb;
+        gl_FragColor = vec4(sum * (uWeight / 16.0), 1.0);
+    }
+`;
+
+const COMPOSITE_FRAGMENT = /* glsl */ `
+    uniform sampler2D tScene;
+    uniform sampler2D tBloom;
+    uniform float uBloom;
+    uniform float uExposure;
+    uniform float uSaturation;
+    uniform float uVignette;
+    uniform vec3 uShadowTint;
+    uniform float uSeed;
+    varying vec2 vUv;
+
+    float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+    }
+
+    void main() {
+        vec3 c = texture2D(tScene, vUv).rgb + texture2D(tBloom, vUv).rgb * uBloom;
+        c *= uExposure;
+
+        /*
+         * The shoulder. 1 - exp(-x) has slope one at black, so the faint end - the
+         * arms, the haze, the dark between them - comes through as authored, and it
+         * only bends where the 8-bit canvas used to clip. Applied per channel it
+         * also bleaches towards white as it saturates, which is right for a core;
+         * applied to luminance alone it keeps the hue, which is right for a blue
+         * arm or a pink knot. The mix leans on the first and keeps some of the
+         * second, so the bulge goes to a warm white rather than to paper.
+         */
+        vec3 perChannel = 1.0 - exp(-c);
+        float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+        vec3 hueKept = c * ((1.0 - exp(-lum)) / max(lum, 0.0001));
+        c = mix(perChannel, min(hueKept, vec3(1.0)), 0.3);
+
+        float grey = dot(c, vec3(0.2126, 0.7152, 0.0722));
+        c = mix(vec3(grey), c, uSaturation);
+
+        // a lens falls off towards its corners; so does this, slightly
+        vec2 q = vUv - 0.5;
+        c *= 1.0 - uVignette * smoothstep(0.25, 0.95, dot(q, q) * 2.0);
+
+        // space is not quite black on any real exposure
+        c += uShadowTint * (1.0 - grey);
+
+        // half a level of noise, so faint gradients do not band in 8 bits
+        float n = hash(gl_FragCoord.xy + uSeed) + hash(gl_FragCoord.yx * 1.31 + uSeed) - 1.0;
+        gl_FragColor = vec4(c + n / 255.0, 1.0);
+    }
+`;
+
+const POST = {
+    exposure: 1.12,
+    bloom: 0.5,
+    threshold: 0.62,
+    knee: 0.45,
+    levels: 6,
+    saturation: 1.06,
+    vignette: 0.22,
+    shadowTint: new THREE.Color(0.004, 0.005, 0.012),
+};
+
+class PostPipeline {
+    constructor(renderer) {
+        this.renderer = renderer;
+        // sizes on the soft layer are in that target's pixels, which are twice as big
+        this.softScale = 1;
+        // rendering into a float target needs one of these; without it the scene
+        // goes straight to the canvas as it always did
+        this.supported =
+            renderer.capabilities.isWebGL2 &&
+            (renderer.extensions.has("EXT_color_buffer_float") || renderer.extensions.has("EXT_color_buffer_half_float"));
+        if (!this.supported) return;
+        this.softScale = SOFT_SCALE;
+
+        const target = () =>
+            new THREE.WebGLRenderTarget(4, 4, {
+                type: THREE.HalfFloatType,
+                minFilter: THREE.LinearFilter,
+                magFilter: THREE.LinearFilter,
+                depthBuffer: false,
+                stencilBuffer: false,
+                generateMipmaps: false,
+            });
+        this.scene = target();
+        this.soft = target();
+        this.mips = [];
+        for (let i = 0; i < POST.levels; i++) this.mips.push(target());
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
+        geometry.setAttribute("uv", new THREE.BufferAttribute(new Float32Array([0, 0, 2, 0, 0, 2]), 2));
+        const material = (fragmentShader, uniforms, blending = THREE.NoBlending) =>
+            new THREE.ShaderMaterial({
+                vertexShader: FULLSCREEN_VERTEX,
+                fragmentShader,
+                uniforms,
+                blending,
+                depthTest: false,
+                depthWrite: false,
+            });
+        this.down = material(BLOOM_DOWN_FRAGMENT, {
+            tSource: { value: null },
+            uTexel: { value: new THREE.Vector2() },
+            uPrefilter: { value: 0 },
+            uThreshold: { value: POST.threshold },
+            uKnee: { value: POST.knee },
+        });
+        // added onto the level it lands in, which turns the down chain into the up
+        // chain in place and saves a second set of targets
+        this.up = material(
+            BLOOM_UP_FRAGMENT,
+            { tSource: { value: null }, uTexel: { value: new THREE.Vector2() }, uWeight: { value: 1 } },
+            THREE.AdditiveBlending
+        );
+        // lays the half-resolution soft layers over the scene, ahead of the bloom
+        this.merge = material(
+            /* glsl */ `
+                uniform sampler2D tSource;
+                varying vec2 vUv;
+                void main() {
+                    gl_FragColor = vec4(texture2D(tSource, vUv).rgb, 1.0);
+                }
+            `,
+            { tSource: { value: this.soft.texture } },
+            THREE.AdditiveBlending
+        );
+        this.composite = material(COMPOSITE_FRAGMENT, {
+            tScene: { value: this.scene.texture },
+            tBloom: { value: this.mips[0].texture },
+            uBloom: { value: POST.bloom },
+            uExposure: { value: POST.exposure },
+            uSaturation: { value: POST.saturation },
+            uVignette: { value: POST.vignette },
+            uShadowTint: { value: POST.shadowTint },
+            uSeed: { value: 0 },
+        });
+        this.quad = new THREE.Mesh(geometry, this.down);
+        this.quad.frustumCulled = false;
+        this.quadScene = new THREE.Scene();
+        this.quadScene.add(this.quad);
+        this.quadCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    }
+
+    setSize(width, height) {
+        if (!this.supported) return;
+        this.scene.setSize(width, height);
+        this.soft.setSize(Math.max(1, Math.round(width * SOFT_SCALE)), Math.max(1, Math.round(height * SOFT_SCALE)));
+        let w = width;
+        let h = height;
+        for (const mip of this.mips) {
+            w = Math.max(1, w >> 1);
+            h = Math.max(1, h >> 1);
+            mip.setSize(w, h);
+        }
+    }
+
+    pass(material, target) {
+        this.quad.material = material;
+        this.renderer.setRenderTarget(target);
+        this.renderer.render(this.quadScene, this.quadCamera);
+    }
+
+    render(scene, camera) {
+        const renderer = this.renderer;
+        if (!this.supported) {
+            camera.layers.enableAll();
+            renderer.render(scene, camera);
+            return;
+        }
+        camera.layers.set(SOFT_LAYER);
+        renderer.setRenderTarget(this.soft);
+        renderer.render(scene, camera);
+        camera.layers.set(0);
+        renderer.setRenderTarget(this.scene);
+        renderer.render(scene, camera);
+
+        // the post passes cover every pixel or add to what is there, so none clears
+        renderer.autoClear = false;
+        this.pass(this.merge, this.scene);
+        let source = this.scene;
+        for (let i = 0; i < this.mips.length; i++) {
+            this.down.uniforms.tSource.value = source.texture;
+            this.down.uniforms.uTexel.value.set(1 / source.width, 1 / source.height);
+            this.down.uniforms.uPrefilter.value = i === 0 ? 1 : 0;
+            this.pass(this.down, this.mips[i]);
+            source = this.mips[i];
+        }
+        for (let i = this.mips.length - 2; i >= 0; i--) {
+            source = this.mips[i + 1];
+            this.up.uniforms.tSource.value = source.texture;
+            this.up.uniforms.uTexel.value.set(1 / source.width, 1 / source.height);
+            this.pass(this.up, this.mips[i]);
+        }
+        this.composite.uniforms.uSeed.value = (this.composite.uniforms.uSeed.value + 0.137) % 7;
+        this.pass(this.composite, null);
+        renderer.autoClear = true;
+    }
+}
 
 class Marker {
     constructor({
@@ -1499,6 +2326,7 @@ class GalaxyView {
         this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, powerPreference: "high-performance" });
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.setClearColor(0x000000, 1);
+        this.post = new PostPipeline(this.renderer);
 
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(50, 1, 0.01, 9000);
@@ -1533,13 +2361,17 @@ class GalaxyView {
         this.controls.maxPolarAngle = THREE.MathUtils.degToRad(89.6);
         this.controls.screenSpacePanning = false;
         this.controls.zoomSpeed = 1.2;
-        this.controls.autoRotate = true;
-        this.controls.autoRotateSpeed = 0.2;
+        /*
+         * No idle auto-rotation. It used to drift the camera whenever the view sat
+         * still for 25 seconds, which meant the galaxy was never where you left it:
+         * you read a label, looked away, and came back to a different composition.
+         * The view now moves only when the user moves it, or on a flight.
+         */
+        this.controls.autoRotate = false;
         // left button moves the map, right button tilts and turns it
         this.controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
         this.controls.addEventListener("start", () => {
             this.flight = null;
-            this.controls.autoRotate = false;
             this.lastInteraction = performance.now();
         });
 
@@ -1547,7 +2379,7 @@ class GalaxyView {
         this.buildMarkers();
         this.bindControls();
         this.bindPanels();
-        this.placeCamera(OVERVIEW);
+        this.placeCamera(START);
 
         /*
          * The readout follows the cursor: one ray-plane intersection per move, which
@@ -1574,7 +2406,8 @@ class GalaxyView {
     buildScene() {
         this.materials = {
             stars: pointsMaterial({ maxSize: 5.5, minSize: 1.2, nearFade: 0.08, sharpness: 23, lane: true }),
-            gas: pointsMaterial({ maxSize: 900, nearFade: 7, sharpness: 2.5, lane: true }),
+            gas: pointsMaterial({ maxSize: 900, nearFade: 7, sharpness: 2.5, lane: true, soft: true, cloud: 0.85 }),
+            bulge: pointsMaterial({ maxSize: 640, nearFade: 2.5, sharpness: 2.3, soft: true }),
             knots: pointsMaterial({ maxSize: 12, nearFade: 0.6, sharpness: 9, lane: true }),
             scattered: pointsMaterial({ maxSize: 11, minSize: 2.7, nearFade: 0.3, sharpness: 6 }),
             backdropStars: pointsMaterial({ maxSize: 4, sharpness: 18, attenuate: 0 }),
@@ -1591,6 +2424,12 @@ class GalaxyView {
 
         this.core = buildCore();
         this.scene.add(this.core.group);
+
+        this.bulge = new THREE.Points(buildBulgeGlow().geometry(), this.materials.bulge);
+        this.bulge.renderOrder = 4;
+        this.bulge.frustumCulled = false;
+        this.bulge.layers.set(SOFT_LAYER);
+        this.scene.add(this.bulge);
 
         this.arms = buildArmOutlines();
         this.scene.add(this.arms.group);
@@ -1666,6 +2505,8 @@ class GalaxyView {
             this.backdrop = buildBackdropVolume(texture);
             this.scene.add(this.backdrop.group);
             const galaxy = buildGalaxyFromImage(texture.image);
+            // the backdrop darkens its own lanes with the map the star field read
+            for (const m of this.backdrop.materials) m.uniforms.uDust.value = galaxy.dustTexture;
             this.scatteredPoints = new THREE.Points(galaxy.scattered.geometry(), this.materials.scattered);
             this.scatteredPoints.renderOrder = 8;
             this.scatteredPoints.frustumCulled = false;
@@ -1674,6 +2515,7 @@ class GalaxyView {
                 const points = new THREE.Points(galaxy[key].geometry(), this.materials[key]);
                 points.renderOrder = order;
                 points.frustumCulled = false;
+                if (key === "gas") points.layers.set(SOFT_LAYER);
                 this.scene.add(points);
             }
             this.root.classList.add("Ready");
@@ -1931,7 +2773,6 @@ class GalaxyView {
             fromSph: from,
             toSph,
         };
-        this.controls.autoRotate = false;
         this.lastInteraction = performance.now();
     }
 
@@ -1967,8 +2808,20 @@ class GalaxyView {
         const width = this.root.clientWidth || window.innerWidth;
         const height = this.root.clientHeight || window.innerHeight;
         this.renderer.setSize(width, height, false);
-        this.camera.aspect = width / height;
+        const buffer = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+        this.post.setSize(buffer.x, buffer.y);
+        /*
+         * The galaxy is parked right of centre to leave the left side free for the
+         * panels. This is a projection offset rather than a moved camera target: the
+         * frustum is widened and only its left part is rendered, so the galactic
+         * centre lands at about 58% of the width while the view keeps its scale, its
+         * pivot limits and its mouse picking - all of which read the same projection
+         * matrix and so follow along for free.
+         */
+        const shift = width * VIEW_SHIFT;
+        this.camera.aspect = (width + 2 * shift) / height;
         this.camera.updateProjectionMatrix();
+        this.camera.setViewOffset(width + 2 * shift, height, 0, 0, width, height);
         this.width = width;
         this.height = height;
         // point sizes are authored for a ~900px tall view seen from ~80 units away
@@ -1976,6 +2829,7 @@ class GalaxyView {
         for (const m of [...Object.values(this.materials), this.local.dotMaterial, this.deepSkyPoints.material, this.localDeepSkyPoints.material, this.core.material, this.core.holeMaterial]) {
             m.uniforms.uScale.value = scale;
         }
+        for (const key of ["gas", "bulge"]) this.materials[key].uniforms.uScale.value = scale * this.post.softScale;
         this.iconHalf = Math.min(width, height) * 0.0055;
         // label boxes are sized in vmin, so they change with the viewport
         for (const marker of this.markers) {
@@ -2037,9 +2891,6 @@ class GalaxyView {
         requestAnimationFrame((t) => this.frame(t));
 
         if (this.flight) this.stepFlight(now);
-        if (!this.flight && !this.controls.autoRotate && now - this.lastInteraction > 25000 && this.spherical().radius > 20) {
-            this.controls.autoRotate = true;
-        }
         this.controls.update();
 
         const target = this.controls.target;
@@ -2101,13 +2952,44 @@ class GalaxyView {
          * saving pays for the arithmetic.
          */
         const laneDepth = DUST.laneDepth * (1 - smoothstep(0.18, 0.3, elevation));
-        for (const key of ["stars", "gas", "knots"]) {
+        /*
+         * The arm dust is the mirror image: off near the plane, where the long
+         * column already draws a lane and where per-star structure would read as
+         * the patches and stains the sprite versions produced, and on from a few
+         * degrees up, where it is the only thing that can show a lane at all.
+         */
+        const armDustRamp = smoothstep(0.1, 0.26, elevation);
+        /*
+         * And its opposite number: the lane that cuts the band when the disk is seen
+         * edge-on. It hands over to the arm dust as the view tilts up, so there is
+         * always one of the two carrying the dust and never both at full strength.
+         */
+        const planeLane = DUST.planeLaneDepth * (1 - smoothstep(0.045, 0.2, elevation));
+        const armDust = DUST.armDepth * armDustRamp;
+        for (const key of ["stars", "knots"]) {
             this.materials[key].uniforms.uLane.value = laneDepth;
+            this.materials[key].uniforms.uArmDust.value = armDust;
+        }
+        /*
+         * The soft layers take the same lane per fragment. uUpY is how much of a
+         * sprite's height on screen is height in the world: all of it edge-on, none
+         * of it from overhead, where the sprite's vertical extent is depth instead.
+         */
+        const upY = Math.sqrt(Math.max(0, 1 - elevation * elevation));
+        for (const key of ["gas", "bulge"]) {
+            const u = this.materials[key].uniforms;
+            u.uLane.value = 0;
+            u.uSoftLane.value = laneDepth * DUST.softLane;
+            u.uArmDust.value = key === "gas" ? armDust : 0;
+            u.uUpY.value = upY;
+            u.uCamY.value = this.camera.position.y;
         }
 
         const closeness = 1 - smoothstep(15, 60, cameraDistance);
         this.materials.stars.uniforms.uMaxSize.value = THREE.MathUtils.lerp(6.0, 4.8, closeness);
-        this.materials.gas.uniforms.uMaxSize.value = THREE.MathUtils.lerp(900, 240, closeness);
+        // caps are in the soft target's pixels, hence the scale
+        this.materials.gas.uniforms.uMaxSize.value = THREE.MathUtils.lerp(900, 520, closeness) * this.post.softScale;
+        this.materials.bulge.uniforms.uMaxSize.value = THREE.MathUtils.lerp(640, 300, closeness) * this.post.softScale;
 
         const closeGain = 1 - smoothstep(10, 80, cameraDistance);
         this.materials.stars.uniforms.uGain.value = 1 + 5.6 * closeGain;
@@ -2131,15 +3013,26 @@ class GalaxyView {
              * the most expensive thing in the frame, so the outer sheets bow out.
              */
             const sheetFade = 1 - closeness;
+            /*
+             * A painting of a galaxy from above is a decal from the side. Edge-on it
+             * contributes a smear of light at the mid-plane that obeys none of the
+             * dust the 3D layers do, and it was most of why the lane kept washing
+             * out there. It bows out as the view flattens and the stars, the haze
+             * and the bulge - which all work the lane out for themselves - carry it.
+             */
+            const flatFade = 0.12 + 0.88 * smoothstep(0.03, 0.24, elevation);
             for (const m of this.backdrop.materials) {
                 const sheet = m.userData.offset === 0 ? 1 : sheetFade;
-                m.uniforms.uOpacity.value = BACKDROP.opacity * m.userData.weight * closeFade * sheet;
+                m.uniforms.uOpacity.value = BACKDROP.opacity * m.userData.weight * closeFade * sheet * flatFade;
                 m.uniforms.uCoreFade.value = coreFade;
+                m.uniforms.uDustStrength.value = DUST.backdropDepth * armDustRamp;
+                m.uniforms.uPlaneLane.value = planeLane * m.userData.inLane;
             }
         }
 
         this.arms.group.visible = this.layerState.arms !== false && local < 0.99;
-        this.arms.material.opacity = 0.22 * (1 - local);
+        // the dashed arm skeleton is a map overlay: up close it is just scratches
+        this.arms.material.opacity = 0.22 * (1 - local) * smoothstep(16, 46, cameraDistance) * smoothstep(0.06, 0.22, elevation);
         this.core.shellMaterial.opacity = 0.3 * (1 - local) * (this.layerState.arms !== false ? 1 : 0);
 
         /*
@@ -2167,12 +3060,14 @@ class GalaxyView {
             shell.material.color.copy(shell.userData.baseColor).lerp(EXTINCTION_RED, reddening * 0.85);
         }
         /*
-         * The black holes are a reward for going in, not part of the galaxy's wider
-         * look: they stay out of sight until the camera is well inside the bulge,
-         * and disappear again once it is inside the cloud itself, where rings of
-         * fixed screen size would cover everything. Visible roughly 5 to 24 units.
+         * The black holes are still a reward for going in, but they used to need a
+         * dive most people would never make: nothing until 24 units and only full
+         * strength inside 13. They now come in from 46 units - about a third of the
+         * way out from the core - and are at full strength by 26. The inner fade
+         * stays: below ~5 units the camera is inside the cloud itself, where rings
+         * of fixed screen size would cover everything.
          */
-        const holeFade = smoothstep(3, 7, cameraDistance) * (1 - smoothstep(13, 24, cameraDistance)) * (1 - local);
+        const holeFade = smoothstep(3, 7, cameraDistance) * (1 - smoothstep(26, 46, cameraDistance)) * (1 - local);
         this.core.holePoints.visible = holeFade > 0.01;
         this.core.holeMaterial.uniforms.uOpacity.value = holeFade;
         /*
@@ -2266,7 +3161,7 @@ class GalaxyView {
             ? "Sol-centred · rings at 10 / 100 / 1,000 ly"
             : `${label} · ${fromCore.toLocaleString("en-US")} ly from core · ${fromSun.toLocaleString("en-US")} ly from Sol`;
 
-        this.renderer.render(this.scene, this.camera);
+        this.post.render(this.scene, this.camera);
     }
 
     start() {
@@ -2281,17 +3176,7 @@ class GalaxyView {
     }
 }
 
-let view = null;
-
-function onView(name) {
-    if (name === "galaxy") {
-        view ??= new GalaxyView();
-        window.galaxyView = view; // handy for tuning from the console
-        view.start();
-    } else if (view) {
-        view.stop();
-    }
-}
-
-document.addEventListener("mainview", (event) => onView(event.detail));
-if (document.body.classList.contains("ViewGalaxy")) onView("galaxy");
+// the galaxy is the main page, so it starts as soon as the module runs
+const view = new GalaxyView();
+window.galaxyView = view; // handy for tuning from the console
+view.start();

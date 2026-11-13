@@ -7,65 +7,13 @@
     --galaxy-font: "Bahnschrift", "DIN Alternate", "DIN", "Segoe UI", sans-serif;
 }
 
-/* view switch */
-
-.ViewSwitch {
-    display: flex;
-    gap: .4vmin;
-    left: 50%;
-    position: absolute;
-    top: 2.2vmin;
-    transform: translateX(-50%);
-    z-index: 30
-}
-
-.ViewSwitchButton {
-    background: var(--galaxy-panel);
-    border: 1px solid var(--galaxy-line);
-    color: var(--galaxy-ink-dim);
-    cursor: pointer;
-    font-family: var(--galaxy-font);
-    font-size: 1.6vmin;
-    letter-spacing: .25em;
-    padding: .9vmin 2.6vmin;
-    text-transform: uppercase;
-    transition: color .3s, border-color .3s, box-shadow .3s
-}
-
-.ViewSwitchButton:hover {
-    color: #fff
-}
-
-.ViewSwitchActive {
-    border-color: var(--galaxy-accent);
-    box-shadow: inset 0 0 1.4vmin rgba(158, 203, 255, .35);
-    color: #fff
-}
-
-.LowerPart {
-    transition: opacity .6s
-}
-
-.ViewGalaxy .LowerPart {
-    opacity: 0;
-    pointer-events: none
-}
-
 /* galaxy view */
 
 .GalaxyView {
     background: #000;
     inset: 0;
-    opacity: 0;
-    pointer-events: none;
-    position: absolute;
-    transition: opacity .6s;
+    position: fixed;
     z-index: 20
-}
-
-.ViewGalaxy .GalaxyView {
-    opacity: 1;
-    pointer-events: auto
 }
 
 #GALAXY_CANVAS {

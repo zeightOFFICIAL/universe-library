@@ -5,7 +5,6 @@
         {{ head| safe}}
         <link rel="stylesheet" href="{% static 'Styles/UniverseStyles.css' %}" charset="UTF-8">
         <link rel="stylesheet" href="{% static 'Styles/GalaxyStyles.css' %}" charset="UTF-8">
-        <link rel="stylesheet" href="{% static 'Vendor/swiper-bundle.min.css' %}" charset="UTF-8">
         <script type="importmap">
             {
                 "imports": {
@@ -16,18 +15,7 @@
         </script>
     </head>
     <body>
-        <nav class="ViewSwitch" aria-label="Main page view">
-            <button type="button" class="ViewSwitchButton" data-view="cards">Cards</button>
-            <button type="button" class="ViewSwitchButton" data-view="galaxy">Galaxy</button>
-        </nav>
-        <div id="LOWER_PART" class="LowerPart">
-            {{cards| safe}}
-            <span class="Titler">
-                Artemii Zeight, 2024
-            </span>
-            <div class="swiper-pagination"></div>
-        </div>
-        <div id="GALAXY_VIEW" class="GalaxyView" aria-hidden="true"
+        <div id="GALAXY_VIEW" class="GalaxyView"
              data-backdrop="{% static 'Images/GalaxyBackdrop.jpg' %}"
              data-galaxies="{% static 'Images/Galaxies/' %}">
             <canvas id="GALAXY_CANVAS"></canvas>
@@ -61,9 +49,6 @@
             </div>
         </div>
         {{ galaxy|json_script:"GALAXY_DATA" }}
-        <script src="{% static 'Vendor/swiper-bundle.min.js' %}"></script>
-        <script src="{% static 'Scripts/CoreFunctions.js' %}"></script>
-        <script src="{% static 'Scripts/UniverseScripts.js' %}"></script>
         <script type="module" src="{% static 'Scripts/Galaxy.js' %}"></script>
     </body>
 </html>

@@ -4,11 +4,6 @@ import random
 class Style:
     class Box:
         @staticmethod
-        def card_info(a_color, img_name):
-            style = f"height: 65%; border: .5vmin solid {a_color};box-shadow: 0 0 6vmin {a_color};background-image:url('../static/Images/{img_name}');"
-            return f'style="{style}"'
-
-        @staticmethod
         def text_info(a_color, c_color, slider=False):
             if slider == True:
                 return 'style="display:none;" class="Slider"'
@@ -35,18 +30,6 @@ class Style:
             return f'style="{style}"'
 
     class Text:
-        @staticmethod
-        def card_text_font(a_color):
-            style = f"color: {a_color};"
-            return f'style="{style}"'
-
-        @staticmethod
-        def title_font(a_color):
-            style = (
-                f"color: {a_color}; text-shadow: 0 0 6vmin {a_color};cursor:pointer;"
-            )
-            return f'style="{style}"'
-
         @staticmethod
         def star_font(position, a_color):
             style = f"text-align: left;display: block;font-family: 'solar';font-size: 4vmin;font-weight: bolder;cursor: pointer;overflow-x: hidden;transition: background-color .5s, padding-left .5s;background-clip: text;-webkit-background-clip: text;-webkit-text-fill-color: transparent;padding: 3vmin 0;overflow-y: hidden; position:absolute;top:{position};background-color: {a_color};padding-left:20%;min-width: 60vh;line-height: 3vmin;margin:auto;text-decoration:none;"
@@ -96,11 +79,6 @@ class Style:
         @staticmethod
         def short(position):
             style = f"position:absolute;left:120%;height:20vmin;transition:.5s;top:{position};"
-            return f'style="{style}"'
-
-        @staticmethod
-        def thumb(img_name):
-            style = f"display: block;position:absolute;height:55%;width:auto;margin: auto;top:-100%;text-align: center;transition: top .5s;z-index:1;pointer-events: none !important;background-image:url('../static/LinkImages/{img_name}');background-size:contain;background-repeat:none;"
             return f'style="{style}"'
 
     class Video:
@@ -217,11 +195,6 @@ class EventHandlers:
     @staticmethod
     def hover_2d(id, id2, class_name, class_name2):
         call = f"onmouseover=\"onHoverEnterAddClass('{id}','{class_name}');onHoverEnterAddClass('{id2}','{class_name2}');\" onmouseout=\"onHoverLeaveRemoveClass('{id}','{class_name}');onHoverLeaveRemoveClass('{id2}','{class_name2}');\""
-        return call
-
-    @staticmethod
-    def hover_4d(id, id2, id3, id4, class_name, class_name2, class_name3, class_name4):
-        call = f"onmouseover=\"onHoverEnterAddClass('{id}','{class_name}');onHoverEnterAddClass('{id2}','{class_name2}');onHoverEnterAddClass('{id3}','{class_name3}');onHoverEnterAddClass('{id4}','{class_name4}');\"   onmouseout=\"onHoverLeaveRemoveClass('{id}','{class_name}');onHoverLeaveRemoveClass('{id2}','{class_name2}');onHoverLeaveRemoveClass('{id3}','{class_name3}');onHoverLeaveRemoveClass('{id4}','{class_name4}');\""
         return call
 
     @staticmethod

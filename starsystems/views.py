@@ -3,8 +3,6 @@ from django.shortcuts import render, HttpResponse
 from mysite.PredefinedSystems.AlphaCentauri import System as Alpha
 from mysite.PredefinedSystems.SolarSystem import System as Solar
 
-from mysite.Types.DeckType import DeckClass
-from mysite.Types.CardType import CardClass
 from starsystems.galaxy import (
     BACKGROUND_GALAXY_IMAGES,
     CELESTIAL_POLE_GALACTIC,
@@ -19,42 +17,20 @@ from mysite.ServerScripts import (
     get_sql_system,
     get_sql_system_id,
     get_sql_systems_thumbnail,
-    get_sql_cards,
+    get_sql_system_links,
 )
+
+# The two systems that are Python rather than database rows. Everything the main
+# page needs of a system is its name, its page and its accent colour; where it sits
+# in the galaxy comes from GALAXY_PLACEMENT, keyed by the same href.
+PREDEFINED_SYSTEM_LINKS = [
+    {"name": "Solar", "href": "Solar", "color": "#FBAB7E"},
+    {"name": "Alpha Centauri", "href": "AlphaCentauri", "color": "#FF0000"},
+]
 
 
 def universe_page(request) -> HttpResponse:
-    all_cards = []
-
-    all_cards.insert(
-        0,
-        CardClass(
-            -2,
-            "Alpha Centauri",
-            "AlphaCentauri",
-            "Alpha Centauri is a star system located in the constellation of Centaurus, which is the closest star system to our own solar system. The system consists of three stars: Alpha Centauri A, Alpha Centauri B, and Proxima Centauri.",
-            ["#FF0000", "#FF5000"],
-            "Alphacover",
-            "Alpha",
-        ),
-    )
-    all_cards.insert(
-        0,
-        CardClass(
-            -1,
-            "Solar",
-            "Solar",
-            "The Solar System is our neighborhood in space, where our planet Earth resides. It consists of the Sun, a yellow dwarf star at the center, and a collection of celestial bodies that orbit around it. It is a cradle of humankind.",
-            ["#FBAB7E", "#ff792b"],
-            "Solarcover",
-            "Solar",
-        ),
-    )
-
-    for card in get_sql_cards():
-        all_cards.append(card)
-
-    Deck = DeckClass(1, all_cards)
+    links = PREDEFINED_SYSTEM_LINKS + get_sql_system_links()
     Head = '<meta charset="UTF-8" name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="../static/Icons/LogoStrip.ico" charset="UTF-8"><title>Universe Library</title>'
     galaxy = {
         "sunDistance": SUN_TO_GALACTIC_CENTRE_LY,
@@ -65,21 +41,13 @@ def universe_page(request) -> HttpResponse:
         "backgroundGalaxies": BACKGROUND_GALAXY_IMAGES,
         "credits": IMAGE_CREDITS,
         "systems": [
-            {
-                "name": card.name,
-                "href": card.href,
-                "color": card.coloring_set[0],
-                "placement": GALAXY_PLACEMENT[card.href],
-            }
-            for card in all_cards
-            if card.href in GALAXY_PLACEMENT and not GALAXY_PLACEMENT[card.href].get("hidden")
+            dict(link, placement=GALAXY_PLACEMENT[link["href"]])
+            for link in links
+            if link["href"] in GALAXY_PLACEMENT
+            and not GALAXY_PLACEMENT[link["href"]].get("hidden")
         ],
     }
-    return render(
-        request,
-        "Universe.html",
-        {"cards": Deck.__repr__(), "head": Head, "galaxy": galaxy},
-    )
+    return render(request, "Universe.html", {"head": Head, "galaxy": galaxy})
 
 
 def template_system_page(request, name) -> HttpResponse:

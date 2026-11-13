@@ -1,7 +1,6 @@
 from mysite.Types.SystemType import *
 from mysite.Types.ObjectType import *
 from mysite.Types.PanelType import *
-from mysite.Types.CardType import *
 from starsystems.models import *
 from operator import attrgetter
 from mysite.settings import BASE_DIR
@@ -22,23 +21,24 @@ def get_sql_systems_thumbnail() -> list:
     return a_systems
 
 
-def get_sql_cards() -> list:
-    a_cards = []
-    a_rows = Systems.objects.all()
-    for row in a_rows:
-        href = row.name_name.replace(" ", "")
-        card = CardClass(
-            row.pk,
-            row.name_name,
-            href,
-            row.short_desc_text,
-            [row.prime_color_any, row.second_color_any],
-            f"{href}cover",
-            f"{href.lower()}",
-        )
-        a_cards.append(card)
+def get_sql_system_links() -> list[dict]:
+    """Name, page href and accent colour for every system in the database.
 
-    return a_cards
+    This is all the main page needs of a system: the galaxy view places a marker
+    from the href and labels it with the name. Adding a system is still a matter
+    of adding a row plus a GALAXY_PLACEMENT entry.
+    """
+    a_links = []
+    for row in Systems.objects.all():
+        a_links.append(
+            {
+                "name": row.name_name,
+                "href": row.name_name.replace(" ", ""),
+                "color": row.prime_color_any,
+            }
+        )
+
+    return a_links
 
 
 def get_sql_system(f_id: int) -> SystemClass:
