@@ -25,26 +25,61 @@
                 <p class="GalaxyLoaderStep" id="GALAXY_LOADER_STEP">Loading imagery</p>
             </div>
             <div id="GALAXY_LABELS" class="GalaxyLabels"></div>
-            <div class="GalaxySidebar">
-                <button type="button" class="GalaxySideButton" data-panel="GALAXY_LAYERS" aria-expanded="false">&#9776; Layers</button>
-                <div class="GalaxyPanel" id="GALAXY_LAYERS">
-                    <label class="GalaxyLayer"><input type="checkbox" data-layer="arms" checked><span>Arm &amp; galaxy labels</span></label>
-                    <label class="GalaxyLayer"><input type="checkbox" data-layer="deepsky" checked><span>Nebula &amp; cluster labels</span></label>
-                    <label class="GalaxyLayer"><input type="checkbox" data-layer="systems" checked><span>Star system labels</span></label>
-                    <p class="GalaxyPanelNote">Backdrop, landmarks and galaxies are always drawn; these switch their labels. {{ galaxy.credits }} Landmarks at true positions; far galaxies drawn closer.</p>
+            <aside class="GalaxyDock" id="GALAXY_DOCK" aria-label="Map navigation">
+                <header class="DockHead">
+                    <div class="DockHeadText">
+                        <p class="DockEyebrow">Universe Library</p>
+                        <h1 class="DockTitle">Milky Way</h1>
+                    </div>
+                    <button type="button" class="DockToggle" id="GALAXY_DOCK_TOGGLE" aria-expanded="true" aria-controls="GALAXY_DOCK_BODY" title="Hide or show the panel">
+                        <span aria-hidden="true"></span>
+                    </button>
+                </header>
+                <div class="DockBody" id="GALAXY_DOCK_BODY">
+                    <p class="DockLead">A map of our galaxy. Choose a star system to visit, or wander.</p>
+
+                    <section class="DockSection">
+                        <h2 class="DockLabel">Star systems</h2>
+                        <div class="SystemList" id="GALAXY_SYSTEM_LIST"></div>
+                    </section>
+
+                    <section class="DockSection">
+                        <h2 class="DockLabel">Jump to</h2>
+                        <div class="DockChips">
+                            <button type="button" class="DockChip" data-action="overview">Whole galaxy</button>
+                            <button type="button" class="DockChip" data-action="sun">The Sun</button>
+                            <button type="button" class="DockChip" data-action="core">Galactic core</button>
+                            <button type="button" class="DockChip" data-action="edge">Edge-on</button>
+                        </div>
+                    </section>
+
+                    <section class="DockSection">
+                        <h2 class="DockLabel">Labels</h2>
+                        <label class="GalaxyLayer"><span class="LayerText"><span class="LayerName">Star systems</span><span class="LayerHint">Places you can open</span></span><input type="checkbox" data-layer="systems" checked><span class="Switch" aria-hidden="true"></span></label>
+                        <label class="GalaxyLayer"><span class="LayerText"><span class="LayerName">Arms &amp; galaxies</span><span class="LayerHint">The spiral structure and our neighbours</span></span><input type="checkbox" data-layer="arms" checked><span class="Switch" aria-hidden="true"></span></label>
+                        <label class="GalaxyLayer"><span class="LayerText"><span class="LayerName">Nebulae &amp; clusters</span><span class="LayerHint">Landmarks within the disk</span></span><input type="checkbox" data-layer="deepsky" checked><span class="Switch" aria-hidden="true"></span></label>
+                    </section>
+
+                    <section class="DockSection">
+                        <h2 class="DockLabel">Legend</h2>
+                        <ul class="DockLegend" id="GALAXY_LEGEND"></ul>
+                    </section>
+
+                    <details class="DockDetails">
+                        <summary>In view now</summary>
+                        <div class="GalaxyPanelScroll" id="GALAXY_OBJECT_LIST"></div>
+                    </details>
+                    <details class="DockDetails">
+                        <summary>About this map</summary>
+                        <p class="GalaxyPanelNote">Positions of landmarks are real; the far galaxies are drawn closer than they are, and say so. The backdrop, landmarks and galaxies are always drawn - the switches above only show or hide their names. {{ galaxy.credits }}</p>
+                    </details>
                 </div>
-                <button type="button" class="GalaxySideButton" data-panel="GALAXY_OBJECTS" aria-expanded="false">&#9673; In view</button>
-                <div class="GalaxyPanel GalaxyPanelScroll" id="GALAXY_OBJECTS">
-                    <div id="GALAXY_OBJECT_LIST"></div>
-                </div>
-            </div>
+            </aside>
             <div class="GalaxyReadout" id="GALAXY_READOUT"></div>
             <div class="GalaxyScaleNote" id="GALAXY_SCALE_NOTE">Local view · distances log-scaled, directions true</div>
-            <div class="GalaxyHint">Left-drag to move · right-drag to tilt · scroll to zoom</div>
+            <div class="GalaxyHint">Drag to move · right-drag to tilt · scroll to zoom</div>
             <div class="GalaxyControls">
                 <button type="button" data-action="zoom-out" title="Zoom out">&minus;</button>
-                <button type="button" data-action="overview" title="Whole galaxy">&#8982;</button>
-                <button type="button" data-action="sun" title="Fly to the Sun">&#9737;</button>
                 <button type="button" data-action="zoom-in" title="Zoom in">+</button>
             </div>
         </div>

@@ -34,7 +34,7 @@ const DATA = JSON.parse(document.getElementById("GALAXY_DATA").textContent);
 const SUN = new THREE.Vector3(0, (DATA.sunHeight || 0) / 1000, DATA.sunDistance / 1000);
 
 // how far right of centre the galactic centre sits, as a fraction of the width
-const VIEW_SHIFT = 0.08;
+const VIEW_SHIFT = 0.11;
 const GALAXY_RADIUS = 50;
 const ARM_PITCH = THREE.MathUtils.degToRad(12);
 const ARM_K = Math.tan(ARM_PITCH);
@@ -443,15 +443,16 @@ const VERTEX_SHADER = /* glsl */ `
     uniform float uLaneHeight;
     uniform float uArmDust;
     uniform float uLaneFloor;
-    uniform float uSoft;
     varying vec3 vColor;
     varying float vAlpha;
     varying float vExtinction;
+    #ifdef SOFT_SPRITE
     varying float vWorldY;
     varying float vWorldSize;
     varying float vLen;
     varying float vInside;
     varying float vSeed;
+    #endif
     void main() {
         vec4 mv = modelViewMatrix * vec4(position, 1.0);
         /*
@@ -488,10 +489,10 @@ const VERTEX_SHADER = /* glsl */ `
          * tenth of the field - so the test earns its keep there. Near the plane the
          * smooth lane applies to everything and the branch is taken anyway.
          */
-        if (uLane > 0.0 || (uArmDust > 0.0 && aDust > 0.012)) {
+        if (uLane > 0.0 || (uArmDust > 0.0 && aDust > 0.1)) {
             float len = max(length(cameraPosition - position), 0.001);
             // only the part of the sight line inside the disk has dust on it
-            float inside = insideDisk(position.xz, cameraPosition.xz);
+            float inside = uLane > 0.0 ? insideDisk(position.xz, cameraPosition.xz) : 1.0;
             float exitY = position.y + inside * (cameraPosition.y - position.y);
             float column = len * inside * laneDensity(position.y, exitY, uLaneHeight);
             /*
@@ -525,17 +526,13 @@ const VERTEX_SHADER = /* glsl */ `
          * instead: how long the sight line is, where the sprite sits, and how many
          * kly of height its screen size stands for.
          */
+        #ifdef SOFT_SPRITE
         vWorldY = position.y;
-        vWorldSize = 0.0;
-        vLen = 0.0;
-        vInside = 0.0;
-        vSeed = 0.0;
-        if (uSoft > 0.5) {
-            vInside = insideDisk(position.xz, cameraPosition.xz);
-            vLen = length(cameraPosition - position) * vInside;
-            vWorldSize = gl_PointSize * dist * 0.0829 / uScale;
-            vSeed = fract(sin(dot(position.xz, vec2(12.9898, 78.233))) * 43758.5453);
-        }
+        vInside = insideDisk(position.xz, cameraPosition.xz);
+        vLen = length(cameraPosition - position) * vInside;
+        vWorldSize = gl_PointSize * dist * 0.0829 / uScale;
+        vSeed = fract(sin(dot(position.xz, vec2(12.9898, 78.233))) * 43758.5453);
+        #endif
         /*
          * Transmission is per channel, and that is the whole point: extinction at
          * A_V = 1 passes about 0.50 of the red and 0.30 of the blue, so starlight
@@ -566,11 +563,13 @@ const FRAGMENT_SHADER = /* glsl */ `
     varying vec3 vColor;
     varying float vAlpha;
     varying float vExtinction;
+    #ifdef SOFT_SPRITE
     varying float vWorldY;
     varying float vWorldSize;
     varying float vLen;
     varying float vInside;
     varying float vSeed;
+    #endif
 
     ${LANE_GLSL}
 
@@ -593,11 +592,13 @@ const FRAGMENT_SHADER = /* glsl */ `
          * into wisps - and a few thousand overlapping wisps read as cloud where the
          * same number of gaussians read as cotton wool.
          */
+        #ifdef SOFT_SPRITE
         if (uCloud > 0.0) {
             vec2 q = gl_PointCoord * 0.17 + vSeed * vec2(3.7, 9.1);
             float n = 0.62 * texture2D(uNoise, q).r + 0.38 * texture2D(uNoise, q * 2.7 + 0.37).r;
             a *= mix(1.0, smoothstep(0.26, 0.74, n) * 1.9, uCloud);
         }
+        #endif
         if (a < 0.002) discard;
         vec3 color = vColor * mix(uTint, vec3(1.0), vExtinction);
         /*
@@ -606,12 +607,14 @@ const FRAGMENT_SHADER = /* glsl */ `
          * sprite's centre - which is what lets a lane a third of a kly thick cut
          * cleanly through a glow several kly across.
          */
+        #ifdef SOFT_SPRITE
         if (uSoftLane > 0.0) {
             float y = vWorldY + (0.5 - gl_PointCoord.y) * vWorldSize * uUpY;
             float exitY = y + vInside * (uCamY - y);
             float tau = max(-uSoftLane * vLen * laneDensity(y, exitY, uLaneHeight), -uLaneFloor);
             color *= exp(tau * vec3(0.75, 1.0, 1.32));
         }
+        #endif
         gl_FragColor = vec4(color, a);
     }
 `;
@@ -620,6 +623,9 @@ const NOISE_TEXTURE = noiseTexture();
 
 function pointsMaterial({ maxSize, minSize = 1, nearFade = 0.02, sharpness = 16, attenuate = 1, ring = false, lane = false, soft = false, cloud = 0, blending = THREE.AdditiveBlending }) {
     const material = new THREE.ShaderMaterial({
+        // the soft variant carries five more varyings and the per-pixel lane; the
+        // two million stars compile without any of it
+        defines: soft ? { SOFT_SPRITE: 1 } : {},
         uniforms: {
             uScale: { value: 1 },
             uMaxSize: { value: maxSize },
@@ -637,7 +643,6 @@ function pointsMaterial({ maxSize, minSize = 1, nearFade = 0.02, sharpness = 16,
             uLaneFloor: { value: DUST.laneFloor },
             uRing: { value: ring ? 1 : 0 },
             // soft sprites take the lane per fragment instead of per vertex
-            uSoft: { value: soft ? 1 : 0 },
             uSoftLane: { value: 0 },
             uUpY: { value: 1 },
             uCamY: { value: 0 },
@@ -739,7 +744,7 @@ const BACKDROP_FRAGMENT = /* glsl */ `
     void main() {
         vec3 c = texture2D(uMap, vUv, uBias).rgb;
         float radius = length(vUv - 0.5);
-        float edge = 1.0 - smoothstep(0.42, 0.5, radius);
+        float edge = 1.0 - smoothstep(0.34, 0.5, radius);
         /*
          * The artwork paints a bulge and we build one in 3D, so up close the two
          * stack and blow the centre out. Fade the painted one away as the camera
@@ -1036,7 +1041,14 @@ function dustMapFrom(sampler, radius = 7) {
             }
             // a touch of gain: averaging along the lane fills the gaps between the
             // beads but also takes the tops off them
-            ribbons[i] = Math.min(1, (acc / weight) * 1.35);
+            /*
+             * And a floor. Smoothing spreads a trace of dust over every pixel near a
+             * lane, and the shader skips the lane maths only for stars that carry
+             * none - so without this nearly every star stopped being skipped and
+             * the star field's cost tripled for a difference nobody could see.
+             */
+            const value = (acc / weight) * 1.35;
+            ribbons[i] = value < 0.12 ? 0 : Math.min(1, value);
         }
     }
     return ribbons;
@@ -1338,7 +1350,7 @@ function buildGalaxyFromImage(image) {
         if (r < 8.5 && rand() > smoothstep(5.5, 8.5, r) * 0.6) continue;
         p.y += gauss() * (0.12 + 0.006 * r);
         color.setRGB(Math.min(c.r * 1.2, 1), c.g * 0.85, c.b * 0.95);
-        knots.add(p, color, 1.8 + rand() * 3.0, 0.16 + rand() * 0.26, dustMap[index]);
+        knots.add(p, color, 1.8 + rand() * 3.0, (0.16 + rand() * 0.26) * (0.3 + 0.7 * smoothstep(6, 15, r)), dustMap[index]);
     }
 
     return { stars, gas, knots, scattered, dustTexture: dustTexture(dustMap, sampler.n) };
@@ -2064,12 +2076,12 @@ const COMPOSITE_FRAGMENT = /* glsl */ `
 `;
 
 const POST = {
-    exposure: 1.12,
-    bloom: 0.5,
+    exposure: 1.32,
+    bloom: 0.55,
     threshold: 0.62,
     knee: 0.45,
     levels: 6,
-    saturation: 1.06,
+    saturation: 1.16,
     vignette: 0.22,
     shadowTint: new THREE.Color(0.004, 0.005, 0.012),
 };
@@ -2425,6 +2437,15 @@ class GalaxyView {
         this.core = buildCore();
         this.scene.add(this.core.group);
 
+        /*
+         * A galaxy does not end at its disk. The stellar halo and the gas around it
+         * are far too faint to resolve, but together they are why a galaxy on a long
+         * exposure sits in a soft glow instead of being cut out of black card.
+         */
+        this.haloGlow = glowSprite(new THREE.Color(0.36, 0.4, 0.72), 230, 0.05);
+        this.haloGlow.renderOrder = -2;
+        this.scene.add(this.haloGlow);
+
         this.bulge = new THREE.Points(buildBulgeGlow().geometry(), this.materials.bulge);
         this.bulge.renderOrder = 4;
         this.bulge.frustumCulled = false;
@@ -2714,11 +2735,14 @@ class GalaxyView {
     }
 
     bindControls() {
-        this.root.querySelectorAll(".GalaxyControls button").forEach((button) => {
+        // the dock's jump chips and the zoom buttons share one vocabulary
+        this.root.querySelectorAll("[data-action]").forEach((button) => {
             button.addEventListener("click", () => {
                 const action = button.dataset.action;
                 if (action === "overview") this.flyTo(OVERVIEW);
                 if (action === "sun") this.flyToSun();
+                if (action === "core") this.flyTo({ target: ORIGIN.clone(), distance: 24, polar: 0.95 });
+                if (action === "edge") this.flyTo({ target: ORIGIN.clone(), distance: 96, polar: THREE.MathUtils.degToRad(88.7) });
                 if (action === "zoom-in") this.zoomBy(0.6);
                 if (action === "zoom-out") this.zoomBy(1 / 0.6);
             });
@@ -2726,14 +2750,68 @@ class GalaxyView {
     }
 
     bindPanels() {
-        this.root.querySelectorAll("[data-panel]").forEach((button) => {
-            const panel = document.getElementById(button.dataset.panel);
-            button.addEventListener("click", () => {
-                const open = panel.classList.toggle("Open");
-                button.classList.toggle("Active", open);
-                button.setAttribute("aria-expanded", String(open));
-            });
-        });
+        /*
+         * The dock. This page is the site's map, so the first thing in it is the
+         * list of places you can go: every star system, as a link to its page with
+         * a button beside it that flies the camera there instead.
+         */
+        const dock = document.getElementById("GALAXY_DOCK");
+        const toggle = document.getElementById("GALAXY_DOCK_TOGGLE");
+        const setCollapsed = (collapsed) => {
+            dock.classList.toggle("Collapsed", collapsed);
+            toggle.setAttribute("aria-expanded", String(!collapsed));
+        };
+        toggle.addEventListener("click", () => setCollapsed(!dock.classList.contains("Collapsed")));
+        // on a narrow window the dock would cover the map it is the index to
+        const narrow = window.matchMedia("(max-width: 760px)");
+        if (narrow.matches) setCollapsed(true);
+        narrow.addEventListener("change", (event) => setCollapsed(event.matches));
+
+        const list = document.getElementById("GALAXY_SYSTEM_LIST");
+        const entry = (system) => this.registry.find((e) => e.group === "Star systems" && (e.name === system.name || (system.placement.d === 0 && e.name === "Sun")));
+        const systems = [...DATA.systems].sort((a, b) => (a.placement.d ?? Infinity) - (b.placement.d ?? Infinity));
+        for (const system of systems) {
+            const row = document.createElement("div");
+            row.className = "SystemRow";
+            row.style.setProperty("--system-color", system.color);
+            const open = document.createElement("a");
+            open.className = "SystemOpen";
+            open.href = system.href;
+            const sub = system.placement.fictional
+                ? `Fictional - ${system.placement.source}`
+                : system.placement.d === 0
+                  ? "Home - you are here"
+                  : `${formatLy(system.placement.d)} away`;
+            open.innerHTML = '<span class="SystemDot"></span><span class="SystemText"><span class="SystemName"></span><span class="SystemSub"></span></span><span class="SystemArrow" aria-hidden="true">&rarr;</span>';
+            open.querySelector(".SystemName").textContent = system.name;
+            open.querySelector(".SystemSub").textContent = sub;
+            row.appendChild(open);
+            const found = entry(system);
+            if (found) {
+                const locate = document.createElement("button");
+                locate.type = "button";
+                locate.className = "SystemLocate";
+                locate.title = `Show ${system.name} on the map`;
+                locate.setAttribute("aria-label", locate.title);
+                locate.addEventListener("click", () => found.fly());
+                row.appendChild(locate);
+            }
+            list.appendChild(row);
+        }
+
+        // the legend is built from the same table the map's dots are coloured by
+        const legend = document.getElementById("GALAXY_LEGEND");
+        const key = (label, color, shape = "") => {
+            const item = document.createElement("li");
+            item.innerHTML = `<span class="LegendDot ${shape}"></span><span></span>`;
+            item.firstChild.style.setProperty("--legend-color", color);
+            item.lastChild.textContent = label;
+            legend.appendChild(item);
+        };
+        key("Star system", "#ffffff", "Ring");
+        key("Spiral arm", "#8fa7d8", "Dash");
+        for (const kind of ["nebula", "open", "globular", "remnant", "planetary"]) key(DEEP_SKY_STYLE[kind].label, DEEP_SKY_STYLE[kind].color);
+        key("Star-forming gas", "#ff8fb0");
         this.root.querySelectorAll(".GalaxyLayer input").forEach((input) => {
             const key = input.dataset.layer;
             let saved = null;
@@ -2991,6 +3069,17 @@ class GalaxyView {
         this.materials.gas.uniforms.uMaxSize.value = THREE.MathUtils.lerp(900, 520, closeness) * this.post.softScale;
         this.materials.bulge.uniforms.uMaxSize.value = THREE.MathUtils.lerp(640, 300, closeness) * this.post.softScale;
 
+        /*
+         * From outside, the bulge is a glow. From inside it would be a white wall:
+         * the same sprites, each now hundreds of pixels wide, stacked over the whole
+         * view. So the glow steps back as the camera enters and the star field and
+         * the nucleus - which are what you came in to see - take over.
+         */
+        const coreNear = 1 - smoothstep(12, 62, this.camera.position.length());
+        this.materials.bulge.uniforms.uOpacity.value = THREE.MathUtils.lerp(1, 0.16, coreNear);
+        // and the haze goes smoother up close, where a wisp is a whole screen wide
+        this.materials.gas.uniforms.uCloud.value = THREE.MathUtils.lerp(0.85, 0.4, closeness);
+
         const closeGain = 1 - smoothstep(10, 80, cameraDistance);
         this.materials.stars.uniforms.uGain.value = 1 + 5.6 * closeGain;
         this.materials.knots.uniforms.uGain.value = 1 + 2.0 * closeGain;
@@ -3025,6 +3114,15 @@ class GalaxyView {
                 const sheet = m.userData.offset === 0 ? 1 : sheetFade;
                 m.uniforms.uOpacity.value = BACKDROP.opacity * m.userData.weight * closeFade * sheet * flatFade;
                 m.uniforms.uCoreFade.value = coreFade;
+                /*
+                 * Up close the painting is magnified far past its resolution, and
+                 * what it has at that scale is the artist's own painted stars -
+                 * which, stretched across a grazing plane, came out as a field of
+                 * grey flecks under the real star field. The mid-plane sheet drops
+                 * to a coarser mip as the camera closes in, so it stays as colour
+                 * and loses the flecks.
+                 */
+                if (m.userData.offset === 0) m.uniforms.uBias.value = 3.6 * Math.pow(closeness, 1.4);
                 m.uniforms.uDustStrength.value = DUST.backdropDepth * armDustRamp;
                 m.uniforms.uPlaneLane.value = planeLane * m.userData.inLane;
             }
