@@ -40,6 +40,21 @@
     cursor: grabbing
 }
 
+/* the map takes keyboard focus; show it with an inset ring rather than the default */
+#GALAXY_CANVAS:focus {
+    outline: none
+}
+
+#GALAXY_CANVAS:focus-visible {
+    box-shadow: inset 0 0 0 2px rgba(158, 203, 255, .55)
+}
+
+.GalaxyPanelNote a {
+    color: var(--galaxy-accent);
+    font-size: inherit;
+    text-decoration: underline
+}
+
 /* ---------- labels on the map ---------- */
 
 .GalaxyLabels {
@@ -131,6 +146,35 @@
     background: var(--galaxy-glass-strong);
     border-color: var(--marker-color, var(--galaxy-accent));
     box-shadow: 0 0 18px -2px var(--marker-color, var(--galaxy-accent))
+}
+
+/*
+ * A system label that had to step aside: it can sit left of its icon, and it can move
+ * up or down, with a leader line from the icon so it still points at its star.
+ */
+.GalaxyMarker.Left {
+    flex-direction: row-reverse
+}
+
+.GalaxyMarker.Displaced .GalaxyMarkerText {
+    transform: translateY(var(--label-shift, 0))
+}
+
+.GalaxyMarker.Displaced .GalaxyMarkerIcon::before {
+    background: linear-gradient(var(--marker-color, #fff), transparent);
+    content: "";
+    height: var(--leader, 0);
+    left: calc(50% - .5px);
+    opacity: .55;
+    position: absolute;
+    top: 50%;
+    width: 1px
+}
+
+.GalaxyMarker.Displaced.Above .GalaxyMarkerIcon::before {
+    background: linear-gradient(transparent, var(--marker-color, #fff));
+    bottom: 50%;
+    top: auto
 }
 
 .GalaxyMarker.Fictional .GalaxyMarkerText {
@@ -817,8 +861,23 @@
         --galaxy-dock: min(300px, calc(100vw - 20px))
     }
 
+    /* the bottom edge is full, so on a phone the hint sits top right until first touch */
     .GalaxyHint {
-        display: none
+        bottom: auto;
+        max-width: 52vw;
+        top: calc(var(--galaxy-gap) + 6px);
+        transition: opacity .6s
+    }
+
+    /* long subtitles (Sgr A*'s is a sentence) wrap rather than run off the screen */
+    .GalaxyMarker.Link .GalaxyMarkerSub {
+        max-width: 44vw;
+        white-space: normal
+    }
+
+    .GalaxyHint.Dismissed {
+        opacity: 0;
+        pointer-events: none
     }
 
     /* the dock would cover the map, so the readout goes above the zoom buttons */

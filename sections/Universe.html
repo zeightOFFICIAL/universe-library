@@ -18,7 +18,8 @@
         <div id="GALAXY_VIEW" class="GalaxyView"
              data-backdrop="{% static 'Images/GalaxyBackdrop.jpg' %}"
              data-galaxies="{% static 'Images/Galaxies/' %}">
-            <canvas id="GALAXY_CANVAS"></canvas>
+            <canvas id="GALAXY_CANVAS" tabindex="0" role="application" aria-roledescription="galaxy map"
+                    aria-label="Map of the Milky Way. Arrow keys move, Shift and arrow keys turn and tilt, plus and minus zoom, Home shows the whole galaxy."></canvas>
             <div class="GalaxyLoader" id="GALAXY_LOADER">
                 <p class="GalaxyLoaderTitle">Charting the galaxy</p>
                 <div class="GalaxyLoaderTrack"><span id="GALAXY_LOADER_BAR"></span></div>
@@ -72,6 +73,8 @@
                     <details class="DockDetails">
                         <summary>About this map</summary>
                         <p class="GalaxyPanelNote">Positions of landmarks are real; the far galaxies are drawn closer than they are, and say so. The backdrop, landmarks and galaxies are always drawn - the switches above only show or hide their names. {{ galaxy.credits }}</p>
+                        <p class="GalaxyPanelNote" id="GALAXY_QUALITY"></p>
+                        <p class="GalaxyPanelNote">Keyboard: arrow keys move, Shift + arrows turn and tilt, + and &minus; zoom, Home shows the whole galaxy.</p>
                     </details>
                 </div>
             </aside>
@@ -84,6 +87,6 @@
             </div>
         </div>
         {{ galaxy|json_script:"GALAXY_DATA" }}
-        <script type="module" src="{% static 'Scripts/Galaxy.js' %}"></script>
+        <script type="module" src="{% static 'Scripts/galaxy/main.js' %}"></script>
     </body>
 </html>
