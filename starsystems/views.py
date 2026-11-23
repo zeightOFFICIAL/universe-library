@@ -12,6 +12,7 @@ from starsystems.galaxy import (
     GALAXY_PLACEMENT,
     IMAGE_CREDITS,
     PLANETARY_SYSTEMS,
+    SPACECRAFT,
     SUN_HEIGHT_ABOVE_PLANE_LY,
     SUN_TO_GALACTIC_CENTRE_LY,
 )
@@ -41,6 +42,7 @@ def universe_page(request) -> HttpResponse:
         "galaxies": GALAXIES,
         "planetarySystems": PLANETARY_SYSTEMS,
         "fiction": FICTIONAL_PLACES,
+        "spacecraft": SPACECRAFT,
         "celestialPole": CELESTIAL_POLE_GALACTIC,
         "backgroundGalaxies": BACKGROUND_GALAXY_IMAGES,
         "credits": IMAGE_CREDITS,

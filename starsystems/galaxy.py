@@ -31,7 +31,7 @@ GALAXY_PLACEMENT = {
     "Polaris": {"l": 123.28, "b": 26.46, "d": 433.0},
     # "label" overrides the display name where the URL-safe DB name cannot carry it
     "BarnardsStar": {"l": 31.01, "b": 14.06, "d": 5.96, "label": "Barnard's Star"},
-    "Trebia": {"fictional": True, "source": "Mass Effect", "x": 21_000, "z": -9_000, "hidden": True},
+    "Trebia": {"fictional": True, "source": "Mass Effect", "note": "Palaven, the turian homeworld", "x": 21_000, "z": -9_000},
 }
 
 # Landmarks drawn at their true positions, as a reference for where our systems sit.
@@ -199,26 +199,30 @@ PLANETARY_SYSTEMS = [
     {"name": "OGLE-2005-BLG-390L", "note": "A cold super-Earth found by microlensing, near the bulge", "l": 359.73, "b": -2.36, "d": 21_500},
 ]
 
-# Places from fiction, kept apart from the real ones and drawn differently. Where the
-# story names a real star, the place sits at that star ("anchor"). Where it does not,
-# x/z (ly, galactocentric) are placed by eye from the source's own galaxy map and
-# say so. "offMap" places are not in the Milky Way at all; they are listed with a note.
+# Fiction set in the Milky Way, kept apart from the real places and drawn differently
+# (dashed, violet, its own layer). "type" sorts each into the Star systems or the
+# Objects panel. Where the story names a real star the place sits at it ("anchor",
+# l/b/d computed from J2000 RA/Dec like everything else); otherwise x/z (ly,
+# galactocentric) are placed by eye from the source's own galaxy map, and say so.
+# Trebia, which has a page, lives in GALAXY_PLACEMENT instead.
 FICTIONAL_PLACES = [
-    {"name": "Vulcan", "source": "Star Trek", "anchor": "40 Eridani A", "l": 200.75, "b": -38.05, "d": 16.3},
-    {"name": "Reach", "source": "Halo", "anchor": "Epsilon Eridani", "l": 195.84, "b": -48.05, "d": 10.5},
-    {"name": "Pandora", "source": "Avatar", "anchor": "Alpha Centauri A", "l": 315.73, "b": -0.68, "d": 4.37},
-    {"name": "Trisolaris", "source": "The Three-Body Problem", "anchor": "Alpha Centauri", "l": 315.73, "b": -0.68, "d": 4.37},
-    {"name": "Arrakis", "source": "Dune", "anchor": "Canopus", "l": 261.21, "b": -25.29, "d": 310},
-    {"name": "Ford Prefect's home", "source": "The Hitchhiker's Guide", "anchor": "near Betelgeuse", "l": 199.79, "b": -8.96, "d": 548},
-    {"name": "Arcturus Station", "source": "Mass Effect", "anchor": "Arcturus", "l": 15.05, "b": 69.11, "d": 36.7},
-    {"name": "Gargantua's wormhole", "source": "Interstellar", "anchor": "by Saturn", "l": 0.0, "b": 0.0, "d": 0.00015,
-     "note": "The wormhole sits by Saturn; Gargantua itself is in another galaxy"},
-    {"name": "The Citadel", "source": "Mass Effect", "x": 8_000, "z": 14_000, "note": "Serpent Nebula"},
-    {"name": "Omega", "source": "Mass Effect", "x": -14_000, "z": 12_000, "note": "Terminus Systems"},
-    {"name": "Tuchanka", "source": "Mass Effect", "x": 16_000, "z": 2_000, "note": "Krogan homeworld"},
-    {"name": "Collector Base", "source": "Mass Effect", "x": 1_500, "z": 2_500, "note": "Beyond the Omega-4 Relay, near the core"},
-    {"name": "A galaxy far, far away", "source": "Star Wars", "offMap": True,
-     "note": "Star Wars is set in another galaxy, so it has no place on this map"},
+    {"type": "system", "name": "Widow", "source": "Mass Effect", "note": "The Citadel, in the Serpent Nebula", "x": 8_000, "z": 14_000},
+    {"type": "system", "name": "Sahrabarik", "source": "Mass Effect", "note": "Omega station, Terminus Systems", "x": -14_000, "z": 12_000},
+    {"type": "system", "name": "Aralakh", "source": "Mass Effect", "note": "Tuchanka, the krogan homeworld", "x": 16_000, "z": 2_000},
+    {"type": "system", "name": "40 Eridani", "source": "Star Trek", "note": "Vulcan", "anchor": "40 Eridani A", "l": 200.75, "b": -38.05, "d": 16.3},
+    {"type": "system", "name": "Epsilon Eridani", "source": "Halo", "note": "Reach", "anchor": "Epsilon Eridani", "l": 195.84, "b": -48.05, "d": 10.5},
+    {"type": "system", "name": "Canopus", "source": "Dune", "note": "Arrakis", "anchor": "Canopus", "l": 261.21, "b": -25.29, "d": 310},
+    {"type": "object", "name": "Arcturus Station", "source": "Mass Effect", "note": "Alliance capital station", "anchor": "Arcturus", "l": 15.05, "b": 69.11, "d": 36.7},
+    {"type": "object", "name": "Collector Base", "source": "Mass Effect", "note": "Beyond the Omega-4 Relay, near the core", "x": 1_500, "z": 2_500},
+    {"type": "object", "name": "Gargantua's wormhole", "source": "Interstellar", "note": "By Saturn; Gargantua lies beyond it", "anchor": "Saturn", "l": 0.0, "b": 0.0, "d": 0.00015},
+]
+
+# Real objects that are not star systems. The Voyagers' directions are where they
+# are heading as seen from the Sun (RA/Dec converted as above); distances in AU for
+# late 2026, when Voyager 1 passes one light-day.
+SPACECRAFT = [
+    {"name": "Voyager 1", "note": "Farthest human-made object, about one light-day out", "l": 33.13, "b": 26.78, "au": 173},
+    {"name": "Voyager 2", "note": "Left the heliosphere in 2018", "l": 337.63, "b": -32.75, "au": 142},
 ]
 
 CELESTIAL_POLE_GALACTIC = {"l": 122.93192, "b": 27.12825}

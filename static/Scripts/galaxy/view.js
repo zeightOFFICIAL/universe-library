@@ -259,7 +259,7 @@ export class GalaxyView {
              * their like, and plain dots made the named ones look like the only
              * nebulae in the galaxy.
              */
-            this.scatteredArt = buildDeepSky(galaxy.scattered.objects, { seed: 7311, amount: LITE ? 0.35 : 0.5, cores: false, haloFloor: 2.5 });
+            this.scatteredArt = buildDeepSky(galaxy.scattered.objects, { seed: 7311, amount: LITE ? 0.3 : 0.4, cores: false, haloFloor: 2 });
             this.scatteredArt.group.renderOrder = 8;
             this.scene.add(this.scatteredArt.group);
             this.resize();
@@ -456,7 +456,8 @@ export class GalaxyView {
         }
         for (const s of this.visibleSystems().filter((s) => s.placement.fictional)) {
             const position = new THREE.Vector3(s.placement.x / 1000, 0, s.placement.z / 1000);
-            const marker = add({ position, name: s.name, sub: `Fiction · ${s.placement.source}`, level: "galaxy", layer: "fiction", href: s.href, color: s.color, variant: "fiction" });
+            const sub = [s.placement.source, s.placement.note, "placed by eye"].filter(Boolean).join(" · ");
+            const marker = add({ position, name: s.name, sub, level: "any", layer: "fiction", href: s.href, color: s.color, variant: "fiction", far: 40, measureFrom: "camera" });
             this.systemMarkers.set(s.href, marker);
         }
 
@@ -481,7 +482,7 @@ export class GalaxyView {
                 priority: 0.4,
                 onClick: fly,
             });
-            this.places.push({ kind: "map", data: s, marker, fly, position, distance: s.d });
+            this.places.push({ kind: "map", type: "system", data: s, marker, fly, position, distance: s.d });
         }
 
         /*
@@ -490,29 +491,49 @@ export class GalaxyView {
          * at that star; the rest are placed by eye and say so.
          */
         for (const f of DATA.fiction || []) {
-            if (f.offMap) {
-                this.places.push({ kind: "fiction", data: f, marker: null, fly: null, distance: Infinity });
-                continue;
-            }
             const anchored = f.d !== undefined;
             const position = anchored ? truePosition(f.l, f.b, f.d) : new THREE.Vector3(f.x / 1000, 0, f.z / 1000);
             const near = anchored && f.d < 1000;
-            const fly = () => this.flyTo({ target: position.clone(), distance: anchored ? Math.max((f.d / 1000) * 2.2, 0.014) : 8 });
-            const where = anchored ? `at ${f.anchor}` : `${f.note} · placed by eye`;
+            const fly = () => this.flyTo({ target: position.clone(), distance: anchored ? Math.max((f.d / 1000) * 2.2, LOCAL_MIN_DISTANCE * 1.5) : 8 });
             const marker = add({
                 position,
                 name: f.name,
-                sub: `${f.source} · ${where}`,
+                sub: [f.source, f.note, anchored ? "" : "placed by eye"].filter(Boolean).join(" · "),
                 level: "any",
                 layer: "fiction",
                 variant: "fiction",
+                object: f.type === "object",
                 color: "#c7a6ff",
-                far: near ? 1.6 : 40,
+                far: f.d < 0.01 ? 0.004 : near ? 1.6 : 40,
                 measureFrom: "camera",
                 priority: 0.8,
                 onClick: fly,
             });
-            this.places.push({ kind: "fiction", data: f, marker, fly, position, distance: anchored ? f.d : position.distanceTo(SUN) * 1000 });
+            this.places.push({ kind: "fiction", type: f.type, data: f, marker, fly, position, distance: anchored ? f.d : position.distanceTo(SUN) * 1000 });
+        }
+
+        /*
+         * Real things that are not star systems: the Voyagers, the farthest objects
+         * we have sent. At true scale they are a light-day out, so they only part
+         * from the Sun at the bottom of the local zoom.
+         */
+        for (const c of DATA.spacecraft || []) {
+            const ly = c.au / 63241;
+            const position = truePosition(c.l, c.b, ly);
+            const fly = () => this.flyTo({ target: SUN.clone(), distance: (ly / 1000) * 3.2, polar: 1.1 });
+            const marker = add({
+                position,
+                name: c.name,
+                sub: formatLy(ly),
+                level: "local",
+                object: true,
+                color: "#e6eaf2",
+                far: (ly / 1000) * 40,
+                measureFrom: "camera",
+                priority: 0.6,
+                onClick: fly,
+            });
+            this.places.push({ kind: "real", type: "object", data: { ...c, d: ly }, marker, fly, position, distance: ly });
         }
 
         /*
@@ -718,6 +739,10 @@ export class GalaxyView {
                 storageKey: "galaxyPanel:systems",
                 filters: [["page", "With a page"], ["map", "Map only"], ["fiction", "Fiction"]],
             });
+            this.objectPanel = new Catalogue(document.getElementById("PANEL_OBJECTS"), {
+                storageKey: "galaxyPanel:objects",
+                filters: [["real", "Real"], ["fiction", "Fiction"]],
+            });
             this.landmarkPanel = new Catalogue(document.getElementById("PANEL_LANDMARKS"), {
                 storageKey: "galaxyPanel:landmarks",
                 filters: [["nebula", "Nebulae"], ["cluster", "Clusters"], ["remnant", "Supernovae"], ["planetary", "Planetary"], ["structure", "Structure"]],
@@ -733,7 +758,7 @@ export class GalaxyView {
             systems.push({
                 id: `page-${system.href}`,
                 name: home ? "Sun · Solar System" : system.name,
-                sub: fiction ? `${system.placement.source} · has a page` : home ? "Home · you are here" : formatLy(system.placement.d),
+                sub: fiction ? [system.placement.source, system.placement.note].filter(Boolean).join(" · ") : home ? "Home · you are here" : formatLy(system.placement.d),
                 search: fiction ? "fiction" : "",
                 color: system.color,
                 style: fiction ? "fiction" : "page",
@@ -745,22 +770,27 @@ export class GalaxyView {
                 distance: fiction ? Infinity : system.placement.d,
             });
         }
+        // star systems go to the first panel, everything else to Objects
+        const objects = [];
         for (const place of this.places) {
             const d = place.data;
-            systems.push({
+            const fiction = place.kind === "fiction";
+            const entry = {
                 id: `${place.kind}-${d.name}`,
                 name: d.name,
-                sub: place.kind === "map" ? `${formatLy(d.d)} · ${d.note}` : d.offMap ? `${d.source} · ${d.note}` : `${d.source} · ${d.anchor ? `at ${d.anchor}` : d.note}`,
-                search: place.kind === "fiction" ? `fiction ${d.note || ""}` : "",
-                color: place.kind === "map" ? "#9ecbff" : "#c7a6ff",
-                style: place.kind,
-                filter: place.kind,
+                sub: fiction ? [d.source, d.note].filter(Boolean).join(" · ") : `${formatLy(d.d)} · ${d.note}`,
+                search: fiction ? `fiction ${d.source}` : "",
+                color: place.kind === "map" ? "#9ecbff" : fiction ? "#c7a6ff" : "#e6eaf2",
+                style: place.type === "object" ? (fiction ? "fiction-object" : "object") : place.kind,
+                filter: place.type === "object" ? (fiction ? "fiction" : "real") : place.kind,
                 fly: place.fly,
                 inView: seen(place.marker),
                 distance: place.distance,
-            });
+            };
+            (place.type === "object" ? objects : systems).push(entry);
         }
         this.systemPanel.setEntries(systems);
+        this.objectPanel.setEntries(objects);
 
         const landmarks = [];
         const kindFilter = { nebula: "nebula", open: "cluster", globular: "cluster", remnant: "remnant", planetary: "planetary" };
@@ -814,6 +844,7 @@ export class GalaxyView {
         if (now - this.lastListUpdate < 400) return;
         this.lastListUpdate = now;
         this.systemPanel?.refresh();
+        this.objectPanel?.refresh();
         this.landmarkPanel?.refresh();
     }
 
@@ -829,6 +860,7 @@ export class GalaxyView {
             ["Star system, opens its page", "#ffffff", "Ring", true],
             ["Real system, map only", "#9ecbff", "Ring Hollow", true],
             ["Place from fiction", "#c7a6ff", "Ring Fiction", true],
+            ["Object: spacecraft or station", "#e6eaf2", "Diamond", true],
             ["Spiral arm", "#8fa7d8", "Dash", true],
             [DEEP_SKY_STYLE.nebula.label, DEEP_SKY_STYLE.nebula.color, "", true],
             [DEEP_SKY_STYLE.open.label, DEEP_SKY_STYLE.open.color, "", true],
@@ -1144,7 +1176,7 @@ export class GalaxyView {
          * galaxy's scale, so the near plane follows the camera in. A fixed one would
          * either clip the Sun's neighbours or waste the depth buffer on the galaxy.
          */
-        const near = THREE.MathUtils.clamp(cameraDistance * 0.02, 0.00005, 0.01);
+        const near = THREE.MathUtils.clamp(cameraDistance * 0.02, 1e-8, 0.01);
         if (Math.abs(near - this.camera.near) > this.camera.near * 0.1) {
             this.camera.near = near;
             this.camera.updateProjectionMatrix();

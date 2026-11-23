@@ -31,6 +31,8 @@ export class Marker {
         // a system whose page is still empty: shown, but quieter, and it says so
         // "map": a real place with no page yet; "fiction": a place from a story
         variant = null,
+        // not a star system: a station, a spacecraft, a wormhole - drawn as a diamond
+        object = false,
     }) {
         this.position = position;
         this.level = level;
@@ -48,7 +50,7 @@ export class Marker {
         this.fade = 0;
         this.drawnFade = -1;
         const el = document.createElement(href ? "a" : "div");
-        el.className = `GalaxyMarker ${kind === "region" ? "Region" : kind === "ring" ? "Ring" : "Link"}${fictional ? " Fictional" : ""}${members ? " Cluster" : ""}${variant === "map" ? " MapOnly" : variant === "fiction" ? " Fiction" : ""}`;
+        el.className = `GalaxyMarker ${kind === "region" ? "Region" : kind === "ring" ? "Ring" : "Link"}${fictional ? " Fictional" : ""}${members ? " Cluster" : ""}${variant === "map" ? " MapOnly" : variant === "fiction" ? " Fiction" : ""}${object ? " Object" : ""}`;
         if (href) el.href = href;
         if (color) el.style.setProperty("--marker-color", color);
         if (kind === "link") {

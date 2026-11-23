@@ -85,6 +85,18 @@
                         <div class="CatalogueList"></div>
                     </div>
                 </section>
+                <section class="SidePanel CataloguePanel" id="PANEL_OBJECTS" aria-label="Objects">
+                    <header class="PanelHead">
+                        <button type="button" class="PanelFold" aria-expanded="true" aria-controls="PANEL_OBJECTS_BODY">
+                            <span class="PanelTitle">Objects</span><span class="PanelCount"></span><span class="PanelChevron" aria-hidden="true"></span>
+                        </button>
+                    </header>
+                    <div class="PanelBody" id="PANEL_OBJECTS_BODY">
+                        <input type="search" class="PanelSearch" placeholder="Search spacecraft, stations…" aria-label="Search spacecraft, stations…" autocomplete="off" spellcheck="false">
+                        <div class="PanelFilters" role="group" aria-label="Filter"></div>
+                        <div class="CatalogueList"></div>
+                    </div>
+                </section>
                 <section class="SidePanel CataloguePanel" id="PANEL_LANDMARKS" aria-label="Nebulae &amp; clusters">
                     <header class="PanelHead">
                         <button type="button" class="PanelFold" aria-expanded="true" aria-controls="PANEL_LANDMARKS_BODY">
@@ -113,7 +125,7 @@
                 </button>
                 <button type="button" class="LayerToggle" data-layer="fiction" aria-pressed="true" aria-label="Fiction" aria-describedby="TIP_FICTION">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5c-2-1.6-5-2-8-1.5v13c3-.5 6-.1 8 1.5 2-1.6 5-2 8-1.5V5c-3-.5-6-.1-8 1.5z"/><path d="M12 6.5V20"/><path d="M16.5 9.2l.5 1.2 1.2.2-.9.8.3 1.2-1.1-.6-1.1.6.3-1.2-.9-.8 1.2-.2z" fill="currentColor" stroke="none"/></svg>
-                    <span class="LayerTip" id="TIP_FICTION" role="tooltip"><strong>Fiction</strong><span class="TipText">Places from stories: Vulcan, Arrakis, the Citadel and more, drawn dashed and violet. Where a story names a real star the place sits there; otherwise it is placed by eye from the story's own map.</span><span class="TipState"></span></span>
+                    <span class="LayerTip" id="TIP_FICTION" role="tooltip"><strong>Fiction</strong><span class="TipText">Star systems and stations from stories set in the Milky Way - Mass Effect, Star Trek, Halo, Dune, Interstellar - drawn dashed and violet. Where a story names a real star the place sits there; otherwise it is placed by eye from the story's own map.</span><span class="TipState"></span></span>
                 </button>
             </nav>
             <aside class="GalaxyLegend" id="GALAXY_LEGEND" aria-label="Legend">

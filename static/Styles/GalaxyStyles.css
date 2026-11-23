@@ -737,8 +737,24 @@ div.CatalogueJump {
     width: 10px
 }
 
-.Style-fiction .CatalogueName {
+.Style-fiction .CatalogueName,
+.Style-fiction-object .CatalogueName {
     font-style: italic
+}
+
+.Style-object .CatalogueDot,
+.Style-fiction-object .CatalogueDot {
+    border-radius: 2px;
+    height: 7px;
+    margin: 0 2px;
+    transform: rotate(45deg);
+    width: 7px
+}
+
+.Style-fiction-object .CatalogueDot {
+    background: transparent;
+    border: 1.5px dashed var(--row-color);
+    box-shadow: none
 }
 
 .Style-arm .CatalogueDot {
@@ -1053,7 +1069,8 @@ div.CatalogueJump {
     box-shadow: 0 18px 50px -18px rgba(0, 0, 0, .8);
     padding: 8px 12px 10px;
     position: absolute;
-    right: calc(var(--galaxy-gap) * 2 + 52px);
+    /* its right edge lines up with the settings panel's */
+    right: var(--galaxy-gap);
     top: calc(var(--galaxy-gap) + 62px);
     width: 214px;
     z-index: 24
@@ -1118,6 +1135,15 @@ div.CatalogueJump {
     box-shadow: none
 }
 
+.LegendDot.Diamond {
+    border-radius: 2px;
+    box-shadow: none;
+    height: 7px;
+    margin: 0 4px;
+    transform: rotate(45deg);
+    width: 7px
+}
+
 .LegendDot.Fiction {
     border-style: dashed;
     box-shadow: 0 0 6px -1px var(--legend-color)
@@ -1140,6 +1166,26 @@ div.CatalogueJump {
     background: transparent;
     border-color: transparent;
     text-shadow: 0 0 4px #000, 0 0 10px #000
+}
+
+/* not a star system - a spacecraft, a station, a wormhole: a diamond, not a ring */
+/* the diamond is the inner shape, so a displaced label's leader line stays upright */
+.GalaxyMarker.Object .GalaxyMarkerIcon {
+    border-color: transparent;
+    box-shadow: none
+}
+
+.GalaxyMarker.Object .GalaxyMarkerIcon::after {
+    border: 1.5px solid var(--galaxy-ink);
+    border-radius: 1px;
+    box-shadow: 0 0 8px var(--marker-color, #fff);
+    inset: 14%;
+    transform: rotate(45deg)
+}
+
+.GalaxyMarker.Object.Fiction .GalaxyMarkerIcon::after {
+    background: transparent;
+    border: 1.5px dashed var(--marker-color)
 }
 
 /* fiction: violet, dashed and italic, so it never passes for a real place */
@@ -1586,7 +1632,7 @@ div.CatalogueJump {
     /* the legend shrinks to a tab under the layers; a tap opens it */
     .GalaxyLegend {
         padding: 6px 10px;
-        right: calc(var(--galaxy-gap) * 2 + 48px);
+        right: var(--galaxy-gap);
         top: calc(var(--galaxy-gap) + 54px);
         width: auto
     }

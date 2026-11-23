@@ -169,6 +169,8 @@ const LY_IN_PC = 3.26156;
 const KM_IN_LY = 9.4607e12;
 
 export function formatDistance(ly) {
+    // inside the Solar System light-years are unreadable, so it switches to AU
+    if (ly > 0 && ly < 0.05 && UNITS.distance !== "km") return `${formatNumber(ly * 63241)} AU`;
     switch (UNITS.distance) {
         case "pc":
             return `${formatNumber(ly / LY_IN_PC)} pc`;

@@ -207,9 +207,9 @@ export const LOCAL_RINGS_LY = [10, 100, 1000];
  */
 export const LOCAL_ENTER = 2.6;
 export const LOCAL_FULL = 1.5;
-// how close the camera may come near the Sun: about 4 ly, enough to split Alpha
-// Centauri from the Sun. Elsewhere the old limit holds (see frame()).
-export const LOCAL_MIN_DISTANCE = 0.004;
+// how close the camera may come near the Sun: about 130 AU, enough to see the two
+// Voyagers apart from the Sun. Elsewhere the old limit holds (see frame()).
+export const LOCAL_MIN_DISTANCE = 0.000002;
 export const GALAXY_MIN_DISTANCE = 0.8;
 // where the Sun button lands: every one of our systems in frame
 export const SUN_VIEW = { distance: 0.95, polar: 1.0 };

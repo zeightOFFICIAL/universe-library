@@ -16,6 +16,9 @@ import { rand, gauss, mulberry32, directionFromSun, truePosition, Layer } from "
  *
  * Its own seeded generator, so adding a landmark never reshuffles the star field.
  */
+// one dial for how loud the painted layer is against the star field
+const ART_BRIGHTNESS = 0.68;
+
 const ARTISTIC = {
     nebula: { wisps: 4, spread: 0.05, size: [14, 26], alpha: [0.045, 0.08], tints: ["#ff6b8a", "#ff9fc0", "#8fb8ff", "#c58cff"] },
     remnant: { wisps: 2, spread: 0.03, size: [12, 18], alpha: [0.045, 0.065], tints: ["#ff9d6b", "#7fd6ff"], ring: 13 },
@@ -59,16 +62,16 @@ export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: draw
         for (let i = 0; i < wisps; i++) {
             p.set(normal(), normal() * 0.6, normal()).multiplyScalar(art.spread).add(o.position);
             color.set(art.tints[(i + offset) % art.tints.length]).convertSRGBToLinear();
-            halos.add(i === 0 ? o.position : p, color, between(art.size) * (0.7 + 0.3 * amount), between(art.alpha) * (0.5 + 0.5 * amount));
+            halos.add(i === 0 ? o.position : p, color, between(art.size) * (0.7 + 0.3 * amount), between(art.alpha) * (0.5 + 0.5 * amount) * ART_BRIGHTNESS);
         }
-        if (art.ring) rings.add(o.position, new THREE.Color(style.color).convertSRGBToLinear(), art.ring * (0.7 + 0.3 * amount), 0.42 * Math.pow(amount, 1.6));
+        if (art.ring) rings.add(o.position, new THREE.Color(style.color).convertSRGBToLinear(), art.ring * (0.7 + 0.3 * amount), 0.42 * Math.pow(amount, 1.6) * ART_BRIGHTNESS);
         const memberCount = Math.round((art.members || 0) * amount);
         for (let i = 0; i < memberCount; i++) {
             // globulars crowd to the middle, open clusters stay loose
             const r = art.memberSpread * (o.kind === "globular" ? Math.pow(random(), 1.8) : 0.35 + 0.65 * random());
             p.set(normal(), normal(), normal()).normalize().multiplyScalar(r).add(o.position);
             color.set(style.color).convertSRGBToLinear().lerp(white, 0.35 + 0.4 * random());
-            members.add(p, color, 2.2 + 2.6 * random(), 0.5 + 0.4 * random());
+            members.add(p, color, 2.2 + 2.6 * random(), (0.5 + 0.4 * random()) * ART_BRIGHTNESS);
         }
     }
 

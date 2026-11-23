@@ -8,6 +8,12 @@
  *   style   "page" | "map" | "fiction" | a deep-sky kind - sets the dot
  *   filter  which filter chip the entry belongs to
  */
+/*
+ * The catalogues share one column, so they open one at a time: unfolding one folds
+ * the rest. Three open lists on a laptop screen left each about one row tall.
+ */
+const OPEN_GROUP = [];
+
 export class Catalogue {
     constructor(panel, { filters = [], storageKey }) {
         this.panel = panel;
@@ -49,7 +55,7 @@ export class Catalogue {
             }
         });
 
-        // each panel folds on its own, and remembers it
+        // one panel open at a time, remembered; the first one opens by default
         const fold = panel.querySelector(".PanelFold");
         const setOpen = (open) => {
             panel.classList.toggle("Folded", !open);
@@ -57,12 +63,19 @@ export class Catalogue {
             try {
                 localStorage.setItem(storageKey, open ? "1" : "0");
             } catch (e) {}
+            if (open) {
+                for (const other of OPEN_GROUP) if (other !== this && !other.panel.classList.contains("Folded")) other.setOpen(false);
+                this.refresh(true);
+            }
         };
+        this.setOpen = setOpen;
         let saved = null;
         try {
             saved = localStorage.getItem(storageKey);
         } catch (e) {}
-        setOpen(saved !== "0");
+        const anotherOpen = OPEN_GROUP.some((other) => !other.panel.classList.contains("Folded"));
+        OPEN_GROUP.push(this);
+        setOpen(saved === null ? !anotherOpen : saved === "1" && !anotherOpen);
         fold.addEventListener("click", () => setOpen(panel.classList.contains("Folded")));
     }
 
