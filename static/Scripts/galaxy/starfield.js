@@ -490,6 +490,13 @@ export function buildGalaxyFromImage(image) {
  */
 export function buildScatteredDeepSky(sampler) {
     const layer = new Layer(BACKDROP.scatteredDeepSky);
+    /*
+     * Each filler object is also recorded with its kind, so the painted treatment
+     * the named landmarks get (see buildDeepSky) can be laid over the whole disk.
+     * Recording draws no random numbers: the star field sampled after this is
+     * exactly what it was.
+     */
+    layer.objects = [];
     const color = new THREE.Color();
     const p = new THREE.Vector3();
     const nebula = new THREE.Color(DEEP_SKY_STYLE.nebula.color).convertSRGBToLinear();
@@ -506,6 +513,7 @@ export function buildScatteredDeepSky(sampler) {
             p.set(gauss(), gauss(), gauss()).normalize().multiplyScalar(4 + Math.abs(gauss()) * 16);
             color.copy(globular);
             layer.add(p, color, 2.8 + rand() * 2.0, 0.4 + rand() * 0.22);
+            layer.objects.push({ position: p.clone(), kind: "globular" });
             continue;
         }
         const index = sampler.pick();
@@ -527,10 +535,10 @@ export function buildScatteredDeepSky(sampler) {
         const roll2 = rand();
         // mostly nebulae where the artwork is pink and clusters where it is blue,
         // with a few remnants and planetaries mixed through for variety
-        if (roll2 < 0.08) color.copy(remnant);
-        else if (roll2 < 0.16) color.copy(planetary);
-        else color.copy(pink ? nebula : open);
+        const kind = roll2 < 0.08 ? "remnant" : roll2 < 0.16 ? "planetary" : pink ? "nebula" : "open";
+        color.copy({ remnant, planetary, nebula, open }[kind]);
         layer.add(p, color, 2.8 + rand() * 2.6, 0.36 + rand() * 0.26);
+        layer.objects.push({ position: p.clone(), kind });
     }
     return layer;
 }

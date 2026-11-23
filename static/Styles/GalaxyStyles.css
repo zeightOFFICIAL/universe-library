@@ -61,11 +61,15 @@
     inset: 0;
     overflow: hidden;
     pointer-events: none;
-    position: absolute
+    position: absolute;
+    /* every label is sized in em off this, so Settings can scale them all */
+    font-size: calc(1rem * var(--label-size, 1))
 }
 
 .GalaxyMarker {
     align-items: center;
+    /* system labels are links, and the site-wide a {} rule sets a tiny vmin size */
+    font-size: 1em;
     color: var(--galaxy-ink);
     display: flex;
     gap: 8px;
@@ -109,14 +113,14 @@
 }
 
 .GalaxyMarkerName {
-    font-size: .8rem;
+    font-size: .8em;
     letter-spacing: .12em;
     text-transform: uppercase
 }
 
 .GalaxyMarkerSub {
     color: var(--galaxy-ink-dim);
-    font-size: .64rem;
+    font-size: .64em;
     letter-spacing: .08em;
     text-transform: uppercase
 }
@@ -179,18 +183,6 @@
 
 .GalaxyMarker.Fictional .GalaxyMarkerText {
     border-style: dashed
-}
-
-/* a system whose page is still empty: on the map, but quieter, and labelled so */
-.GalaxyMarker.Soon .GalaxyMarkerIcon {
-    border-style: dotted;
-    box-shadow: none;
-    opacity: .7
-}
-
-.GalaxyMarker.Soon .GalaxyMarkerText {
-    border-style: dashed;
-    opacity: .75
 }
 
 /*
@@ -267,15 +259,6 @@
     width: 6px
 }
 
-.GalaxyMarkerDots i.Soon {
-    background: transparent;
-    border: 1px solid var(--member-color);
-    box-shadow: none;
-    height: 6px;
-    opacity: .8;
-    width: 6px
-}
-
 .GalaxyMarkerDots:hover,
 .GalaxyMarkerDots:focus-visible,
 .GalaxyMarker.Open .GalaxyMarkerDots {
@@ -303,7 +286,7 @@
     border-radius: 999px;
     color: var(--galaxy-ink);
     display: inline-flex;
-    font-size: .7rem;
+    font-size: .7em;
     gap: 6px;
     letter-spacing: .03em;
     padding: 3px 9px 3px 7px;
@@ -322,19 +305,7 @@
 
 .GalaxyMember small {
     color: var(--galaxy-ink-faint);
-    font-size: .62rem
-}
-
-.GalaxyMember.Soon {
-    border-color: rgba(255, 255, 255, .12);
-    border-style: dashed;
-    color: var(--galaxy-ink-dim)
-}
-
-.GalaxyMember.Soon::before {
-    background: transparent;
-    border: 1px solid var(--member-color);
-    box-shadow: none
+    font-size: .885em
 }
 
 .GalaxyMember:hover,
@@ -348,7 +319,7 @@
 .GalaxyMembersNote {
     color: var(--galaxy-ink-faint);
     flex-basis: 100%;
-    font-size: .6rem;
+    font-size: .6em;
     letter-spacing: .12em;
     margin-top: 2px;
     text-transform: uppercase
@@ -373,7 +344,7 @@
 }
 
 .GalaxyMarker.Region .GalaxyMarkerName {
-    font-size: .7rem;
+    font-size: .7em;
     letter-spacing: .28em;
     text-shadow: 0 0 4px #000, 0 0 10px #000, 0 0 20px #000
 }
@@ -384,12 +355,36 @@
 
 .GalaxyMarker.Ring .GalaxyMarkerName {
     color: var(--galaxy-ink-dim);
-    font-size: .62rem
+    font-size: .62em
 }
 
-/* ---------- the dock ---------- */
+/* ---------- the side: a column of separate panels ---------- */
 
+/*
+ * The dock is now only a column: the intro (title, jumps, about) and one panel per
+ * catalogue, each its own glass card. The catalogues share whatever height is left
+ * and scroll inside; a folded one shrinks to its header.
+ */
 .GalaxyDock {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    /* a definite height, so the catalogues can share what the intro leaves */
+    height: calc(100% - var(--galaxy-gap) * 2);
+    left: var(--galaxy-gap);
+    /* the column itself is see-through: only its panels take the pointer */
+    pointer-events: none;
+    position: absolute;
+    top: var(--galaxy-gap);
+    width: var(--galaxy-dock);
+    z-index: 25
+}
+
+.GalaxyDock > * {
+    pointer-events: auto
+}
+
+.SidePanel {
     -webkit-backdrop-filter: blur(22px) saturate(150%);
     backdrop-filter: blur(22px) saturate(150%);
     background: linear-gradient(160deg, rgba(40, 48, 78, .42), rgba(12, 15, 26, .58));
@@ -398,14 +393,23 @@
     box-shadow: 0 18px 50px -18px rgba(0, 0, 0, .8), inset 0 1px 0 rgba(255, 255, 255, .09);
     display: flex;
     flex-direction: column;
-    left: var(--galaxy-gap);
-    max-height: calc(100% - var(--galaxy-gap) * 2);
+    min-height: 0;
     overflow: hidden;
-    position: absolute;
-    top: var(--galaxy-gap);
-    transition: width .35s ease, border-radius .35s ease;
-    width: var(--galaxy-dock);
-    z-index: 25
+    transition: width .35s ease, border-radius .35s ease
+}
+
+.IntroPanel {
+    flex: none
+}
+
+.CataloguePanel {
+    flex: 1 1 0;
+    min-height: 120px
+}
+
+.CataloguePanel.Folded {
+    flex: none;
+    min-height: 0
 }
 
 .DockHead {
@@ -413,7 +417,7 @@
     display: flex;
     gap: 12px;
     justify-content: space-between;
-    padding: 16px 16px 12px 20px
+    padding: 14px 14px 10px 18px
 }
 
 .DockEyebrow {
@@ -468,11 +472,8 @@
 .DockBody {
     display: flex;
     flex-direction: column;
-    gap: 18px;
-    overflow-y: auto;
-    padding: 0 20px 20px;
-    scrollbar-color: rgba(255, 255, 255, .2) transparent;
-    scrollbar-width: thin
+    gap: 14px;
+    padding: 0 18px 16px
 }
 
 .DockLead {
@@ -482,25 +483,13 @@
     margin: 0
 }
 
-.DockSection {
-    display: flex;
-    flex-direction: column;
-    gap: 8px
-}
-
-.DockLabel {
-    color: var(--galaxy-ink-faint);
-    font-size: .64rem;
-    font-weight: 500;
-    letter-spacing: .26em;
-    margin: 0;
-    text-transform: uppercase
-}
-
-/* collapsed: only the header's button is left, as a round glass chip */
+/* collapsed: only the intro's button is left, as a round glass chip */
 .GalaxyDock.Collapsed {
-    border-radius: 26px;
     width: 52px
+}
+
+.GalaxyDock.Collapsed .IntroPanel {
+    border-radius: 26px
 }
 
 .GalaxyDock.Collapsed .DockHead {
@@ -508,7 +497,8 @@
 }
 
 .GalaxyDock.Collapsed .DockHeadText,
-.GalaxyDock.Collapsed .DockBody {
+.GalaxyDock.Collapsed .DockBody,
+.GalaxyDock.Collapsed .CataloguePanel {
     display: none
 }
 
@@ -516,142 +506,326 @@
     transform: translate(-70%, -50%) rotate(225deg)
 }
 
-/* star systems: the way into the rest of the site */
+/* ---------- catalogue panels ---------- */
 
-.SystemList {
-    display: flex;
-    flex-direction: column;
-    gap: 6px
+.PanelHead {
+    flex: none
 }
 
-.SystemRow {
+.PanelFold {
     align-items: center;
-    background: rgba(255, 255, 255, .045);
-    border: 1px solid transparent;
-    border-radius: var(--galaxy-radius-small);
-    display: flex;
-    gap: 6px;
-    padding: 0 6px 0 0;
-    transition: background .2s, border-color .2s, box-shadow .2s
-}
-
-.SystemRow:hover,
-.SystemRow:focus-within {
-    background: rgba(255, 255, 255, .09);
-    border-color: color-mix(in srgb, var(--system-color) 55%, transparent);
-    box-shadow: 0 0 22px -8px var(--system-color)
-}
-
-.SystemOpen {
-    align-items: center;
+    background: none;
+    border: none;
     color: var(--galaxy-ink);
+    cursor: pointer;
     display: flex;
-    flex: 1;
-    font-size: inherit;
-    gap: 12px;
-    min-width: 0;
-    padding: 9px 4px 9px 12px
+    font-family: inherit;
+    gap: 10px;
+    padding: 13px 18px;
+    text-align: left;
+    width: 100%
 }
 
-.SystemOpen:focus-visible {
+.PanelTitle {
+    color: var(--galaxy-ink-dim);
+    font-size: .66rem;
+    font-weight: 500;
+    letter-spacing: .26em;
+    text-transform: uppercase
+}
+
+.PanelCount {
+    background: rgba(255, 255, 255, .07);
+    border-radius: 999px;
+    color: var(--galaxy-ink-faint);
+    font-size: .64rem;
+    padding: 1px 7px
+}
+
+.PanelChevron {
+    border-bottom: 1.5px solid var(--galaxy-ink-faint);
+    border-right: 1.5px solid var(--galaxy-ink-faint);
+    height: 6px;
+    margin-left: auto;
+    transform: translateY(-2px) rotate(45deg);
+    transition: transform .25s;
+    width: 6px
+}
+
+.CataloguePanel.Folded .PanelChevron {
+    transform: rotate(-45deg)
+}
+
+.PanelFold:hover .PanelTitle,
+.PanelFold:focus-visible .PanelTitle {
+    color: #fff
+}
+
+.PanelFold:focus-visible {
     outline: none
 }
 
-.SystemDot {
-    background: var(--system-color);
-    border-radius: 50%;
-    box-shadow: 0 0 10px var(--system-color);
-    flex: none;
-    height: 9px;
-    width: 9px
+.PanelBody {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+    padding: 0 12px 12px
 }
 
-.SystemText {
+.CataloguePanel.Folded .PanelBody {
+    display: none
+}
+
+.PanelSearch {
+    background: rgba(255, 255, 255, .06);
+    border: 1px solid var(--galaxy-line);
+    border-radius: 999px;
+    color: var(--galaxy-ink);
+    font-family: inherit;
+    font-size: .78rem;
+    outline: none;
+    padding: 7px 14px;
+    transition: border-color .2s, background .2s
+}
+
+.PanelSearch::placeholder {
+    color: var(--galaxy-ink-faint)
+}
+
+.PanelSearch:focus {
+    background: rgba(255, 255, 255, .1);
+    border-color: rgba(158, 203, 255, .55)
+}
+
+.PanelFilters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px
+}
+
+.PanelFilter {
+    background: transparent;
+    border: 1px solid var(--galaxy-line);
+    border-radius: 999px;
+    color: var(--galaxy-ink-dim);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .66rem;
+    letter-spacing: .03em;
+    padding: 3px 9px;
+    transition: background .2s, border-color .2s, color .2s
+}
+
+.PanelFilter:hover,
+.PanelFilter:focus-visible {
+    border-color: var(--galaxy-line-strong);
+    color: #fff;
+    outline: none
+}
+
+.PanelFilter[aria-pressed="true"] {
+    background: rgba(158, 203, 255, .16);
+    border-color: rgba(158, 203, 255, .5);
+    color: #fff
+}
+
+.PanelHint {
+    color: var(--galaxy-ink-faint);
+    font-size: .64rem;
+    margin: 0 4px
+}
+
+.CatalogueList {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-color: rgba(255, 255, 255, .2) transparent;
+    scrollbar-width: thin
+}
+
+.CatalogueRow {
+    align-items: center;
+    border: 1px solid transparent;
+    border-radius: var(--galaxy-radius-small);
+    display: flex;
+    flex: none;
+    transition: background .2s, border-color .2s
+}
+
+.CatalogueRow[hidden] {
+    display: none
+}
+
+.CatalogueRow:hover,
+.CatalogueRow:focus-within {
+    background: rgba(255, 255, 255, .07);
+    border-color: color-mix(in srgb, var(--row-color) 45%, transparent)
+}
+
+.CatalogueJump {
+    align-items: center;
+    background: none;
+    border: none;
+    color: var(--galaxy-ink);
+    cursor: pointer;
+    display: flex;
+    flex: 1;
+    font-family: inherit;
+    gap: 10px;
+    min-width: 0;
+    padding: 6px 6px 6px 8px;
+    text-align: left
+}
+
+div.CatalogueJump {
+    cursor: default
+}
+
+.CatalogueJump:focus-visible {
+    outline: none
+}
+
+.CatalogueDot {
+    background: var(--row-color);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--row-color);
+    flex: none;
+    height: 8px;
+    margin: 0 1px;
+    width: 8px
+}
+
+/* the dots echo the map: a ringed star system, a hollow ring for map-only, dashed fiction */
+.Style-page .CatalogueDot {
+    background: transparent;
+    border: 1.5px solid var(--row-color);
+    height: 10px;
+    margin: 0;
+    width: 10px
+}
+
+.Style-page .CatalogueDot::after {
+    background: var(--row-color);
+    border-radius: 50%;
+    content: "";
+    display: block;
+    height: 4px;
+    margin: 1.5px;
+    width: 4px
+}
+
+.Style-map .CatalogueDot {
+    background: transparent;
+    border: 1.5px solid var(--row-color);
+    box-shadow: none;
+    height: 10px;
+    margin: 0;
+    width: 10px
+}
+
+.Style-fiction .CatalogueDot {
+    background: transparent;
+    border: 1.5px dashed var(--row-color);
+    box-shadow: 0 0 8px -2px var(--row-color);
+    height: 10px;
+    margin: 0;
+    width: 10px
+}
+
+.Style-fiction .CatalogueName {
+    font-style: italic
+}
+
+.Style-arm .CatalogueDot {
+    background: none;
+    border-radius: 0;
+    border-top: 2px dashed var(--row-color);
+    box-shadow: none;
+    height: 0;
+    margin: 0;
+    width: 10px
+}
+
+.Style-galaxy .CatalogueDot {
+    height: 5px;
+    margin: 0;
+    transform: rotate(-25deg);
+    width: 10px
+}
+
+.CatalogueText {
     display: flex;
     flex-direction: column;
     min-width: 0
 }
 
-.SystemName {
-    font-size: .92rem;
-    letter-spacing: .03em;
+.CatalogueName {
+    font-size: .84rem;
+    letter-spacing: .02em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap
 }
 
-.SystemSub {
-    color: var(--galaxy-ink-dim);
-    font-size: .7rem;
-    letter-spacing: .03em
+.CatalogueSub {
+    color: var(--galaxy-ink-faint);
+    font-size: .66rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap
 }
 
-/* a system whose page is still empty: listed, but quieter */
-.SystemRow.Soon .SystemDot {
-    background: transparent;
-    border: 1.5px dotted var(--system-color);
-    box-shadow: none
+/* a small eye-like mark on rows that are on screen now */
+.CatalogueSeen {
+    border: 1.5px solid transparent;
+    border-radius: 50%;
+    flex: none;
+    height: 6px;
+    margin-left: auto;
+    width: 6px
 }
 
-.SystemRow.Soon .SystemName {
+.CatalogueRow.InView .CatalogueSeen {
+    background: var(--galaxy-accent);
+    box-shadow: 0 0 6px var(--galaxy-accent)
+}
+
+.CatalogueRow:not(.InView) .CatalogueName {
     color: var(--galaxy-ink-dim)
 }
 
-.SystemArrow {
-    color: var(--galaxy-ink-faint);
-    font-size: .95rem;
-    margin-left: auto;
-    transition: color .2s, transform .2s
-}
-
-.SystemRow:hover .SystemArrow {
-    color: #fff;
-    transform: translateX(3px)
-}
-
-.SystemLocate {
-    background: transparent;
+.CatalogueOpen {
+    align-items: center;
     border: 1px solid var(--galaxy-line);
     border-radius: 50%;
     color: var(--galaxy-ink-dim);
-    cursor: pointer;
+    display: flex;
     flex: none;
-    height: 28px;
-    position: relative;
+    font-size: .85rem;
+    height: 26px;
+    justify-content: center;
+    margin-right: 5px;
     transition: color .2s, border-color .2s, background .2s;
-    width: 28px
+    width: 26px
 }
 
-.SystemLocate:hover,
-.SystemLocate:focus-visible {
+.CatalogueOpen:hover,
+.CatalogueOpen:focus-visible {
     background: rgba(255, 255, 255, .1);
     border-color: var(--galaxy-line-strong);
     color: #fff;
     outline: none
 }
 
-/* a small crosshair */
-.SystemLocate::before,
-.SystemLocate::after {
-    content: "";
-    left: 50%;
-    position: absolute;
-    top: 50%;
-    transform: translate(-50%, -50%)
-}
-
-.SystemLocate::before {
-    border: 1.5px solid currentColor;
-    border-radius: 50%;
-    height: 9px;
-    width: 9px
-}
-
-.SystemLocate::after {
-    background: currentColor;
-    border-radius: 50%;
-    height: 3px;
-    width: 3px
+.CatalogueEmpty {
+    color: var(--galaxy-ink-faint);
+    font-size: .72rem;
+    margin: 8px
 }
 
 /* jump chips */
@@ -697,16 +871,28 @@
     gap: 2px;
     padding: 5px;
     position: absolute;
-    right: var(--galaxy-gap);
+    right: calc(var(--galaxy-gap) * 2 + 52px);
     top: var(--galaxy-gap);
     z-index: 25
 }
 
-.LayersDivider {
-    align-self: stretch;
-    background: var(--galaxy-line);
-    margin: 6px 4px;
-    width: 1px
+.SettingsOpen {
+    color: var(--galaxy-ink)
+}
+
+/* settings: a panel of its own in the corner, apart from the layers */
+.GalaxySettingsPanel {
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    backdrop-filter: blur(18px) saturate(150%);
+    background: linear-gradient(160deg, rgba(40, 48, 78, .38), rgba(12, 15, 26, .56));
+    border: 1px solid var(--galaxy-line);
+    border-radius: 999px;
+    box-shadow: 0 18px 50px -18px rgba(0, 0, 0, .8), inset 0 1px 0 rgba(255, 255, 255, .08);
+    padding: 5px;
+    position: absolute;
+    right: var(--galaxy-gap);
+    top: var(--galaxy-gap);
+    z-index: 25
 }
 
 .LayerToggle {
@@ -806,24 +992,6 @@
     letter-spacing: .06em
 }
 
-.TipLegend {
-    display: grid;
-    gap: 4px;
-    list-style: none;
-    margin: 2px 0 0;
-    padding: 0
-}
-
-.TipLegend:empty {
-    display: none
-}
-
-.TipLegend li {
-    align-items: center;
-    display: flex;
-    gap: 8px
-}
-
 .TipState {
     border-top: 1px solid var(--galaxy-line);
     color: var(--galaxy-ink-faint);
@@ -851,11 +1019,6 @@
     width: 10px
 }
 
-.LegendDot.Dim {
-    border-style: dotted;
-    box-shadow: none
-}
-
 .LegendDot.Dash,
 .LegendDot.Line {
     background: none;
@@ -879,9 +1042,128 @@
     width: 14px
 }
 
+/* ---------- legend: under the layers, the main keys first, all on hover ---------- */
+
+.GalaxyLegend {
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    backdrop-filter: blur(18px) saturate(150%);
+    background: linear-gradient(160deg, rgba(40, 48, 78, .34), rgba(12, 15, 26, .54));
+    border: 1px solid var(--galaxy-line);
+    border-radius: var(--galaxy-radius-small);
+    box-shadow: 0 18px 50px -18px rgba(0, 0, 0, .8);
+    padding: 8px 12px 10px;
+    position: absolute;
+    right: calc(var(--galaxy-gap) * 2 + 52px);
+    top: calc(var(--galaxy-gap) + 62px);
+    width: 214px;
+    z-index: 24
+}
+
+.LegendHead {
+    background: none;
+    border: none;
+    color: var(--galaxy-ink-faint);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .6rem;
+    letter-spacing: .3em;
+    padding: 0 0 6px;
+    text-transform: uppercase
+}
+
+.LegendHead::after {
+    content: "  +";
+    letter-spacing: 0
+}
+
+.GalaxyLegend:hover .LegendHead::after,
+.GalaxyLegend:focus-within .LegendHead::after,
+.GalaxyLegend.Open .LegendHead::after {
+    content: "  –"
+}
+
+.LegendHead:focus-visible {
+    color: #fff;
+    outline: none
+}
+
+.LegendList {
+    display: grid;
+    gap: 5px;
+    list-style: none;
+    margin: 0;
+    padding: 0
+}
+
+.LegendList li {
+    align-items: center;
+    color: var(--galaxy-ink-dim);
+    display: flex;
+    font-size: .7rem;
+    gap: 8px
+}
+
+/* only the main keys until the legend is hovered, focused or opened */
+.LegendList li:not(.Primary) {
+    display: none
+}
+
+.GalaxyLegend:hover .LegendList li,
+.GalaxyLegend:focus-within .LegendList li,
+.GalaxyLegend.Open .LegendList li {
+    display: flex
+}
+
+.LegendDot.Hollow {
+    box-shadow: none
+}
+
+.LegendDot.Fiction {
+    border-style: dashed;
+    box-shadow: 0 0 6px -1px var(--legend-color)
+}
+
+/* ---------- markers for map-only systems and fiction ---------- */
+
+/* a real system with no page yet: a hollow ring and plain text, no card */
+.GalaxyMarker.MapOnly .GalaxyMarkerIcon {
+    box-shadow: none
+}
+
+.GalaxyMarker.MapOnly .GalaxyMarkerIcon::after {
+    display: none
+}
+
+.GalaxyMarker.MapOnly .GalaxyMarkerText {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: transparent;
+    border-color: transparent;
+    text-shadow: 0 0 4px #000, 0 0 10px #000
+}
+
+/* fiction: violet, dashed and italic, so it never passes for a real place */
+.GalaxyMarker.Fiction .GalaxyMarkerIcon {
+    border-style: dashed;
+    box-shadow: 0 0 10px -2px var(--marker-color)
+}
+
+.GalaxyMarker.Fiction .GalaxyMarkerText {
+    background: rgba(40, 24, 64, .45);
+    border-color: color-mix(in srgb, var(--marker-color) 55%, transparent);
+    border-style: dashed
+}
+
+.GalaxyMarker.Fiction .GalaxyMarkerName {
+    color: #e6d8ff;
+    font-style: italic;
+    letter-spacing: .08em
+}
+
 /* ---------- settings ---------- */
 
 .GalaxySettings {
+    overflow: auto;
     background: transparent;
     border: none;
     color: var(--galaxy-ink);
@@ -934,6 +1216,17 @@
 .SettingsClose span {
     background: linear-gradient(currentColor, currentColor) center / 100% 2px no-repeat, linear-gradient(currentColor, currentColor) center / 2px 100% no-repeat;
     border: none
+}
+
+.SettingsSection {
+    border-top: 1px solid var(--galaxy-line);
+    color: var(--galaxy-warm);
+    font-size: .66rem;
+    font-weight: 500;
+    letter-spacing: .3em;
+    margin: 0;
+    padding-top: 14px;
+    text-transform: uppercase
 }
 
 .SettingsLead {
@@ -1098,69 +1391,6 @@
     font-size: .68rem;
     line-height: 1.5;
     margin: 10px 0 0
-}
-
-.GalaxyPanelScroll {
-    margin-top: 8px;
-    max-height: 34vh;
-    overflow-y: auto;
-    scrollbar-color: rgba(255, 255, 255, .2) transparent;
-    scrollbar-width: thin
-}
-
-.GalaxyListHeading {
-    color: var(--galaxy-ink-faint);
-    font-size: .62rem;
-    letter-spacing: .22em;
-    margin: 12px 0 4px;
-    text-transform: uppercase
-}
-
-.GalaxyListHeading:first-child {
-    margin-top: 2px
-}
-
-.GalaxyListRow {
-    align-items: baseline;
-    background: transparent;
-    border: none;
-    border-radius: 8px;
-    color: var(--galaxy-ink-dim);
-    cursor: pointer;
-    display: flex;
-    font-family: inherit;
-    gap: 8px;
-    justify-content: space-between;
-    padding: 5px 8px;
-    text-align: left;
-    transition: color .2s, background .2s;
-    width: 100%
-}
-
-.GalaxyListRow:hover,
-.GalaxyListRow:focus-visible {
-    background: rgba(255, 255, 255, .07);
-    color: #fff;
-    outline: none
-}
-
-.GalaxyListName {
-    font-size: .78rem
-}
-
-.GalaxyListSub {
-    color: var(--galaxy-ink-faint);
-    flex: none;
-    font-size: .66rem
-}
-
-.GalaxyListRow.Static {
-    cursor: default
-}
-
-.GalaxyListRow.Static:hover {
-    background: transparent;
-    color: var(--galaxy-ink-dim)
 }
 
 /* ---------- things around the edge ---------- */
@@ -1353,6 +1583,30 @@
         z-index: 26
     }
 
+    /* the legend shrinks to a tab under the layers; a tap opens it */
+    .GalaxyLegend {
+        padding: 6px 10px;
+        right: calc(var(--galaxy-gap) * 2 + 48px);
+        top: calc(var(--galaxy-gap) + 54px);
+        width: auto
+    }
+
+    .GalaxyLegend .LegendHead {
+        padding: 0
+    }
+
+    .GalaxyLegend:not(.Open) .LegendList {
+        display: none
+    }
+
+    .GalaxyLegend.Open {
+        width: 214px
+    }
+
+    .GalaxyLegend.Open .LegendHead {
+        padding-bottom: 6px
+    }
+
     /* a tighter row, so it fits beside the dock's button on a phone */
     .GalaxyLayers {
         padding: 4px
@@ -1363,8 +1617,12 @@
         width: 38px
     }
 
-    .LayersDivider {
-        margin: 6px 2px
+    .GalaxySettingsPanel {
+        padding: 4px
+    }
+
+    .GalaxyLayers {
+        right: calc(var(--galaxy-gap) * 2 + 48px)
     }
 
     /* the bottom edge is full, so on a phone the hint sits under the layers until
@@ -1373,7 +1631,7 @@
         bottom: auto;
         max-width: 60vw;
         right: var(--galaxy-gap);
-        top: calc(var(--galaxy-gap) + 56px);
+        top: calc(var(--galaxy-gap) + 92px);
         transition: opacity .6s
     }
 

@@ -29,7 +29,8 @@ export class Marker {
         members = null,
         membersNote = "",
         // a system whose page is still empty: shown, but quieter, and it says so
-        soon = false,
+        // "map": a real place with no page yet; "fiction": a place from a story
+        variant = null,
     }) {
         this.position = position;
         this.level = level;
@@ -47,7 +48,7 @@ export class Marker {
         this.fade = 0;
         this.drawnFade = -1;
         const el = document.createElement(href ? "a" : "div");
-        el.className = `GalaxyMarker ${kind === "region" ? "Region" : kind === "ring" ? "Ring" : "Link"}${fictional ? " Fictional" : ""}${members ? " Cluster" : ""}${soon ? " Soon" : ""}`;
+        el.className = `GalaxyMarker ${kind === "region" ? "Region" : kind === "ring" ? "Ring" : "Link"}${fictional ? " Fictional" : ""}${members ? " Cluster" : ""}${variant === "map" ? " MapOnly" : variant === "fiction" ? " Fiction" : ""}`;
         if (href) el.href = href;
         if (color) el.style.setProperty("--marker-color", color);
         if (kind === "link") {
@@ -177,9 +178,10 @@ export class Marker {
         this.onScreen = p.z < 1 && Math.abs(p.x) < 1.1 && Math.abs(p.y) < 1.1;
         this.screenX = (p.x * 0.5 + 0.5) * width;
         this.screenY = (-p.y * 0.5 + 0.5) * height;
-        if (fade > 0 && (this.far !== Infinity || this.near > 0)) {
-            fade *= this.distanceFade(this.measureFrom === "camera" ? camera.position.distanceTo(this.position) : targetDistance);
-        }
+        // kept apart from the layer and level factors, so the side panels can tell
+        // what is in view even when its label is switched off
+        this.distanceFactor = this.far !== Infinity || this.near > 0 ? this.distanceFade(this.measureFrom === "camera" ? camera.position.distanceTo(this.position) : targetDistance) : 1;
+        fade *= this.distanceFactor;
         this.fade = fade;
         // below a few percent a label is noise, and it should not block others
         this.candidate = this.onScreen && fade > 0.04;

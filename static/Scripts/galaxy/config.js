@@ -58,10 +58,20 @@ export const ARM_K = Math.tan(ARM_PITCH);
  * changes.
  */
 export const ARMS = [
-    { name: "Norma Arm", crossing: 10.9, label: 21, outerLabel: "Outer Arm", outerAt: 42, rMax: 48 },
-    { name: "Scutum–Centaurus Arm", crossing: 17.9, label: 25, rMax: 40 },
-    { name: "Sagittarius Arm", crossing: 21.8, label: 38, rMax: 49 },
-    { name: "Perseus Arm", crossing: 32.7, label: 31, rMax: 46 },
+    { name: "Norma Arm", kind: "Minor arm", crossing: 10.9, label: 21, outerLabel: "Outer Arm", outerAt: 42, rMax: 48 },
+    { name: "Scutum–Centaurus Arm", kind: "Major arm", crossing: 17.9, label: 25, rMax: 40 },
+    { name: "Sagittarius–Carina Arm", kind: "Minor arm, inside the Sun", crossing: 21.8, label: 38, rMax: 49 },
+    { name: "Perseus Arm", kind: "Major arm, outside the Sun", crossing: 32.7, label: 31, rMax: 46 },
+];
+/*
+ * The Near and Far 3 kpc Arms run along either side of the bar, about 10,000 ly
+ * from the centre. The artwork does not resolve them, so they get names but no
+ * outline, set across the bar's flanks: the near one on the Sun's side. x and z in
+ * kly, angle is the direction along the arm (the bar's own axis, BAR_ANGLE).
+ */
+export const THREE_KPC_ARMS = [
+    { name: "Near 3 kpc Arm", x: 9.6, z: 4.9, angle: THREE.MathUtils.degToRad(117) },
+    { name: "Far 3 kpc Arm", x: -9.6, z: -4.9, angle: THREE.MathUtils.degToRad(117) },
 ];
 export const ORION_SPUR = { name: "Orion Spur", crossing: 26.3, rMin: 23, rMax: 30.5 };
 

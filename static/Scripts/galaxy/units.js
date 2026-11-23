@@ -76,6 +76,72 @@ export function onUnitsChange(listener) {
     listeners.add(listener);
 }
 
+/* ---------- display options ---------- */
+
+/*
+ * How the map itself behaves, remembered the same way under "galaxyDisplay": label
+ * size, whether systems without a page yet are drawn, and whether the camera flies
+ * or cuts between places.
+ */
+export const DISPLAY_OPTIONS = {
+    labelSize: {
+        label: "Label size",
+        hint: "Names on the map",
+        choices: [
+            { value: "small", label: "Small", example: "more fits" },
+            { value: "medium", label: "Medium", example: "default" },
+            { value: "large", label: "Large", example: "easier to read" },
+        ],
+    },
+    emptySystems: {
+        label: "Systems without a page yet",
+        hint: "Polaris, Sirius, Mira and others",
+        choices: [
+            { value: "show", label: "Show", example: "every system" },
+            { value: "hide", label: "Hide", example: "only finished pages" },
+        ],
+    },
+    motion: {
+        label: "Camera moves",
+        hint: "Between places",
+        choices: [
+            { value: "fly", label: "Fly", example: "a smooth flight" },
+            { value: "cut", label: "Cut", example: "jump straight there" },
+        ],
+    },
+};
+
+export const LABEL_SCALE = { small: 0.86, medium: 1, large: 1.2 };
+
+const DISPLAY_KEY = "galaxyDisplay";
+const DISPLAY_DEFAULTS = { labelSize: "medium", emptySystems: "show", motion: "fly" };
+
+function loadDisplay() {
+    const display = { ...DISPLAY_DEFAULTS };
+    try {
+        const saved = JSON.parse(localStorage.getItem(DISPLAY_KEY) || "{}");
+        for (const [key, value] of Object.entries(saved)) {
+            if (DISPLAY_OPTIONS[key]?.choices.some((c) => c.value === value)) display[key] = value;
+        }
+    } catch (e) {}
+    return display;
+}
+
+export const DISPLAY = loadDisplay();
+const displayListeners = new Set();
+
+export function setDisplay(changes) {
+    Object.assign(DISPLAY, changes);
+    try {
+        localStorage.setItem(DISPLAY_KEY, JSON.stringify(DISPLAY));
+    } catch (e) {}
+    for (const listener of displayListeners) listener(DISPLAY, changes);
+}
+
+export function onDisplayChange(listener) {
+    displayListeners.add(listener);
+}
+
 /* ---------- formatting ---------- */
 
 const SUPERSCRIPT = { "-": "⁻", 0: "⁰", 1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹" };

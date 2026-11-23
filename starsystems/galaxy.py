@@ -29,10 +29,14 @@ GALAXY_PLACEMENT = {
     "Trappist": {"l": 69.71, "b": -56.64, "d": 40.7},
     "Mira": {"l": 167.75, "b": -57.98, "d": 300.0},
     "Polaris": {"l": 123.28, "b": 26.46, "d": 433.0},
+    # "label" overrides the display name where the URL-safe DB name cannot carry it
+    "BarnardsStar": {"l": 31.01, "b": 14.06, "d": 5.96, "label": "Barnard's Star"},
     "Trebia": {"fictional": True, "source": "Mass Effect", "x": 21_000, "z": -9_000, "hidden": True},
 }
 
 # Landmarks drawn at their true positions, as a reference for where our systems sit.
+# Additions of 2026-11-23 were converted from J2000 RA/Dec with the same transform,
+# checked by reproducing M42, the Pleiades and Omega Centauri to 0.01 degrees.
 # kind: nebula | remnant | planetary | open | globular | structure
 DEEP_SKY = [
     {"name": "Orion Nebula", "alias": "M42", "kind": "nebula", "l": 209.01, "b": -19.38, "d": 1_344},
@@ -48,13 +52,30 @@ DEEP_SKY = [
     {"name": "W51 Complex", "alias": "W51", "kind": "nebula", "l": 49.40, "b": -0.32, "d": 17_000},
     {"name": "Bubble Nebula", "alias": "NGC 7635", "kind": "nebula", "l": 112.24, "b": 2.80, "d": 11_000},
     {"name": "North America Nebula", "alias": "NGC 7000", "kind": "nebula", "l": 84.66, "b": -3.52, "d": 2_590},
+    {"name": "Heart Nebula", "alias": "IC 1805", "kind": "nebula", "l": 134.80, "b": 0.94, "d": 7_500},
+    {"name": "Soul Nebula", "alias": "IC 1848", "kind": "nebula", "l": 137.23, "b": 0.96, "d": 6_500},
+    {"name": "California Nebula", "alias": "NGC 1499", "kind": "nebula", "l": 160.60, "b": -12.05, "d": 1_000},
+    {"name": "Flaming Star Nebula", "alias": "IC 405", "kind": "nebula", "l": 172.11, "b": -2.30, "d": 1_500},
+    {"name": "Iris Nebula", "alias": "NGC 7023", "kind": "nebula", "l": 104.06, "b": 14.19, "d": 1_300},
+    {"name": "Elephant's Trunk", "alias": "IC 1396", "kind": "nebula", "l": 99.31, "b": 3.73, "d": 2_400},
+    {"name": "Pac-Man Nebula", "alias": "NGC 281", "kind": "nebula", "l": 123.15, "b": -6.25, "d": 9_500},
+    {"name": "Rho Ophiuchi Clouds", "alias": "Rho Oph", "kind": "nebula", "l": 353.69, "b": 17.69, "d": 460},
+    {"name": "Cat's Paw Nebula", "alias": "NGC 6334", "kind": "nebula", "l": 351.27, "b": 0.56, "d": 5_500},
+    {"name": "Running Chicken Nebula", "alias": "IC 2944", "kind": "nebula", "l": 294.85, "b": -1.65, "d": 6_000},
     {"name": "Tarantula Nebula", "alias": "NGC 2070", "kind": "nebula", "l": 279.46, "b": -31.67, "d": 160_000},
     {"name": "Crab Nebula", "alias": "M1", "kind": "remnant", "l": 184.56, "b": -5.78, "d": 6_500},
     {"name": "Veil Nebula", "alias": "NGC 6960", "kind": "remnant", "l": 74.23, "b": -8.61, "d": 2_400},
+    {"name": "Vela Supernova Remnant", "alias": "Vela SNR", "kind": "remnant", "l": 263.52, "b": -2.84, "d": 800},
+    {"name": "Cassiopeia A", "alias": "Cas A", "kind": "remnant", "l": 111.73, "b": -2.13, "d": 11_000},
+    {"name": "Tycho's Supernova", "alias": "SN 1572", "kind": "remnant", "l": 120.08, "b": 1.42, "d": 8_000},
+    {"name": "Kepler's Supernova", "alias": "SN 1604", "kind": "remnant", "l": 4.53, "b": 6.82, "d": 20_000},
     {"name": "Helix Nebula", "alias": "NGC 7293", "kind": "planetary", "l": 36.16, "b": -57.12, "d": 655},
     {"name": "Ring Nebula", "alias": "M57", "kind": "planetary", "l": 63.17, "b": 13.98, "d": 2_570},
     {"name": "Dumbbell Nebula", "alias": "M27", "kind": "planetary", "l": 60.84, "b": -3.70, "d": 1_360},
     {"name": "Cat's Eye Nebula", "alias": "NGC 6543", "kind": "planetary", "l": 96.47, "b": 29.95, "d": 3_300},
+    {"name": "Butterfly Nebula", "alias": "NGC 6302", "kind": "planetary", "l": 349.51, "b": 1.06, "d": 3_400},
+    {"name": "Owl Nebula", "alias": "M97", "kind": "planetary", "l": 148.49, "b": 57.05, "d": 2_030},
+    {"name": "Ghost of Jupiter", "alias": "NGC 3242", "kind": "planetary", "l": 261.05, "b": 32.05, "d": 1_400},
     {"name": "Pleiades", "alias": "M45", "kind": "open", "l": 166.64, "b": -23.46, "d": 444},
     {"name": "Hyades", "alias": "Mel 25", "kind": "open", "l": 180.08, "b": -22.32, "d": 153},
     {"name": "Beehive Cluster", "alias": "M44", "kind": "open", "l": 205.92, "b": 32.48, "d": 577},
@@ -65,6 +86,9 @@ DEEP_SKY = [
     {"name": "Jewel Box", "alias": "NGC 4755", "kind": "open", "l": 303.20, "b": 2.50, "d": 6_400},
     {"name": "Wild Duck Cluster", "alias": "M11", "kind": "open", "l": 27.30, "b": -2.78, "d": 6_200},
     {"name": "Double Cluster", "alias": "NGC 869", "kind": "open", "l": 136.30, "b": -3.57, "d": 7_500},
+    {"name": "Southern Pleiades", "alias": "IC 2602", "kind": "open", "l": 289.60, "b": -4.90, "d": 479},
+    {"name": "Westerlund 1", "alias": "Wd 1", "kind": "open", "l": 339.55, "b": -0.40, "d": 12_000},
+    {"name": "M35", "alias": "NGC 2168", "kind": "open", "l": 186.59, "b": 2.19, "d": 2_800},
     {"name": "Omega Centauri", "alias": "NGC 5139", "kind": "globular", "l": 309.10, "b": 14.97, "d": 17_090},
     {"name": "Great Cluster", "alias": "M13", "kind": "globular", "l": 59.01, "b": 40.91, "d": 22_200},
     {"name": "47 Tucanae", "alias": "NGC 104", "kind": "globular", "l": 305.89, "b": -44.89, "d": 13_000},
@@ -160,6 +184,43 @@ GALAXIES = [
 
 # Direction of the celestial north pole in galactic coordinates, which is what the
 # position angles above are measured from.
+# Real planetary systems beyond the Solar Neighbourhood. They have no page yet, so
+# they are map-only: drawn and named, and the camera can fly to them. l/b computed
+# from J2000 RA/Dec with the same transform as everything else (it reproduces Sgr A*,
+# the Pleiades and Barnard's Star to 0.01 degrees); d in light-years.
+PLANETARY_SYSTEMS = [
+    {"name": "Kepler-186", "note": "First Earth-sized planet found in a habitable zone", "l": 78.52, "b": 8.17, "d": 579},
+    {"name": "Kepler-22", "note": "First Kepler planet in a habitable zone", "l": 79.09, "b": 15.79, "d": 640},
+    {"name": "KELT-9", "note": "Hottest known planet, 4,300 °C by day", "l": 78.91, "b": 0.25, "d": 667},
+    {"name": "WASP-12", "note": "A planet being torn apart by its star", "l": 184.08, "b": 8.94, "d": 1_400},
+    {"name": "Kepler-452", "note": "Earth's 'older cousin', a year of 385 days", "l": 77.86, "b": 9.99, "d": 1_800},
+    {"name": "PSR B1257+12", "note": "The first planets ever found, around a pulsar", "l": 311.31, "b": 75.41, "d": 2_300},
+    {"name": "Kepler-90", "note": "Eight planets, as many as the Solar System", "l": 79.27, "b": 19.26, "d": 2_840},
+    {"name": "OGLE-2005-BLG-390L", "note": "A cold super-Earth found by microlensing, near the bulge", "l": 359.73, "b": -2.36, "d": 21_500},
+]
+
+# Places from fiction, kept apart from the real ones and drawn differently. Where the
+# story names a real star, the place sits at that star ("anchor"). Where it does not,
+# x/z (ly, galactocentric) are placed by eye from the source's own galaxy map and
+# say so. "offMap" places are not in the Milky Way at all; they are listed with a note.
+FICTIONAL_PLACES = [
+    {"name": "Vulcan", "source": "Star Trek", "anchor": "40 Eridani A", "l": 200.75, "b": -38.05, "d": 16.3},
+    {"name": "Reach", "source": "Halo", "anchor": "Epsilon Eridani", "l": 195.84, "b": -48.05, "d": 10.5},
+    {"name": "Pandora", "source": "Avatar", "anchor": "Alpha Centauri A", "l": 315.73, "b": -0.68, "d": 4.37},
+    {"name": "Trisolaris", "source": "The Three-Body Problem", "anchor": "Alpha Centauri", "l": 315.73, "b": -0.68, "d": 4.37},
+    {"name": "Arrakis", "source": "Dune", "anchor": "Canopus", "l": 261.21, "b": -25.29, "d": 310},
+    {"name": "Ford Prefect's home", "source": "The Hitchhiker's Guide", "anchor": "near Betelgeuse", "l": 199.79, "b": -8.96, "d": 548},
+    {"name": "Arcturus Station", "source": "Mass Effect", "anchor": "Arcturus", "l": 15.05, "b": 69.11, "d": 36.7},
+    {"name": "Gargantua's wormhole", "source": "Interstellar", "anchor": "by Saturn", "l": 0.0, "b": 0.0, "d": 0.00015,
+     "note": "The wormhole sits by Saturn; Gargantua itself is in another galaxy"},
+    {"name": "The Citadel", "source": "Mass Effect", "x": 8_000, "z": 14_000, "note": "Serpent Nebula"},
+    {"name": "Omega", "source": "Mass Effect", "x": -14_000, "z": 12_000, "note": "Terminus Systems"},
+    {"name": "Tuchanka", "source": "Mass Effect", "x": 16_000, "z": 2_000, "note": "Krogan homeworld"},
+    {"name": "Collector Base", "source": "Mass Effect", "x": 1_500, "z": 2_500, "note": "Beyond the Omega-4 Relay, near the core"},
+    {"name": "A galaxy far, far away", "source": "Star Wars", "offMap": True,
+     "note": "Star Wars is set in another galaxy, so it has no place on this map"},
+]
+
 CELESTIAL_POLE_GALACTIC = {"l": 122.93192, "b": 27.12825}
 
 # Decorative far-field galaxies: real photographs on fixed, randomly oriented
