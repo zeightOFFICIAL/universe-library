@@ -24,8 +24,8 @@ from mysite.ServerScripts import (
 # page needs of a system is its name, its page and its accent colour; where it sits
 # in the galaxy comes from GALAXY_PLACEMENT, keyed by the same href.
 PREDEFINED_SYSTEM_LINKS = [
-    {"name": "Solar", "href": "Solar", "color": "#FBAB7E"},
-    {"name": "Alpha Centauri", "href": "AlphaCentauri", "color": "#FF0000"},
+    {"name": "Solar", "href": "Solar", "color": "#FBAB7E", "ready": True},
+    {"name": "Alpha Centauri", "href": "AlphaCentauri", "color": "#FF0000", "ready": True},
 ]
 
 

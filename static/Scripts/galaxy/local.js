@@ -1,9 +1,9 @@
 import * as THREE from "three";
 import { SUN, LOCAL_RINGS_LY } from "./config.js";
 import { pointsMaterial } from "./shaders.js";
-import { localRadius, Layer } from "./util.js";
+import { Layer } from "./util.js";
 
-/* ---------- local neighbourhood ---------- */
+/* ---------- local neighbourhood, at true scale ---------- */
 
 export function buildLocal(systems, structures) {
     const group = new THREE.Group();
@@ -13,8 +13,10 @@ export function buildLocal(systems, structures) {
         transparent: true,
         opacity: 0.4,
         depthWrite: false,
-        dashSize: 0.05,
-        gapSize: 0.04,
+        // in units of the ring's own circumference (see ring()), so a dash looks the
+        // same on a 10 ly ring and a 500 ly one
+        dashSize: 0.012,
+        gapSize: 0.009,
     });
 
     const ring = (radius, material) => {
@@ -25,13 +27,18 @@ export function buildLocal(systems, structures) {
         }
         const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), material);
         line.computeLineDistances();
+        // dash lengths are measured along the line, so normalise them to the ring
+        const distances = line.geometry.getAttribute("lineDistance");
+        const circumference = 2 * Math.PI * radius;
+        for (let i = 0; i < distances.count; i++) distances.setX(i, distances.getX(i) / circumference);
         group.add(line);
     };
 
-    for (const ly of LOCAL_RINGS_LY) ring(localRadius(ly), lineMaterial);
-    for (const s of structures) ring(localRadius(s.radius), structureMaterial);
+    // radii in kly: 1 unit is 1,000 ly, the same scale as the rest of the galaxy
+    for (const ly of LOCAL_RINGS_LY) ring(ly / 1000, lineMaterial);
+    for (const s of structures) ring(s.radius / 1000, structureMaterial);
 
-    // drop lines from each system to the galactic plane
+    // drop lines from each system to the galactic plane through the Sun
     const drops = [];
     const dots = new Layer(systems.length);
     for (const s of systems) {

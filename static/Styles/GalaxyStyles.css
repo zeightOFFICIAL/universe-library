@@ -80,7 +80,7 @@
 }
 
 .GalaxyMarker.Visible {
-    opacity: 1;
+    opacity: var(--fade, 1);
     pointer-events: auto
 }
 
@@ -179,6 +179,188 @@
 
 .GalaxyMarker.Fictional .GalaxyMarkerText {
     border-style: dashed
+}
+
+/* a system whose page is still empty: on the map, but quieter, and labelled so */
+.GalaxyMarker.Soon .GalaxyMarkerIcon {
+    border-style: dotted;
+    box-shadow: none;
+    opacity: .7
+}
+
+.GalaxyMarker.Soon .GalaxyMarkerText {
+    border-style: dashed;
+    opacity: .75
+}
+
+/*
+ * Sol from afar: one compact marker for the whole neighbourhood - its name, a count,
+ * and a dot per system. Hover, focus or a tap on the dots opens it into a chip per
+ * system, each a link to its page; the name flies the camera in.
+ */
+.GalaxyMarker.Cluster {
+    align-items: flex-start
+}
+
+.GalaxyMarker.Cluster.Open {
+    z-index: 2
+}
+
+.GalaxyMarker.Cluster .GalaxyMarkerIcon {
+    margin-top: 11px
+}
+
+.GalaxyMarker.Cluster .GalaxyMarkerText {
+    gap: 0;
+    padding: 6px 6px 6px 12px
+}
+
+.GalaxyMarkerRow {
+    align-items: center;
+    display: flex;
+    gap: 10px
+}
+
+.GalaxyMarkerHead {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    font-family: inherit;
+    line-height: 1.2;
+    padding: 0;
+    text-align: left
+}
+
+.GalaxyMarkerHead:hover .GalaxyMarkerName,
+.GalaxyMarkerHead:focus-visible .GalaxyMarkerName {
+    color: #fff;
+    text-decoration: underline;
+    text-decoration-color: rgba(255, 255, 255, .4);
+    text-underline-offset: 3px
+}
+
+.GalaxyMarkerHead:focus-visible {
+    outline: none
+}
+
+/* the folded list: one dot per system, which is also the button that opens it */
+.GalaxyMarkerDots {
+    align-items: center;
+    background: rgba(255, 255, 255, .06);
+    border: 1px solid var(--galaxy-line);
+    border-radius: 999px;
+    cursor: pointer;
+    display: flex;
+    gap: 4px;
+    padding: 6px 8px;
+    transition: background .2s, border-color .2s
+}
+
+.GalaxyMarkerDots i {
+    background: var(--member-color);
+    border-radius: 50%;
+    box-shadow: 0 0 5px var(--member-color);
+    height: 6px;
+    width: 6px
+}
+
+.GalaxyMarkerDots i.Soon {
+    background: transparent;
+    border: 1px solid var(--member-color);
+    box-shadow: none;
+    height: 6px;
+    opacity: .8;
+    width: 6px
+}
+
+.GalaxyMarkerDots:hover,
+.GalaxyMarkerDots:focus-visible,
+.GalaxyMarker.Open .GalaxyMarkerDots {
+    background: rgba(255, 255, 255, .13);
+    border-color: var(--galaxy-line-strong);
+    outline: none
+}
+
+.GalaxyMarkerMembers {
+    display: none;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 8px;
+    max-width: 290px
+}
+
+.GalaxyMarker.Open .GalaxyMarkerMembers {
+    display: flex
+}
+
+.GalaxyMember {
+    align-items: center;
+    background: rgba(255, 255, 255, .06);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    color: var(--galaxy-ink);
+    display: inline-flex;
+    font-size: .7rem;
+    gap: 6px;
+    letter-spacing: .03em;
+    padding: 3px 9px 3px 7px;
+    transition: background .2s, border-color .2s
+}
+
+.GalaxyMember::before {
+    background: var(--member-color);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--member-color);
+    content: "";
+    flex: none;
+    height: 6px;
+    width: 6px
+}
+
+.GalaxyMember small {
+    color: var(--galaxy-ink-faint);
+    font-size: .62rem
+}
+
+.GalaxyMember.Soon {
+    border-color: rgba(255, 255, 255, .12);
+    border-style: dashed;
+    color: var(--galaxy-ink-dim)
+}
+
+.GalaxyMember.Soon::before {
+    background: transparent;
+    border: 1px solid var(--member-color);
+    box-shadow: none
+}
+
+.GalaxyMember:hover,
+.GalaxyMember:focus-visible {
+    background: rgba(255, 255, 255, .13);
+    border-color: color-mix(in srgb, var(--member-color) 60%, transparent);
+    color: #fff;
+    outline: none
+}
+
+.GalaxyMembersNote {
+    color: var(--galaxy-ink-faint);
+    flex-basis: 100%;
+    font-size: .6rem;
+    letter-spacing: .12em;
+    margin-top: 2px;
+    text-transform: uppercase
+}
+
+/*
+ * Landmark, arm and ring names are annotations, not controls: they never take the
+ * pointer, so dragging, turning and zooming work straight through them.
+ */
+.GalaxyMarker.Region.Visible,
+.GalaxyMarker.Ring.Visible {
+    pointer-events: none
 }
 
 .GalaxyMarker.Region {
@@ -404,6 +586,17 @@
     letter-spacing: .03em
 }
 
+/* a system whose page is still empty: listed, but quieter */
+.SystemRow.Soon .SystemDot {
+    background: transparent;
+    border: 1.5px dotted var(--system-color);
+    box-shadow: none
+}
+
+.SystemRow.Soon .SystemName {
+    color: var(--galaxy-ink-dim)
+}
+
 .SystemArrow {
     color: var(--galaxy-ink-faint);
     font-size: .95rem;
@@ -490,102 +683,154 @@
     outline: none
 }
 
-/* label switches */
+/* ---------- layers: a row of icons, top right, with settings at the end ---------- */
 
-.GalaxyLayer {
+.GalaxyLayers {
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    backdrop-filter: blur(18px) saturate(150%);
     align-items: center;
-    cursor: pointer;
+    background: linear-gradient(160deg, rgba(40, 48, 78, .38), rgba(12, 15, 26, .56));
+    border: 1px solid var(--galaxy-line);
+    border-radius: 999px;
+    box-shadow: 0 18px 50px -18px rgba(0, 0, 0, .8), inset 0 1px 0 rgba(255, 255, 255, .08);
     display: flex;
-    gap: 12px;
-    justify-content: space-between;
-    padding: 5px 0;
-    position: relative
-}
-
-.LayerText {
-    display: flex;
-    flex-direction: column;
-    min-width: 0
-}
-
-.LayerName {
-    color: var(--galaxy-ink-dim);
-    font-size: .86rem;
-    transition: color .2s
-}
-
-.LayerHint {
-    color: var(--galaxy-ink-faint);
-    font-size: .68rem
-}
-
-.GalaxyLayer input {
-    height: 1px;
-    opacity: 0;
+    gap: 2px;
+    padding: 5px;
     position: absolute;
-    right: 0;
+    right: var(--galaxy-gap);
+    top: var(--galaxy-gap);
+    z-index: 25
+}
+
+.LayersDivider {
+    align-self: stretch;
+    background: var(--galaxy-line);
+    margin: 6px 4px;
     width: 1px
 }
 
-.Switch {
-    background: rgba(255, 255, 255, .1);
-    border: 1px solid var(--galaxy-line);
-    border-radius: 999px;
-    flex: none;
-    height: 20px;
-    position: relative;
-    transition: background .25s, border-color .25s;
-    width: 36px
-}
-
-.Switch::after {
-    background: #aab2c2;
+.LayerToggle {
+    align-items: center;
+    background: transparent;
+    border: 1px solid transparent;
     border-radius: 50%;
-    content: "";
-    height: 14px;
-    left: 2px;
+    color: var(--galaxy-ink-faint);
+    cursor: pointer;
+    display: flex;
+    flex: none;
+    height: 40px;
+    justify-content: center;
+    padding: 0;
+    position: static;
+    transition: background .2s, border-color .2s, color .2s, box-shadow .2s;
+    width: 40px
+}
+
+.LayerToggle svg {
+    fill: none;
+    height: 22px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 1.5;
+    width: 22px
+}
+
+/* on: lit and ringed; off: dim with a slash through it, so state never relies on colour */
+.LayerToggle[aria-pressed="true"] {
+    background: rgba(158, 203, 255, .14);
+    box-shadow: inset 0 0 0 1px rgba(158, 203, 255, .38), 0 0 14px -4px var(--galaxy-accent);
+    color: #d4e7ff
+}
+
+.LayerToggle[aria-pressed="false"] {
+    background-image: linear-gradient(135deg, transparent calc(50% - .75px), rgba(255, 255, 255, .35) calc(50% - .75px), rgba(255, 255, 255, .35) calc(50% + .75px), transparent calc(50% + .75px));
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 24px 24px
+}
+
+.LayerToggle:hover,
+.LayerToggle:focus-visible {
+    border-color: var(--galaxy-line-strong);
+    color: #fff;
+    outline: none
+}
+
+.LayerToggle:focus-visible {
+    border-color: rgba(158, 203, 255, .7)
+}
+
+/* the tooltip: name, what the layer covers, its legend, and its state */
+.LayerTip {
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    backdrop-filter: blur(18px) saturate(150%);
+    background: rgba(14, 18, 30, .86);
+    border: 1px solid var(--galaxy-line-strong);
+    border-radius: var(--galaxy-radius-small);
+    box-shadow: 0 16px 40px -14px rgba(0, 0, 0, .9);
+    color: var(--galaxy-ink-dim);
+    cursor: default;
+    display: flex;
+    flex-direction: column;
+    font-family: var(--galaxy-font);
+    font-size: .72rem;
+    gap: 6px;
+    letter-spacing: .02em;
+    line-height: 1.45;
+    opacity: 0;
+    padding: 12px 14px;
+    pointer-events: none;
     position: absolute;
-    top: 2px;
-    transition: transform .25s, background .25s;
-    width: 14px
+    right: 0;
+    text-align: left;
+    top: calc(100% + 8px);
+    transform: translateY(-4px);
+    transition: opacity .18s, transform .18s;
+    visibility: hidden;
+    width: 260px
 }
 
-.GalaxyLayer input:checked ~ .Switch {
-    background: rgba(158, 203, 255, .32);
-    border-color: rgba(158, 203, 255, .6)
+.LayerToggle:hover .LayerTip,
+.LayerToggle:focus-visible .LayerTip,
+.LayerToggle.ShowTip .LayerTip {
+    opacity: 1;
+    transform: none;
+    transition-delay: .25s;
+    visibility: visible
 }
 
-.GalaxyLayer input:checked ~ .Switch::after {
-    background: #fff;
-    transform: translateX(16px)
+.LayerTip strong {
+    color: var(--galaxy-ink);
+    font-size: .8rem;
+    font-weight: 500;
+    letter-spacing: .06em
 }
 
-.GalaxyLayer input:focus-visible ~ .Switch {
-    box-shadow: 0 0 0 2px rgba(158, 203, 255, .6)
-}
-
-.GalaxyLayer:has(input:checked) .LayerName,
-.GalaxyLayer:hover .LayerName {
-    color: var(--galaxy-ink)
-}
-
-/* legend */
-
-.DockLegend {
+.TipLegend {
     display: grid;
-    gap: 6px 10px;
-    grid-template-columns: 1fr 1fr;
+    gap: 4px;
     list-style: none;
-    margin: 0;
+    margin: 2px 0 0;
     padding: 0
 }
 
-.DockLegend li {
+.TipLegend:empty {
+    display: none
+}
+
+.TipLegend li {
     align-items: center;
-    color: var(--galaxy-ink-dim);
     display: flex;
-    font-size: .72rem;
     gap: 8px
+}
+
+.TipState {
+    border-top: 1px solid var(--galaxy-line);
+    color: var(--galaxy-ink-faint);
+    font-size: .62rem;
+    letter-spacing: .14em;
+    padding-top: 6px;
+    text-transform: uppercase
 }
 
 .LegendDot {
@@ -594,6 +839,7 @@
     box-shadow: 0 0 8px var(--legend-color);
     flex: none;
     height: 8px;
+    margin: 0 3px;
     width: 8px
 }
 
@@ -601,16 +847,213 @@
     background: transparent;
     border: 1.5px solid var(--legend-color);
     height: 10px;
+    margin: 0 2px;
     width: 10px
 }
 
-.LegendDot.Dash {
+.LegendDot.Dim {
+    border-style: dotted;
+    box-shadow: none
+}
+
+.LegendDot.Dash,
+.LegendDot.Line {
     background: none;
     border-radius: 0;
     border-top: 2px dashed var(--legend-color);
     box-shadow: none;
     height: 0;
+    margin: 0;
     width: 14px
+}
+
+.LegendDot.Line {
+    border-top: 1px solid var(--legend-color)
+}
+
+.LegendDot.Oval {
+    border-radius: 50%;
+    height: 6px;
+    margin: 0;
+    transform: rotate(-25deg);
+    width: 14px
+}
+
+/* ---------- settings ---------- */
+
+.GalaxySettings {
+    background: transparent;
+    border: none;
+    color: var(--galaxy-ink);
+    font-family: var(--galaxy-font);
+    max-height: calc(100% - 32px);
+    max-width: calc(100% - 32px);
+    padding: 0;
+    width: 460px
+}
+
+.GalaxySettings::backdrop {
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, .55)
+}
+
+.SettingsPanel {
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
+    backdrop-filter: blur(22px) saturate(150%);
+    background: linear-gradient(160deg, rgba(40, 48, 78, .7), rgba(12, 15, 26, .9));
+    border: 1px solid var(--galaxy-line-strong);
+    border-radius: var(--galaxy-radius);
+    box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .9), inset 0 1px 0 rgba(255, 255, 255, .09);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 20px 22px 22px
+}
+
+.SettingsHead {
+    align-items: center;
+    display: flex;
+    justify-content: space-between
+}
+
+.SettingsTitle {
+    font-size: 1.35rem;
+    font-weight: 500;
+    letter-spacing: .04em;
+    margin: 0
+}
+
+/* the dock's chevron button, turned into a cross */
+.SettingsClose span {
+    height: 14px;
+    transform: translate(-50%, -50%) rotate(45deg);
+    width: 14px
+}
+
+.SettingsClose span {
+    background: linear-gradient(currentColor, currentColor) center / 100% 2px no-repeat, linear-gradient(currentColor, currentColor) center / 2px 100% no-repeat;
+    border: none
+}
+
+.SettingsLead {
+    color: var(--galaxy-ink-dim);
+    font-size: .78rem;
+    line-height: 1.5;
+    margin: 0
+}
+
+.SettingsUnits {
+    display: flex;
+    flex-direction: column;
+    gap: 16px
+}
+
+.SettingGroup {
+    border: none;
+    margin: 0;
+    min-width: 0;
+    padding: 0
+}
+
+.SettingGroup legend {
+    align-items: baseline;
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+    padding: 0
+}
+
+.SettingName {
+    color: var(--galaxy-ink-faint);
+    font-size: .64rem;
+    letter-spacing: .26em;
+    text-transform: uppercase
+}
+
+.SettingHint {
+    color: var(--galaxy-ink-faint);
+    font-size: .7rem
+}
+
+.Segmented {
+    background: rgba(255, 255, 255, .04);
+    border: 1px solid var(--galaxy-line);
+    border-radius: var(--galaxy-radius-small);
+    display: grid;
+    gap: 3px;
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
+    padding: 3px
+}
+
+.Segmented label {
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    padding: 7px 10px;
+    position: relative;
+    transition: background .2s, border-color .2s
+}
+
+.Segmented input {
+    opacity: 0;
+    pointer-events: none;
+    position: absolute
+}
+
+.Segmented span {
+    color: var(--galaxy-ink-dim);
+    font-size: .8rem
+}
+
+.Segmented small {
+    color: var(--galaxy-ink-faint);
+    font-size: .64rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap
+}
+
+.Segmented label:hover {
+    background: rgba(255, 255, 255, .06)
+}
+
+.Segmented label:has(input:checked) {
+    background: rgba(158, 203, 255, .16);
+    border-color: rgba(158, 203, 255, .5)
+}
+
+.Segmented label:has(input:checked) span {
+    color: #fff
+}
+
+.Segmented label:has(input:focus-visible) {
+    box-shadow: 0 0 0 2px rgba(158, 203, 255, .6)
+}
+
+.SettingsDone {
+    align-self: flex-end;
+    background: rgba(158, 203, 255, .16);
+    border: 1px solid rgba(158, 203, 255, .55);
+    border-radius: 999px;
+    color: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .82rem;
+    letter-spacing: .06em;
+    padding: 8px 22px;
+    transition: background .2s
+}
+
+.SettingsDone:hover,
+.SettingsDone:focus-visible {
+    background: rgba(158, 203, 255, .3);
+    outline: none
 }
 
 /* fold-away parts */
@@ -802,7 +1245,51 @@
     outline: none
 }
 
+.GalaxyControls .HomeButton {
+    align-items: center;
+    color: var(--galaxy-accent);
+    display: flex;
+    justify-content: center
+}
+
+.HomeButton svg {
+    fill: none;
+    height: 20px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 1.5;
+    width: 20px
+}
+
 /* ---------- loading ---------- */
+
+/* a small spiral turning above the bar, the way a galaxy turns: the core leads */
+.LoaderGalaxy {
+    filter: drop-shadow(0 0 10px rgba(158, 203, 255, .35));
+    height: 120px;
+    margin-bottom: 22px;
+    overflow: visible;
+    width: 120px
+}
+
+.LoaderArms {
+    animation: LoaderSpin 9s linear infinite;
+    fill: none;
+    stroke: url(#LOADER_ARM);
+    stroke-linecap: round;
+    stroke-width: 5
+}
+
+.LoaderArms .Faint {
+    opacity: .45;
+    stroke-width: 3
+}
+
+@keyframes LoaderSpin {
+    to {
+        transform: rotate(-360deg)
+    }
+}
 
 .GalaxyLoader {
     align-items: center;
@@ -861,18 +1348,55 @@
         --galaxy-dock: min(300px, calc(100vw - 20px))
     }
 
-    /* the bottom edge is full, so on a phone the hint sits top right until first touch */
+    /* the open dock covers everything, the layers included */
+    .GalaxyDock {
+        z-index: 26
+    }
+
+    /* a tighter row, so it fits beside the dock's button on a phone */
+    .GalaxyLayers {
+        padding: 4px
+    }
+
+    .LayerToggle {
+        height: 38px;
+        width: 38px
+    }
+
+    .LayersDivider {
+        margin: 6px 2px
+    }
+
+    /* the bottom edge is full, so on a phone the hint sits under the layers until
+       the first touch */
     .GalaxyHint {
         bottom: auto;
-        max-width: 52vw;
-        top: calc(var(--galaxy-gap) + 6px);
+        max-width: 60vw;
+        right: var(--galaxy-gap);
+        top: calc(var(--galaxy-gap) + 56px);
         transition: opacity .6s
     }
 
-    /* long subtitles (Sgr A*'s is a sentence) wrap rather than run off the screen */
+    /* long subtitles wrap rather than run off the screen */
     .GalaxyMarker.Link .GalaxyMarkerSub {
         max-width: 44vw;
         white-space: normal
+    }
+
+    /* the neighbourhood card has to fit beside its icon: dots under the name, and
+       names only once it opens */
+    .GalaxyMarkerRow {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 6px
+    }
+
+    .GalaxyMarkerMembers {
+        max-width: 46vw
+    }
+
+    .GalaxyMember small {
+        display: none
     }
 
     .GalaxyHint.Dismissed {
@@ -899,8 +1423,12 @@
     .GalaxyDock,
     .GalaxyMarker,
     .GalaxyReadout,
-    .Switch,
-    .Switch::after {
+    .LayerToggle,
+    .LayerTip {
         transition: none
+    }
+
+    .LoaderArms {
+        animation-duration: 60s
     }
 }

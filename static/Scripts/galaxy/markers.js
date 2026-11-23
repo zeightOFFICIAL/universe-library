@@ -1,6 +1,9 @@
 // spots a link label tries, in order: [side, vertical steps]
 export const LABEL_SPOTS = [[1, 0], [-1, 0], [1, -1], [1, 1], [-1, -1], [-1, 1], [1, -2], [1, 2]];
 
+// a cluster card's icon sits this far below the card's top edge (margin + half the icon)
+const CLUSTER_ICON_TOP = 16.5;
+
 export class Marker {
     constructor({
         position,
@@ -8,7 +11,6 @@ export class Marker {
         sub = "",
         level,
         layer = "systems",
-        maxDistance = Infinity,
         kind = "link",
         href = null,
         color = null,
@@ -17,6 +19,17 @@ export class Marker {
         priority = null,
         tangent = null,
         alias = undefined,
+        // distance fades, in scene units: the label comes in as the camera closes
+        // from far * 1.3 to far, and leaves again between near and near * 0.7
+        far = Infinity,
+        near = 0,
+        // "camera" measures from the camera to the label's own point, "target" from
+        // the camera to the pivot - right for things as big as an arm
+        measureFrom = "target",
+        members = null,
+        membersNote = "",
+        // a system whose page is still empty: shown, but quieter, and it says so
+        soon = false,
     }) {
         this.position = position;
         this.level = level;
@@ -27,10 +40,14 @@ export class Marker {
         this.shift = 0;
         this.alias = alias;
         this.layer = layer;
-        this.maxDistance = maxDistance;
+        this.far = far;
+        this.near = near;
+        this.measureFrom = measureFrom;
         this.tangent = tangent;
+        this.fade = 0;
+        this.drawnFade = -1;
         const el = document.createElement(href ? "a" : "div");
-        el.className = `GalaxyMarker ${kind === "region" ? "Region" : kind === "ring" ? "Ring" : "Link"}${fictional ? " Fictional" : ""}`;
+        el.className = `GalaxyMarker ${kind === "region" ? "Region" : kind === "ring" ? "Ring" : "Link"}${fictional ? " Fictional" : ""}${members ? " Cluster" : ""}${soon ? " Soon" : ""}`;
         if (href) el.href = href;
         if (color) el.style.setProperty("--marker-color", color);
         if (kind === "link") {
@@ -40,31 +57,133 @@ export class Marker {
         }
         const text = document.createElement("span");
         text.className = "GalaxyMarkerText";
-        text.innerHTML = `<span class="GalaxyMarkerName"></span>${sub ? '<span class="GalaxyMarkerSub"></span>' : ""}`;
-        text.querySelector(".GalaxyMarkerName").textContent = name;
-        if (sub) text.querySelector(".GalaxyMarkerSub").textContent = sub;
+        // a cluster's name is a button of its own, so its member links stay links
+        const head = document.createElement(members ? "button" : "span");
+        if (members) {
+            head.type = "button";
+            head.className = "GalaxyMarkerHead";
+        } else {
+            head.style.display = "contents";
+        }
+        head.innerHTML = `<span class="GalaxyMarkerName"></span>${sub ? '<span class="GalaxyMarkerSub"></span>' : ""}`;
+        head.querySelector(".GalaxyMarkerName").textContent = name;
+        if (sub) head.querySelector(".GalaxyMarkerSub").textContent = sub;
+        text.appendChild(head);
+        if (members) this.buildMembers(el, text, members, membersNote);
         el.appendChild(text);
         if (onClick) {
-            el.addEventListener("click", (event) => {
+            (members ? head : el).addEventListener("click", (event) => {
                 event.preventDefault();
                 onClick();
             });
         }
         this.el = el;
         this.centered = kind !== "link";
+        this.anchorTop = members ? CLUSTER_ICON_TOP : null;
         this.visible = false;
         // lower wins when two labels overlap: our systems first, then structure, then landmarks
         this.priority = priority ?? (kind === "link" ? 0 : kind === "ring" ? 3 : layer === "arms" ? 1 : 2);
     }
 
-    // project to screen space; the view decides afterwards which labels survive
-    project(camera, width, height, allowed, cameraDistance) {
+    /*
+     * A cluster folds its systems into a strip of coloured dots beside its name.
+     * Hovering or focusing it opens the list; a click on the dots pins it open, which
+     * is also how it opens on a touch screen. The closed card is what the declutter
+     * measures, so opening one never pushes other labels around.
+     */
+    buildMembers(el, text, members, note) {
+        const row = document.createElement("span");
+        row.className = "GalaxyMarkerRow";
+        row.appendChild(text.firstChild);
+        const dots = document.createElement("button");
+        dots.type = "button";
+        dots.className = "GalaxyMarkerDots";
+        dots.setAttribute("aria-expanded", "false");
+        dots.setAttribute("aria-label", `List the ${members.length} systems`);
+        for (const member of members) {
+            const dot = document.createElement("i");
+            dot.style.setProperty("--member-color", member.color);
+            if (member.soon) dot.className = "Soon";
+            dots.appendChild(dot);
+        }
+        row.appendChild(dots);
+        text.appendChild(row);
+
+        const list = document.createElement("span");
+        list.className = "GalaxyMarkerMembers";
+        for (const member of members) {
+            const link = document.createElement("a");
+            link.className = `GalaxyMember${member.soon ? " Soon" : ""}`;
+            link.href = member.href;
+            link.title = member.title;
+            link.style.setProperty("--member-color", member.color);
+            link.innerHTML = "<span></span><small></small>";
+            link.firstChild.textContent = member.name;
+            link.lastChild.textContent = member.soon ? "soon" : member.distance;
+            list.appendChild(link);
+        }
+        if (note) {
+            const caption = document.createElement("span");
+            caption.className = "GalaxyMembersNote";
+            caption.textContent = note;
+            list.appendChild(caption);
+        }
+        text.appendChild(list);
+
+        let pinned = false;
+        const setOpen = (open) => {
+            el.classList.toggle("Open", open);
+            dots.setAttribute("aria-expanded", String(open));
+        };
+        dots.addEventListener("click", (event) => {
+            event.preventDefault();
+            pinned = !pinned;
+            setOpen(pinned);
+        });
+        el.addEventListener("pointerenter", (event) => event.pointerType === "mouse" && setOpen(true));
+        el.addEventListener("pointerleave", (event) => event.pointerType === "mouse" && setOpen(pinned));
+        el.addEventListener("focusin", () => setOpen(true));
+        el.addEventListener("focusout", (event) => {
+            if (!el.contains(event.relatedTarget)) setOpen(pinned);
+        });
+        el.addEventListener("keydown", (event) => {
+            if (event.key !== "Escape") return;
+            pinned = false;
+            setOpen(false);
+        });
+    }
+
+    // how much of the label the camera distance allows, 0..1
+    distanceFade(distance) {
+        let fade = 1;
+        if (this.far !== Infinity) {
+            const t = Math.min(Math.max((this.far * 1.3 - distance) / (this.far * 0.3), 0), 1);
+            fade *= t * t * (3 - 2 * t);
+        }
+        if (this.near > 0) {
+            const t = Math.min(Math.max((distance - this.near * 0.7) / (this.near * 0.3), 0), 1);
+            fade *= t * t * (3 - 2 * t);
+        }
+        return fade;
+    }
+
+    /*
+     * Project to screen space and work out how strongly the label should show. The
+     * view passes in every other reason to fade (level, layer, viewing angle, dust)
+     * as one factor; the view decides afterwards which labels survive collisions.
+     */
+    project(camera, width, height, fade, targetDistance) {
         const p = this.position.clone().project(camera);
         this.onScreen = p.z < 1 && Math.abs(p.x) < 1.1 && Math.abs(p.y) < 1.1;
         this.screenX = (p.x * 0.5 + 0.5) * width;
         this.screenY = (-p.y * 0.5 + 0.5) * height;
-        this.candidate = allowed && this.onScreen && cameraDistance < this.maxDistance;
-        if (this.tangent) {
+        if (fade > 0 && (this.far !== Infinity || this.near > 0)) {
+            fade *= this.distanceFade(this.measureFrom === "camera" ? camera.position.distanceTo(this.position) : targetDistance);
+        }
+        this.fade = fade;
+        // below a few percent a label is noise, and it should not block others
+        this.candidate = this.onScreen && fade > 0.04;
+        if (this.tangent && this.candidate) {
             // lay the label along the arm by following it to a second point
             const q = this.tangent.clone().project(camera);
             const dx = (q.x - p.x) * width;
@@ -86,12 +205,22 @@ export class Marker {
         return this.width > 0;
     }
 
+    // vertical distance from the point to the middle of the label box
+    get anchorShift() {
+        return this.anchorTop === null ? 0 : this.height / 2 - this.anchorTop;
+    }
+
     apply(visible, iconHalf) {
         if (visible !== this.visible) {
             this.el.classList.toggle("Visible", visible);
             this.visible = visible;
         }
         if (!this.onScreen) return;
+        // only write the fade when it has moved enough to see
+        if (visible && Math.abs(this.fade - this.drawnFade) > 0.02) {
+            this.el.style.setProperty("--fade", this.fade.toFixed(2));
+            this.drawnFade = this.fade;
+        }
         const rotate = this.angle ? ` rotate(${this.angle.toFixed(1)}deg)` : "";
         if (this.centered) {
             this.el.style.transform = `translate(${this.screenX}px, ${this.screenY}px) translate(-50%, -50%)${rotate}`;
@@ -100,7 +229,8 @@ export class Marker {
         // the icon always sits on the point; only the text steps aside
         const left = this.side < 0;
         const x = left ? this.screenX + iconHalf - (this.width || 0) : this.screenX - iconHalf;
-        this.el.style.transform = `translate(${x}px, ${this.screenY}px) translate(0, -50%)`;
+        const y = this.anchorTop === null ? "translate(0, -50%)" : `translate(0, -${this.anchorTop}px)`;
+        this.el.style.transform = `translate(${x}px, ${this.screenY}px) ${y}`;
         if (left !== this.drawnLeft || this.shift !== this.drawnShift) {
             this.el.classList.toggle("Left", left);
             this.el.classList.toggle("Displaced", this.shift !== 0);

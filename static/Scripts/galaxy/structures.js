@@ -250,14 +250,24 @@ export function buildArmOutlines() {
         dashSize: 0.9,
         gapSize: 0.7,
     });
-    const draw = (phase, rMin, rMax) => {
+    // per-vertex alpha, so each line tapers in and out where its arm does instead of
+    // stopping dead in the middle of the disk
+    material.vertexColors = true;
+    const draw = (phase, rMin, rMax, taper) => {
         const points = [];
-        for (let i = 0; i <= 160; i++) points.push(armPoint(phase, THREE.MathUtils.lerp(rMin, rMax, i / 160)));
-        const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), material);
+        const colors = [];
+        for (let i = 0; i <= 160; i++) {
+            const r = THREE.MathUtils.lerp(rMin, rMax, i / 160);
+            points.push(armPoint(phase, r));
+            colors.push(1, 1, 1, smoothstep(rMin, rMin + taper, r) * (1 - smoothstep(rMax - taper, rMax, r)));
+        }
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 4));
+        const line = new THREE.Line(geometry, material);
         line.computeLineDistances();
         group.add(line);
     };
-    for (const arm of ARMS) draw(armPhase(arm.crossing), 8.5, GALAXY_RADIUS);
-    draw(armPhase(ORION_SPUR.crossing), ORION_SPUR.rMin, ORION_SPUR.rMax);
+    for (const arm of ARMS) draw(armPhase(arm.crossing), 8.5, arm.rMax ?? GALAXY_RADIUS, 4);
+    draw(armPhase(ORION_SPUR.crossing), ORION_SPUR.rMin, ORION_SPUR.rMax, 2);
     return { group, material };
 }

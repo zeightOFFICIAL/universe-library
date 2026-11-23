@@ -35,6 +35,9 @@ def get_sql_system_links() -> list[dict]:
                 "name": row.name_name,
                 "href": row.name_name.replace(" ", ""),
                 "color": row.prime_color_any,
+                # a system with no objects and no panels has a page with nothing on it
+                "ready": Objects.objects.filter(system=row.pk).exists()
+                or Panels.objects.filter(parent_system=row.pk).exists(),
             }
         )
 

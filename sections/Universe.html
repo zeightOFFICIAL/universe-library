@@ -21,6 +21,27 @@
             <canvas id="GALAXY_CANVAS" tabindex="0" role="application" aria-roledescription="galaxy map"
                     aria-label="Map of the Milky Way. Arrow keys move, Shift and arrow keys turn and tilt, plus and minus zoom, Home shows the whole galaxy."></canvas>
             <div class="GalaxyLoader" id="GALAXY_LOADER">
+                <svg class="LoaderGalaxy" viewBox="-60 -60 120 120" aria-hidden="true">
+                    <defs>
+                        <radialGradient id="LOADER_CORE">
+                            <stop offset="0" stop-color="#fff4dc"/>
+                            <stop offset=".35" stop-color="#ffd9a0" stop-opacity=".75"/>
+                            <stop offset="1" stop-color="#ffd9a0" stop-opacity="0"/>
+                        </radialGradient>
+                        <linearGradient id="LOADER_ARM" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0" stop-color="#ffd9a0"/>
+                            <stop offset=".45" stop-color="#9ecbff"/>
+                            <stop offset="1" stop-color="#8a7dff" stop-opacity=".15"/>
+                        </linearGradient>
+                    </defs>
+                    <g class="LoaderArms">
+                        <path d="M0 0C10-3 16 6 12 16 7 28-12 32-26 24-42 15-46-6-36-22"/>
+                        <path d="M0 0C10-3 16 6 12 16 7 28-12 32-26 24-42 15-46-6-36-22" transform="rotate(180)"/>
+                        <path class="Faint" d="M2 6C-6 14-20 12-26 2-32-10-26-26-10-34" />
+                        <path class="Faint" d="M2 6C-6 14-20 12-26 2-32-10-26-26-10-34" transform="rotate(180)"/>
+                    </g>
+                    <circle r="14" fill="url(#LOADER_CORE)"/>
+                </svg>
                 <p class="GalaxyLoaderTitle">Charting the galaxy</p>
                 <div class="GalaxyLoaderTrack"><span id="GALAXY_LOADER_BAR"></span></div>
                 <p class="GalaxyLoaderStep" id="GALAXY_LOADER_STEP">Loading imagery</p>
@@ -54,36 +75,67 @@
                         </div>
                     </section>
 
-                    <section class="DockSection">
-                        <h2 class="DockLabel">Labels</h2>
-                        <label class="GalaxyLayer"><span class="LayerText"><span class="LayerName">Star systems</span><span class="LayerHint">Places you can open</span></span><input type="checkbox" data-layer="systems" checked><span class="Switch" aria-hidden="true"></span></label>
-                        <label class="GalaxyLayer"><span class="LayerText"><span class="LayerName">Arms &amp; galaxies</span><span class="LayerHint">The spiral structure and our neighbours</span></span><input type="checkbox" data-layer="arms" checked><span class="Switch" aria-hidden="true"></span></label>
-                        <label class="GalaxyLayer"><span class="LayerText"><span class="LayerName">Nebulae &amp; clusters</span><span class="LayerHint">Landmarks within the disk</span></span><input type="checkbox" data-layer="deepsky" checked><span class="Switch" aria-hidden="true"></span></label>
-                    </section>
-
-                    <section class="DockSection">
-                        <h2 class="DockLabel">Legend</h2>
-                        <ul class="DockLegend" id="GALAXY_LEGEND"></ul>
-                    </section>
-
                     <details class="DockDetails">
                         <summary>In view now</summary>
                         <div class="GalaxyPanelScroll" id="GALAXY_OBJECT_LIST"></div>
                     </details>
                     <details class="DockDetails">
                         <summary>About this map</summary>
-                        <p class="GalaxyPanelNote">Positions of landmarks are real; the far galaxies are drawn closer than they are, and say so. The backdrop, landmarks and galaxies are always drawn - the switches above only show or hide their names. {{ galaxy.credits }}</p>
-                        <p class="GalaxyPanelNote" id="GALAXY_QUALITY"></p>
+                        <p class="GalaxyPanelNote">Positions of landmarks are real, and around the Sun so are the distances: the local view is at true scale. The far galaxies are drawn closer than they are, and say so. The spiral-arm outlines are fitted to the artwork, which is an impression rather than a survey. The backdrop, landmarks and galaxies are always drawn - the layers only show or hide their names, and the arm outlines. {{ galaxy.credits }}</p>
                         <p class="GalaxyPanelNote">Keyboard: arrow keys move, Shift + arrows turn and tilt, + and &minus; zoom, Home shows the whole galaxy.</p>
                     </details>
                 </div>
             </aside>
+            <nav class="GalaxyLayers" aria-label="Layers and settings">
+                <button type="button" class="LayerToggle" data-layer="systems" aria-pressed="true" aria-label="Star systems" aria-describedby="TIP_SYSTEMS">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><ellipse cx="12" cy="12" rx="9" ry="4.2" transform="rotate(-20 12 12)"/><circle cx="20" cy="9" r="1.3" fill="currentColor" stroke="none"/></svg>
+                    <span class="LayerTip" id="TIP_SYSTEMS" role="tooltip"><strong>Star systems</strong><span class="TipText">Places you can open. From afar, our neighbourhood is one marker; zoom in to the Sun to see each system at its true distance.</span><ul class="TipLegend"></ul><span class="TipState"></span></span>
+                </button>
+                <button type="button" class="LayerToggle" data-layer="arms" aria-pressed="true" aria-label="Spiral arms" aria-describedby="TIP_ARMS">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12.2c.9-.6.6-2-.5-2.2-1.7-.3-3 1.4-2.6 3 .5 2.3 3.3 3.2 5.2 2.1 2.7-1.5 2.9-5.3.8-7.3C12.4 5.5 7.5 6 5.4 9.3 3 13 4.9 18 9 19.3c3.4 1.1 7.3-.2 9.6-2.9"/></svg>
+                    <span class="LayerTip" id="TIP_ARMS" role="tooltip"><strong>Spiral arms</strong><span class="TipText">Dashed outlines and names of the Milky Way's arms. Seen from above the disk; they fade as you go edge-on or come in close.</span><ul class="TipLegend"></ul><span class="TipState"></span></span>
+                </button>
+                <button type="button" class="LayerToggle" data-layer="deepsky" aria-pressed="true" aria-label="Nebulae and clusters" aria-describedby="TIP_DEEPSKY">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3.5l1.4 4.6L16 9.5l-4.6 1.4L10 15.5l-1.4-4.6L4 9.5l4.6-1.4z" fill="currentColor" stroke="none"/><circle cx="17.5" cy="16.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="14" cy="19.5" r="1" fill="currentColor" stroke="none"/><circle cx="19.5" cy="12.5" r=".9" fill="currentColor" stroke="none"/></svg>
+                    <span class="LayerTip" id="TIP_DEEPSKY" role="tooltip"><strong>Nebulae &amp; clusters</strong><span class="TipText">Names of real landmarks at their true positions, and of the galactic centre. Each appears as the camera comes near it.</span><ul class="TipLegend"></ul><span class="TipState"></span></span>
+                </button>
+                <button type="button" class="LayerToggle" data-layer="galaxies" aria-pressed="true" aria-label="Galaxies" aria-describedby="TIP_GALAXIES">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="12" rx="9.5" ry="3.8" transform="rotate(-28 12 12)"/><ellipse cx="12" cy="12" rx="4.4" ry="1.9" transform="rotate(-28 12 12)" fill="currentColor" stroke="none" opacity=".55"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>
+                    <span class="LayerTip" id="TIP_GALAXIES" role="tooltip"><strong>Galaxies</strong><span class="TipText">Names of our neighbours, from the Magellanic Clouds to Andromeda. They are drawn closer than they are, and their labels say so; a galaxy behind the disk's dust loses its name.</span><ul class="TipLegend"></ul><span class="TipState"></span></span>
+                </button>
+                <span class="LayersDivider" aria-hidden="true"></span>
+                <button type="button" class="LayerToggle SettingsOpen" id="GALAXY_SETTINGS_OPEN" aria-haspopup="dialog" aria-expanded="false" aria-label="Settings" aria-describedby="TIP_SETTINGS">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/></svg>
+                    <span class="LayerTip" id="TIP_SETTINGS" role="tooltip"><strong>Settings</strong><span class="TipText">Units for distances, sizes, masses and temperatures, and how much detail to draw. Remembered on this device.</span></span>
+                </button>
+            </nav>
+            <dialog class="GalaxySettings" id="GALAXY_SETTINGS" aria-labelledby="GALAXY_SETTINGS_TITLE">
+                <form method="dialog" class="SettingsPanel">
+                    <header class="SettingsHead">
+                        <div>
+                            <p class="DockEyebrow">Universe Library</p>
+                            <h2 class="SettingsTitle" id="GALAXY_SETTINGS_TITLE">Settings</h2>
+                        </div>
+                        <button type="submit" class="DockToggle SettingsClose" aria-label="Close settings"><span aria-hidden="true"></span></button>
+                    </header>
+                    <p class="SettingsLead">Units apply at once and are remembered on this device. The map uses distances today; the system pages will use the rest as they are rebuilt.</p>
+                    <div class="SettingsUnits" id="GALAXY_SETTINGS_UNITS"></div>
+                    <fieldset class="SettingGroup">
+                        <legend><span class="SettingName">Detail</span><span class="SettingHint">Changing it reloads the map</span></legend>
+                        <div class="Segmented" id="GALAXY_SETTINGS_DETAIL"></div>
+                    </fieldset>
+                    <button type="submit" class="SettingsDone">Done</button>
+                </form>
+            </dialog>
             <div class="GalaxyReadout" id="GALAXY_READOUT"></div>
-            <div class="GalaxyScaleNote" id="GALAXY_SCALE_NOTE">Local view · distances log-scaled, directions true</div>
+            <div class="GalaxyScaleNote" id="GALAXY_SCALE_NOTE">Local view · true scale · rings at 10, 100 and 1,000 ly</div>
             <div class="GalaxyHint">Drag to move · right-drag to tilt · scroll to zoom</div>
             <div class="GalaxyControls">
-                <button type="button" data-action="zoom-out" title="Zoom out">&minus;</button>
-                <button type="button" data-action="zoom-in" title="Zoom in">+</button>
+                <button type="button" data-action="sun" class="HomeButton" title="Back to the Sun" aria-label="Back to the Sun">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7.5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg>
+                </button>
+                <button type="button" data-action="zoom-out" title="Zoom out" aria-label="Zoom out">&minus;</button>
+                <button type="button" data-action="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
             </div>
         </div>
         {{ galaxy|json_script:"GALAXY_DATA" }}

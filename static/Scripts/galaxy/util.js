@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { SUN, ARM_K, LOCAL_LOG_SCALE } from "./config.js";
+import { SUN, ARM_K } from "./config.js";
+import { formatDistance } from "./units.js";
 
 /* ---------- helpers ---------- */
 
@@ -45,19 +46,9 @@ export function truePosition(l, b, d) {
     return directionFromSun(l, b).multiplyScalar(d / 1000).add(SUN);
 }
 
-// local view: true direction, log-scaled distance, so everything nearby stays readable
-export function localRadius(ly) {
-    return LOCAL_LOG_SCALE * Math.log10(1 + ly);
-}
-
-export function localPosition(placement) {
-    return directionFromSun(placement.l, placement.b).multiplyScalar(localRadius(placement.d)).add(SUN);
-}
-
+// every distance on the map is printed in the unit chosen in the settings
 export function formatLy(ly) {
-    if (ly >= 1e6) return `${(ly / 1e6).toLocaleString("en-US", { maximumFractionDigits: 2 })} million ly`;
-    if (ly >= 1000) return `${Math.round(ly).toLocaleString("en-US")} ly`;
-    return `${ly.toLocaleString("en-US", { maximumFractionDigits: 2 })} ly`;
+    return formatDistance(ly);
 }
 
 export function smoothstep(edge0, edge1, x) {

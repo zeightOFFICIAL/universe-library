@@ -18,8 +18,9 @@ import * as THREE from "three";
  *
  * Two levels of detail:
  *   galaxy - the whole Milky Way, arm names, landmarks, one marker for the Sun
- *   local  - camera close to the Sun; real systems at their true directions with
- *            log-scaled distances, so a 4 ly and a 430 ly system both stay readable
+ *   local  - camera close to the Sun; real systems at their true positions and true
+ *            distances. The nearest are a few light-years out, so this level zooms
+ *            far deeper than the galaxy does (see LOCAL_MIN_DISTANCE)
  */
 
 /*
@@ -43,13 +44,24 @@ export const GALAXY_RADIUS = 50;
 export const ARM_PITCH = THREE.MathUtils.degToRad(12);
 export const ARM_K = Math.tan(ARM_PITCH);
 
-// radius (kly) at which each arm crosses the Sun-centre line; the four crossings are
-// spaced by exp(2*pi*k/4), which puts Sagittarius inside the Sun and Perseus outside
+/*
+ * Radius (kly) at which each arm crosses the Sun-centre line, fitted to the backdrop
+ * rather than spaced evenly. The old crossings (10.8, 15, 21, 29.3) were a symmetric
+ * four-arm pattern, and two of them ran down the artwork's gaps: the mean brightness
+ * along Perseus was 0.87 of the disk average at that radius, Scutum's 0.96. These
+ * come from sweeping every phase at a 12 degree pitch over the artwork (contrast-
+ * normalised by radius, as the backdrop is mapped into the scene) and taking the
+ * ridges: 1.17, 1.01, 1.08 and 0.97 - each now on an arm. A free pitch per arm fits
+ * slightly better but lets arms alias onto each other a turn apart, so the pitch
+ * stays shared. Labels sit where each arm is brightest in the painting, and rMax
+ * stops a line where its arm fades out. Re-fit if the backdrop or its rotation
+ * changes.
+ */
 export const ARMS = [
-    { name: "Norma Arm", crossing: 10.8, label: 13, outerLabel: "Outer Arm" },
-    { name: "Scutum–Centaurus Arm", crossing: 15.0, label: 21 },
-    { name: "Sagittarius Arm", crossing: 21.0, label: 16 },
-    { name: "Perseus Arm", crossing: 29.3, label: 36 },
+    { name: "Norma Arm", crossing: 10.9, label: 21, outerLabel: "Outer Arm", outerAt: 42, rMax: 48 },
+    { name: "Scutum–Centaurus Arm", crossing: 17.9, label: 25, rMax: 40 },
+    { name: "Sagittarius Arm", crossing: 21.8, label: 38, rMax: 49 },
+    { name: "Perseus Arm", crossing: 32.7, label: 31, rMax: 46 },
 ];
 export const ORION_SPUR = { name: "Orion Spur", crossing: 26.3, rMin: 23, rMax: 30.5 };
 
@@ -177,12 +189,21 @@ export const STAR_TINTS = [
     { color: new THREE.Color(1.0, 0.97, 0.93), weight: 0.18, amount: 0.2 },
 ];
 
-export const LOCAL_LOG_SCALE = 0.5;
 export const LOCAL_RINGS_LY = [10, 100, 1000];
-export const LOCAL_ENTER = 9;
-export const LOCAL_FULL = 5;
+/*
+ * The local view is at true scale now, so it begins much closer in: our farthest
+ * system, Polaris, is 0.43 units from the Sun. It fades in between these camera
+ * distances from the Sun, in kly.
+ */
+export const LOCAL_ENTER = 2.6;
+export const LOCAL_FULL = 1.5;
+// how close the camera may come near the Sun: about 4 ly, enough to split Alpha
+// Centauri from the Sun. Elsewhere the old limit holds (see frame()).
+export const LOCAL_MIN_DISTANCE = 0.004;
+export const GALAXY_MIN_DISTANCE = 0.8;
+// where the Sun button lands: every one of our systems in frame
+export const SUN_VIEW = { distance: 0.95, polar: 1.0 };
 export const DEEP_SKY_LABEL_DISTANCE = 45;
-export const LOCAL_DEEP_SKY_LY = 2500;
 
 export const OVERVIEW = { target: new THREE.Vector3(0, 0, 0), distance: 85, polar: 0.9, azimuth: 0.45 };
 /*
