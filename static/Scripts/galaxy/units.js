@@ -7,8 +7,15 @@
  * too. Nothing here imports anything, so any module can use it.
  */
 
+/*
+ * Grouped by what they measure, so the dialog reads as "across space", "planets",
+ * "stars and black holes". Every quantity the map or a future info card prints has
+ * a home here, even where nothing on the map uses it yet: the object cards and the
+ * system pages will read the same choices.
+ */
 export const UNIT_OPTIONS = {
     distance: {
+        section: "Across space",
         label: "Distances",
         hint: "Between stars, and across the galaxy",
         choices: [
@@ -17,37 +24,88 @@ export const UNIT_OPTIONS = {
             { value: "km", label: "Kilometres", example: "4.13 × 10¹³ km" },
         ],
     },
-    size: {
-        label: "Sizes",
-        hint: "Diameters of planets and stars",
-        choices: [
-            { value: "km", label: "Kilometres", example: "12,742 km" },
-            { value: "mi", label: "Miles", example: "7,918 mi" },
-            { value: "earth", label: "Earths", example: "1 Earth" },
-        ],
-    },
-    mass: {
-        label: "Masses",
-        hint: "Planets, stars and black holes",
-        choices: [
-            { value: "relative", label: "Earths and Suns", example: "4.3 million Suns" },
-            { value: "kg", label: "Kilograms", example: "8.6 × 10³⁶ kg" },
-            { value: "lb", label: "Pounds", example: "1.9 × 10³⁷ lb" },
-        ],
-    },
     temperature: {
+        section: "Across space",
         label: "Temperatures",
-        hint: "Surfaces of stars and planets",
+        hint: "Surfaces of stars and planets, nebula gas",
         choices: [
             { value: "C", label: "Celsius", example: "5,505 °C" },
             { value: "K", label: "Kelvin", example: "5,778 K" },
             { value: "F", label: "Fahrenheit", example: "9,941 °F" },
         ],
     },
+    size: {
+        section: "Planets and moons",
+        label: "Sizes",
+        hint: "Diameters",
+        choices: [
+            { value: "km", label: "Kilometres", example: "12,742 km" },
+            { value: "mi", label: "Miles", example: "7,918 mi" },
+            { value: "earth", label: "Earths", example: "1 Earth" },
+            { value: "jupiter", label: "Jupiters", example: "0.09 Jupiters" },
+        ],
+    },
+    planetMass: {
+        section: "Planets and moons",
+        label: "Masses",
+        hint: "Rocky worlds to gas giants",
+        choices: [
+            { value: "earth", label: "Earths", example: "317.8 Earths" },
+            { value: "jupiter", label: "Jupiters", example: "1 Jupiter" },
+            { value: "kg", label: "Kilograms", example: "1.9 × 10²⁷ kg" },
+        ],
+    },
+    period: {
+        section: "Planets and moons",
+        label: "Orbits and days",
+        hint: "Years, days and rotation",
+        choices: [
+            { value: "days", label: "Earth days", example: "365.26 days" },
+            { value: "years", label: "Earth years", example: "1 year" },
+            { value: "hours", label: "Hours", example: "8,766 h" },
+        ],
+    },
+    gravity: {
+        section: "Planets and moons",
+        label: "Surface gravity",
+        hint: "What you would weigh",
+        choices: [
+            { value: "g", label: "Earth g", example: "0.38 g" },
+            { value: "ms2", label: "m/s²", example: "3.72 m/s²" },
+        ],
+    },
+    starSize: {
+        section: "Stars and black holes",
+        label: "Sizes",
+        hint: "Star radii, event horizons",
+        choices: [
+            { value: "sun", label: "Suns", example: "887 Suns" },
+            { value: "km", label: "Kilometres", example: "617 million km" },
+            { value: "au", label: "AU", example: "4.1 AU" },
+        ],
+    },
+    mass: {
+        section: "Stars and black holes",
+        label: "Masses",
+        hint: "From red dwarfs to Sgr A*",
+        choices: [
+            { value: "relative", label: "Suns", example: "4.3 million Suns" },
+            { value: "kg", label: "Kilograms", example: "8.6 × 10³⁶ kg" },
+        ],
+    },
+    luminosity: {
+        section: "Stars and black holes",
+        label: "Brightness",
+        hint: "Light given off",
+        choices: [
+            { value: "sun", label: "Suns", example: "126,000 Suns" },
+            { value: "w", label: "Watts", example: "4.8 × 10³¹ W" },
+        ],
+    },
 };
 
 const KEY = "universeUnits";
-const DEFAULTS = { distance: "ly", size: "km", mass: "relative", temperature: "C" };
+const DEFAULTS = { distance: "ly", temperature: "C", size: "km", planetMass: "earth", period: "days", gravity: "g", starSize: "sun", mass: "relative", luminosity: "sun" };
 
 function load() {
     const units = { ...DEFAULTS };
@@ -189,30 +247,87 @@ export function formatSize(km) {
             const earths = km / 12742;
             return `${formatNumber(earths)} ${earths === 1 ? "Earth" : "Earths"}`;
         }
+        case "jupiter":
+            return `${formatNumber(km / 139820)} Jupiters`;
         default:
             return `${formatNumber(km)} km`;
     }
 }
 
 const KG_IN_EARTH = 5.972e24;
+const KG_IN_JUPITER = 1.898e27;
 const KG_IN_SUN = 1.989e30;
+const KM_IN_SUN = 695700;
+const KM_IN_AU = 1.496e8;
+const W_IN_SUN = 3.828e26;
 
+const unit = (value, one, many) => `${formatNumber(value)} ${value === 1 ? one : many}`;
+
+/*
+ * Masses pick their scale by size: a tenth of a Sun or more is a star or a black
+ * hole and follows the "stars" choice, anything lighter is a planet.
+ */
 export function formatMass(kg) {
-    switch (UNITS.mass) {
+    if (kg >= KG_IN_SUN * 0.1) {
+        return UNITS.mass === "kg" ? `${formatNumber(kg)} kg` : unit(kg / KG_IN_SUN, "Sun", "Suns");
+    }
+    switch (UNITS.planetMass) {
         case "kg":
             return `${formatNumber(kg)} kg`;
-        case "lb":
-            return `${formatNumber(kg * 2.20462)} lb`;
-        default: {
-            // anything a tenth of a Sun or more is counted in Suns
-            if (kg >= KG_IN_SUN * 0.1) return `${formatNumber(kg / KG_IN_SUN)} ${kg === KG_IN_SUN ? "Sun" : "Suns"}`;
-            return `${formatNumber(kg / KG_IN_EARTH)} Earths`;
-        }
+        case "jupiter":
+            return unit(kg / KG_IN_JUPITER, "Jupiter", "Jupiters");
+        default:
+            return unit(kg / KG_IN_EARTH, "Earth", "Earths");
     }
 }
 
 export function solarMasses(suns) {
     return suns * KG_IN_SUN;
+}
+
+// a star's radius or a black hole's event horizon, from kilometres
+export function formatStarSize(km) {
+    switch (UNITS.starSize) {
+        case "km":
+            return `${formatNumber(km)} km`;
+        case "au":
+            return `${formatNumber(km / KM_IN_AU)} AU`;
+        default:
+            return unit(km / KM_IN_SUN, "Sun", "Suns");
+    }
+}
+
+// an event horizon is a few kilometres per Sun, so it is never printed in Suns
+export function formatHorizon(km) {
+    return UNITS.starSize === "au" ? `${formatNumber(km / KM_IN_AU)} AU` : `${formatNumber(km)} km`;
+}
+
+export function solarRadii(suns) {
+    return suns * KM_IN_SUN;
+}
+
+// a black hole's event horizon: 2GM/c², about 2.95 km per solar mass
+export function schwarzschildKm(suns) {
+    return suns * 2.953;
+}
+
+export function formatLuminosity(suns) {
+    return UNITS.luminosity === "w" ? `${formatNumber(suns * W_IN_SUN)} W` : unit(suns, "Sun", "Suns");
+}
+
+export function formatPeriod(days) {
+    switch (UNITS.period) {
+        case "years":
+            return unit(days / 365.25, "year", "years");
+        case "hours":
+            return `${formatNumber(days * 24)} h`;
+        default:
+            return unit(days, "day", "days");
+    }
+}
+
+export function formatGravity(g) {
+    return UNITS.gravity === "ms2" ? `${formatNumber(g * 9.80665)} m/s²` : `${formatNumber(g)} g`;
 }
 
 export function formatTemperature(kelvin) {

@@ -199,6 +199,15 @@ export const STAR_TINTS = [
     { color: new THREE.Color(1.0, 0.97, 0.93), weight: 0.18, amount: 0.2 },
 ];
 
+/*
+ * A slight violet cast over the whole galaxy - the painting, the stars and the haze
+ * sampled from it. Nobody has seen the Milky Way from outside, so its colour is an
+ * expectation, not a measurement, and the house look leans violet. Channel gains,
+ * balanced so luminance stays where it was (0.2126 R + 0.7152 G + 0.0722 B = 0.99).
+ * Not applied to the nebulae, the core points or the photographs of other galaxies.
+ */
+export const GALAXY_TINT = new THREE.Color(1.07, 0.955, 1.13);
+
 export const LOCAL_RINGS_LY = [10, 100, 1000];
 /*
  * The local view is at true scale now, so it begins much closer in: our farthest

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { BACKDROP, SOFT_LAYER } from "./config.js";
+import { BACKDROP, SOFT_LAYER, GALAXY_TINT } from "./config.js";
 import { rand, smoothstep } from "./util.js";
 
 /* ---------- the backdrop, as a stack of slices ---------- */
@@ -34,6 +34,7 @@ EMPTY_DUST.needsUpdate = true;
 export const BACKDROP_FRAGMENT = /* glsl */ `
     uniform sampler2D uMap;
     uniform float uOpacity;
+    uniform vec3 uTint;
     uniform float uBias;
     uniform float uCoreFade;
     uniform float uTear;
@@ -123,6 +124,7 @@ export const BACKDROP_FRAGMENT = /* glsl */ `
          * the arm dust and the edge-on lane - simply add their optical depths, which
          * is what two absorbers in series actually do.
          */
+        c *= uTint;
         float tau = dust + lane;
         c *= exp(-tau * vec3(0.75, 1.0, 1.32));
 
@@ -153,6 +155,7 @@ export function buildBackdropVolume(texture) {
             uniforms: {
                 uMap: { value: texture },
                 uOpacity: { value: 0 },
+                uTint: { value: GALAXY_TINT },
                 uCoreFade: { value: 0 },
                 // mid-plane stays sharp, outer slices blur out into haze
                 uBias: { value: Math.pow(Math.abs(t), 0.75) * BACKDROP.blur },

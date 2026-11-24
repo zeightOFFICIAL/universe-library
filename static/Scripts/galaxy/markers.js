@@ -81,6 +81,8 @@ export class Marker {
             });
         }
         this.el = el;
+        this.href = href;
+        this.iconOnly = false;
         this.centered = kind !== "link";
         this.anchorTop = members ? CLUSTER_ICON_TOP : null;
         this.visible = false;
@@ -107,6 +109,7 @@ export class Marker {
             const dot = document.createElement("i");
             dot.style.setProperty("--member-color", member.color);
             if (member.soon) dot.className = "Soon";
+            if (member.variant) dot.classList.add(member.variant === "fiction" ? "Fiction" : "MapOnly");
             dots.appendChild(dot);
         }
         row.appendChild(dots);
@@ -115,9 +118,17 @@ export class Marker {
         const list = document.createElement("span");
         list.className = "GalaxyMarkerMembers";
         for (const member of members) {
-            const link = document.createElement("a");
-            link.className = `GalaxyMember${member.soon ? " Soon" : ""}`;
-            link.href = member.href;
+            // a system with a page is a link to it; one without flies the camera there
+            const link = document.createElement(member.href ? "a" : "button");
+            link.className = `GalaxyMember${member.soon ? " Soon" : ""}${member.variant === "fiction" ? " Fiction" : member.variant === "map" ? " MapOnly" : ""}`;
+            if (member.href) link.href = member.href;
+            else {
+                link.type = "button";
+                link.addEventListener("click", (event) => {
+                    event.preventDefault();
+                    member.fly?.();
+                });
+            }
             link.title = member.title;
             link.style.setProperty("--member-color", member.color);
             link.innerHTML = "<span></span><small></small>";
@@ -224,6 +235,10 @@ export class Marker {
         if (visible && Math.abs(this.fade - this.drawnFade) > 0.02) {
             this.el.style.setProperty("--fade", this.fade.toFixed(2));
             this.drawnFade = this.fade;
+        }
+        if (this.iconOnly !== this.drawnIconOnly) {
+            this.el.classList.toggle("IconOnly", this.iconOnly);
+            this.drawnIconOnly = this.iconOnly;
         }
         const rotate = this.angle ? ` rotate(${this.angle.toFixed(1)}deg)` : "";
         if (this.centered) {

@@ -1,3 +1,7 @@
+import re
+from pathlib import Path
+
+from django.conf import settings
 from django.shortcuts import render, HttpResponse
 
 from mysite.PredefinedSystems.AlphaCentauri import System as Alpha
@@ -13,9 +17,11 @@ from starsystems.galaxy import (
     IMAGE_CREDITS,
     PLANETARY_SYSTEMS,
     SPACECRAFT,
+    STELLAR_OBJECTS,
     SUN_HEIGHT_ABOVE_PLANE_LY,
     SUN_TO_GALACTIC_CENTRE_LY,
 )
+from starsystems.image_sources import IMAGE_SOURCES
 from mysite.ServerScripts import (
     get_sql_system,
     get_sql_system_id,
@@ -31,6 +37,34 @@ PREDEFINED_SYSTEM_LINKS = [
     {"name": "Alpha Centauri", "href": "AlphaCentauri", "color": "#FF0000", "ready": True},
 ]
 
+# Photographs for the info cards. A card shows one only when the file is on disk, so
+# an image can be added later by dropping it in, and a missing one never makes the
+# page request a file that is not there (the galaxy page makes no external requests).
+INFO_IMAGE_DIR = Path(settings.BASE_DIR) / "static" / "Images" / "DeepSky"
+
+
+def image_slug(entry):
+    return re.sub(r"[^a-z0-9]+", "-", (entry.get("alias") or entry["name"]).lower()).strip("-")
+
+
+def short_credit(source):
+    author = source["author"]
+    if len(author) > 60:
+        author = author[:57].rstrip(" ,;/(") + "…"
+    return f"{author} · {source['license']}"
+
+
+def with_images(entries):
+    found = []
+    for entry in entries:
+        slug = image_slug(entry)
+        source = IMAGE_SOURCES.get(slug)
+        # an image is used only when it is on disk and we know whose it is
+        if source and (INFO_IMAGE_DIR / f"{slug}.jpg").is_file():
+            entry = dict(entry, image=f"{slug}.jpg", imageCredit=short_credit(source), imageSource=source["page"])
+        found.append(entry)
+    return found
+
 
 def universe_page(request) -> HttpResponse:
     links = PREDEFINED_SYSTEM_LINKS + get_sql_system_links()
@@ -38,11 +72,12 @@ def universe_page(request) -> HttpResponse:
     galaxy = {
         "sunDistance": SUN_TO_GALACTIC_CENTRE_LY,
         "sunHeight": SUN_HEIGHT_ABOVE_PLANE_LY,
-        "deepSky": DEEP_SKY,
+        "deepSky": with_images(DEEP_SKY),
         "galaxies": GALAXIES,
         "planetarySystems": PLANETARY_SYSTEMS,
         "fiction": FICTIONAL_PLACES,
-        "spacecraft": SPACECRAFT,
+        "spacecraft": with_images(SPACECRAFT),
+        "stellarObjects": with_images(STELLAR_OBJECTS),
         "celestialPole": CELESTIAL_POLE_GALACTIC,
         "backgroundGalaxies": BACKGROUND_GALAXY_IMAGES,
         "credits": IMAGE_CREDITS,

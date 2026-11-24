@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { BACKDROP, STAR_ALPHA, HAZE_ALPHA, INTER_ARM_TINT, ARM_OUTER_EDGE, ARM_INNER_EDGE, THICK_DISK_TINT, CIRRUS_VIOLET, CIRRUS_BLUE, HALO_TINT, WHITE, STAR_TINTS, DEEP_SKY_STYLE } from "./config.js";
+import { GALAXY_TINT, BACKDROP, STAR_ALPHA, HAZE_ALPHA, INTER_ARM_TINT, ARM_OUTER_EDGE, ARM_INNER_EDGE, THICK_DISK_TINT, CIRRUS_VIOLET, CIRRUS_BLUE, HALO_TINT, WHITE, STAR_TINTS, DEEP_SKY_STYLE } from "./config.js";
 import { rand, gauss, smoothstep, Layer } from "./util.js";
 import { BACKDROP_MATRIX } from "./backdrop.js";
 
@@ -478,6 +478,15 @@ export function buildGalaxyFromImage(image) {
         knots.add(p, color, 1.8 + rand() * 3.0, (0.16 + rand() * 0.26) * (0.3 + 0.7 * smoothstep(6, 15, r)), dustMap[index]);
     }
 
+    // the house violet, over everything sampled from the painting (see GALAXY_TINT)
+    for (const layer of [stars, gas, knots]) {
+        const c = layer.colors;
+        for (let i = 0; i < layer.count * 3; i += 3) {
+            c[i] *= GALAXY_TINT.r;
+            c[i + 1] *= GALAXY_TINT.g;
+            c[i + 2] *= GALAXY_TINT.b;
+        }
+    }
     return { stars, gas, knots, scattered, dustTexture: dustTexture(dustMap, sampler.n) };
 }
 

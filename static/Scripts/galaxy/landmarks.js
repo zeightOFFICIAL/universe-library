@@ -5,35 +5,68 @@ import { rand, gauss, mulberry32, directionFromSun, truePosition, Layer } from "
 
 /*
  * The named landmarks, drawn to be looked at rather than measured. Positions are
- * exact; the look is not. Each object gets:
+ * exact; the look is not, and it is deliberately bigger than life so a nebula is
+ * something you can fly up to. Each object gets:
  *
- *   - a bright core point, as before
- *   - a soft coloured halo; nebulae get several offset, differently tinted wisps,
- *     so each reads as a cloud with a shape rather than a round dot
+ *   - a bright core point
+ *   - an envelope: one soft glow that is what you see of it from across the galaxy
+ *   - detail: offset, differently tinted wisps and a few bright knots, so up close
+ *     it has a shape rather than being a round dot
  *   - planetary nebulae and supernova remnants a ring, the shell they are
- *   - clusters a scatter of member stars, spread wider than life so the Pleiades
- *     look like the Pleiades when you fly past them
+ *   - clusters, and the young stars inside nebulae, a scatter of member stars
+ *
+ * Sizes are in world terms: a sprite of size s spans about s * 83 ly (see
+ * vWorldSize in shaders.js) until it reaches its on-screen cap. The caps are high,
+ * so a nebula keeps growing as the camera closes in; the old 64px cap was what made
+ * them look like stickers.
  *
  * Its own seeded generator, so adding a landmark never reshuffles the star field.
  */
 // one dial for how loud the painted layer is against the star field
-const ART_BRIGHTNESS = 0.68;
+const ART_BRIGHTNESS = 0.78;
 
 const ARTISTIC = {
-    nebula: { wisps: 4, spread: 0.05, size: [14, 26], alpha: [0.045, 0.08], tints: ["#ff6b8a", "#ff9fc0", "#8fb8ff", "#c58cff"] },
-    remnant: { wisps: 2, spread: 0.03, size: [12, 18], alpha: [0.045, 0.065], tints: ["#ff9d6b", "#7fd6ff"], ring: 13 },
-    planetary: { wisps: 1, spread: 0, size: [10, 12], alpha: [0.05, 0.07], tints: ["#7de2c3"], ring: 9 },
-    open: { wisps: 1, spread: 0, size: [16, 22], alpha: [0.03, 0.045], tints: ["#9cc4ff"], members: 18, memberSpread: 0.016 },
-    globular: { wisps: 1, spread: 0, size: [11, 15], alpha: [0.06, 0.08], tints: ["#ffd9a0"], members: 36, memberSpread: 0.022 },
+    nebula: {
+        envelope: [2.6, 3.6], envelopeAlpha: [0.05, 0.07],
+        wisps: 7, spread: 0.055, size: [1.1, 2.2], alpha: [0.06, 0.1],
+        knots: 3, knotSize: [0.35, 0.6], knotAlpha: [0.12, 0.18],
+        tints: ["#ff5f86", "#ff9cc4", "#7fb2ff", "#c487ff", "#ff7a5c"],
+        members: 9, memberSpread: 0.03, memberTint: "#cfe2ff",
+    },
+    remnant: {
+        envelope: [1.8, 2.4], envelopeAlpha: [0.045, 0.06],
+        wisps: 4, spread: 0.035, size: [0.8, 1.4], alpha: [0.06, 0.09],
+        knots: 2, knotSize: [0.25, 0.4], knotAlpha: [0.1, 0.15],
+        tints: ["#ff9d6b", "#7fd6ff", "#ff6f9a"], ring: 1.7, ringAlpha: 0.5,
+    },
+    planetary: {
+        envelope: [1.0, 1.3], envelopeAlpha: [0.05, 0.065],
+        wisps: 2, spread: 0.01, size: [0.5, 0.7], alpha: [0.08, 0.11],
+        tints: ["#7de2c3", "#8fb8ff"], ring: 0.85, ringAlpha: 0.55,
+    },
+    open: {
+        envelope: [2.0, 2.6], envelopeAlpha: [0.04, 0.055],
+        wisps: 1, spread: 0.01, size: [0.9, 1.2], alpha: [0.04, 0.055],
+        tints: ["#9cc4ff"],
+        members: 34, memberSpread: 0.04,
+    },
+    globular: {
+        envelope: [1.4, 1.8], envelopeAlpha: [0.06, 0.08],
+        wisps: 1, spread: 0, size: [0.6, 0.8], alpha: [0.09, 0.12],
+        tints: ["#ffd9a0"],
+        members: 80, memberSpread: 0.035,
+    },
 };
 
 /*
- * options: seed for the generator; amount (0..1) thins the wisps and member stars
- * and quietens them, for the unnamed filler that covers the rest of the disk;
- * cores false when the caller already draws each object's point; haloFloor is the
- * smallest a wisp may shrink to on screen.
+ * options: seed for the generator; amount (0..1) thins the detail and quietens it,
+ * for the unnamed filler that covers the rest of the disk; cores false when the
+ * caller already draws each object's point; haloFloor is the smallest an envelope
+ * may shrink to on screen; sizeScale enlarges everything (the filler is only seen
+ * from afar, so it is drawn larger and capped lower); cap is the envelope's largest
+ * size on screen, in pixels.
  */
-export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: drawCores = true, haloFloor = 5 } = {}) {
+export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: drawCores = true, haloFloor = 8, sizeScale = 1, cap = 520 } = {}) {
     const random = mulberry32(seed);
     const between = ([lo, hi]) => lo + (hi - lo) * random();
     const normal = () => {
@@ -41,55 +74,75 @@ export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: draw
         while (u === 0) u = random();
         return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * random());
     };
+    // the unnamed filler keeps small, quiet member stars: there are two thousand of them
+    const filler = amount < 0.9;
+    const quiet = (0.45 + 0.55 * amount) * ART_BRIGHTNESS;
 
     const cores = new Layer(objects.length);
-    const halos = new Layer(objects.length * 5);
+    const envelopes = new Layer(objects.length);
+    const details = new Layer(objects.length * 40);
     const rings = new Layer(objects.length);
-    const members = new Layer(objects.length * 40);
+    const members = new Layer(objects.length * 82);
     const color = new THREE.Color();
     const white = new THREE.Color(1, 1, 1);
     const p = new THREE.Vector3();
+    const size = (range) => between(range) * sizeScale;
 
     for (const o of objects) {
         const style = DEEP_SKY_STYLE[o.kind];
         const art = ARTISTIC[o.kind];
-        // named landmarks are a touch quieter now that the whole disk is populated
-        if (drawCores) cores.add(o.position, new THREE.Color(style.color).convertSRGBToLinear(), style.size * 0.5, 0.58);
+        if (drawCores) cores.add(o.position, new THREE.Color(style.color).convertSRGBToLinear(), style.size * 0.5, 0.62);
         if (!art) continue;
-        const wisps = Math.max(1, Math.round(art.wisps * amount));
         // the first tint of each kind rotates, so the filler is not all one pink
         const offset = Math.floor(random() * art.tints.length);
+        const tint = (i) => color.set(art.tints[(i + offset) % art.tints.length]).convertSRGBToLinear();
+        // a per-object stretch, so the wisps of one nebula lean one way
+        const lean = new THREE.Vector3(normal(), normal() * 0.4, normal()).normalize();
+
+        envelopes.add(o.position, tint(0), size(art.envelope), between(art.envelopeAlpha) * quiet);
+        const wisps = Math.max(1, Math.round(art.wisps * amount));
         for (let i = 0; i < wisps; i++) {
-            p.set(normal(), normal() * 0.6, normal()).multiplyScalar(art.spread).add(o.position);
-            color.set(art.tints[(i + offset) % art.tints.length]).convertSRGBToLinear();
-            halos.add(i === 0 ? o.position : p, color, between(art.size) * (0.7 + 0.3 * amount), between(art.alpha) * (0.5 + 0.5 * amount) * ART_BRIGHTNESS);
+            const along = normal() * art.spread * 0.8;
+            p.set(normal(), normal() * 0.5, normal()).multiplyScalar(art.spread * 0.45).addScaledVector(lean, along).add(o.position);
+            details.add(i === 0 ? o.position : p, tint(i), size(art.size), between(art.alpha) * quiet);
         }
-        if (art.ring) rings.add(o.position, new THREE.Color(style.color).convertSRGBToLinear(), art.ring * (0.7 + 0.3 * amount), 0.42 * Math.pow(amount, 1.6) * ART_BRIGHTNESS);
-        const memberCount = Math.round((art.members || 0) * amount);
+        const knots = Math.round((art.knots || 0) * amount);
+        for (let i = 0; i < knots; i++) {
+            p.set(normal(), normal() * 0.5, normal()).multiplyScalar(art.spread * 0.45).add(o.position);
+            tint(i + 1).lerp(white, 0.3);
+            details.add(p, color, size(art.knotSize), between(art.knotAlpha) * quiet * 0.8);
+        }
+        if (art.ring) rings.add(o.position, new THREE.Color(style.color).convertSRGBToLinear(), art.ring * sizeScale * (0.7 + 0.3 * amount), art.ringAlpha * Math.pow(amount, 1.6) * ART_BRIGHTNESS);
+        const memberCount = Math.round((art.members || 0) * amount * (filler ? 0.5 : 1));
         for (let i = 0; i < memberCount; i++) {
-            // globulars crowd to the middle, open clusters stay loose
-            const r = art.memberSpread * (o.kind === "globular" ? Math.pow(random(), 1.8) : 0.35 + 0.65 * random());
+            // globulars crowd to the middle, open clusters and nebulae stay loose
+            const r = art.memberSpread * (o.kind === "globular" ? Math.pow(random(), 1.8) : 0.25 + 0.75 * random());
             p.set(normal(), normal(), normal()).normalize().multiplyScalar(r).add(o.position);
-            color.set(style.color).convertSRGBToLinear().lerp(white, 0.35 + 0.4 * random());
-            members.add(p, color, 2.2 + 2.6 * random(), (0.5 + 0.4 * random()) * ART_BRIGHTNESS);
+            color.set(art.memberTint || style.color).convertSRGBToLinear().lerp(white, 0.3 + 0.45 * random());
+            const bright = !filler && random() < 0.15;
+            members.add(p, color, filler ? 2.2 + 2.6 * random() : (bright ? 3 + 1.5 * random() : 1.6 + 1.6 * random()), (bright ? 0.85 : 0.55 + 0.35 * random()) * (filler ? 0.6 : 1) * ART_BRIGHTNESS);
+            // the brightest members get a small glow of their own, like a photograph's
+            if (bright) details.add(p, color, 0.09 * sizeScale, 0.1 * ART_BRIGHTNESS);
         }
     }
 
+    const material = pointsMaterial({ maxSize: 16, minSize: 3, nearFade: 0.3, sharpness: 6 });
+    // the envelope: what you see from afar, with a floor so it never vanishes
+    const envelopeMaterial = pointsMaterial({ maxSize: cap, minSize: haloFloor, nearFade: 0.02, sharpness: 2.2, soft: true, cloud: 0.75 });
+    // detail has no floor: from across the galaxy it folds into the envelope
+    const detailMaterial = pointsMaterial({ maxSize: cap * 0.8, minSize: 0, nearFade: 0.01, sharpness: 2.6, soft: true, cloud: 0.85 });
+    const ringMaterial = pointsMaterial({ maxSize: cap * 0.7, minSize: 5, nearFade: 0.01, ring: true });
     /*
-     * Attenuated, so a landmark shrinks with distance like the galaxy around it
-     * instead of taking over the picture when you pull away - but with a floor on
-     * screen size, or it shrinks below a pixel and disappears entirely.
+     * Member stars only resolve up close; from afar they fold into the core point.
+     * Kept as small and sharp as the 0.8.2.7 ones (7px, not 13): at 13px the named
+     * clusters added twice the light the whole painted layer used to, and read as
+     * brighter than the galaxy around them. The spread and count stay.
      */
-    const material = pointsMaterial({ maxSize: 14, minSize: 2.9, nearFade: 0.3, sharpness: 6 });
-    // wisps: soft, broken up by noise, and capped so a close pass never fills the screen
-    const haloMaterial = pointsMaterial({ maxSize: 64, minSize: haloFloor, nearFade: 0.04, sharpness: 2.4, soft: true, cloud: 0.7 });
-    const ringMaterial = pointsMaterial({ maxSize: 40, minSize: 5, nearFade: 0.02, ring: true });
-    // member stars only resolve up close; from afar they fold into the core point
-    const memberMaterial = pointsMaterial({ maxSize: 6, minSize: 0, nearFade: 0.002, sharpness: 14 });
+    const memberMaterial = pointsMaterial(filler ? { maxSize: 6, minSize: 0, nearFade: 0.002, sharpness: 14 } : { maxSize: 7, minSize: 0, nearFade: 0.002, sharpness: 12 });
 
     const group = new THREE.Group();
     const points = new THREE.Points(cores.geometry(), material);
-    for (const [layer, mat, order] of [[halos, haloMaterial, 7], [rings, ringMaterial, 8], [members, memberMaterial, 8]]) {
+    for (const [layer, mat, order] of [[envelopes, envelopeMaterial, 7], [details, detailMaterial, 7], [rings, ringMaterial, 8], [members, memberMaterial, 8]]) {
         const node = new THREE.Points(layer.geometry(), mat);
         node.renderOrder = order;
         node.frustumCulled = false;
@@ -98,7 +151,49 @@ export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: draw
     points.renderOrder = 8;
     points.frustumCulled = false;
     if (drawCores) group.add(points);
-    return { group, points, material, materials: [material, haloMaterial, ringMaterial, memberMaterial] };
+    return { group, points, material, materials: [material, envelopeMaterial, detailMaterial, ringMaterial, memberMaterial] };
+}
+
+/*
+ * The named objects: a black hole is a warm accretion ring, a neutron star a hard
+ * cyan point, a star a glow in its own colour, sized loosely by how bright it is.
+ * Schematic, like the core's black holes - the real things are far too small to
+ * see at any scale the map can show.
+ */
+const OBJECT_LOOK = {
+    blackhole: { color: "#ffad66", size: 0.5, alpha: 0.9, ring: true },
+    neutron: { color: "#8ff0ff", size: 0.22, alpha: 0.95 },
+    star: { color: "#ffe9a8", size: 0.35, alpha: 0.8 },
+};
+
+export function buildStellarObjects(objects) {
+    const rings = new Layer(objects.length);
+    const glows = new Layer(objects.length * 2);
+    for (const o of objects) {
+        const look = OBJECT_LOOK[o.kind];
+        if (!look) continue;
+        // a star's colour from its temperature, roughly: red below 4,000 K, blue above 10,000 K
+        const tint = o.kind === "star" && o.temperature ? (o.temperature < 4000 ? "#ffb27a" : o.temperature > 10000 ? "#a9c8ff" : look.color) : look.color;
+        const color = new THREE.Color(tint).convertSRGBToLinear();
+        const bright = o.luminosity ? 0.7 + 0.15 * Math.log10(o.luminosity) : 1;
+        if (look.ring) {
+            rings.add(o.position, color, look.size, look.alpha);
+            glows.add(o.position, color, look.size * 1.6, 0.12);
+        } else {
+            glows.add(o.position, color, look.size * bright, look.alpha * 0.5);
+            glows.add(o.position, new THREE.Color(1, 1, 1), look.size * 0.18 * bright, look.alpha);
+        }
+    }
+    const ringMaterial = pointsMaterial({ maxSize: 90, minSize: 3, nearFade: 0.002, ring: true });
+    const glowMaterial = pointsMaterial({ maxSize: 70, minSize: 2, nearFade: 0.002, sharpness: 5 });
+    const group = new THREE.Group();
+    for (const [layer, material] of [[glows, glowMaterial], [rings, ringMaterial]]) {
+        const node = new THREE.Points(layer.geometry(), material);
+        node.renderOrder = 8;
+        node.frustumCulled = false;
+        group.add(node);
+    }
+    return { group, materials: [ringMaterial, glowMaterial] };
 }
 
 /*

@@ -483,29 +483,6 @@
     margin: 0
 }
 
-/* collapsed: only the intro's button is left, as a round glass chip */
-.GalaxyDock.Collapsed {
-    width: 52px
-}
-
-.GalaxyDock.Collapsed .IntroPanel {
-    border-radius: 26px
-}
-
-.GalaxyDock.Collapsed .DockHead {
-    padding: 8px
-}
-
-.GalaxyDock.Collapsed .DockHeadText,
-.GalaxyDock.Collapsed .DockBody,
-.GalaxyDock.Collapsed .CataloguePanel {
-    display: none
-}
-
-.GalaxyDock.Collapsed .DockToggle span {
-    transform: translate(-70%, -50%) rotate(225deg)
-}
-
 /* ---------- catalogue panels ---------- */
 
 .PanelHead {
@@ -1188,6 +1165,16 @@ div.CatalogueJump {
     border: 1.5px dashed var(--marker-color)
 }
 
+/* fiction and objects without a page read like a map-only system: plain text, no card */
+div.GalaxyMarker.Fiction .GalaxyMarkerText,
+div.GalaxyMarker.Object .GalaxyMarkerText {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: transparent;
+    border-color: transparent;
+    text-shadow: 0 0 4px #000, 0 0 10px #000
+}
+
 /* fiction: violet, dashed and italic, so it never passes for a real place */
 .GalaxyMarker.Fiction .GalaxyMarkerIcon {
     border-style: dashed;
@@ -1209,6 +1196,7 @@ div.CatalogueJump {
 /* ---------- settings ---------- */
 
 .GalaxySettings {
+    scrollbar-color: rgba(200, 210, 255, .25) transparent;
     overflow: auto;
     background: transparent;
     border: none;
@@ -1262,6 +1250,21 @@ div.CatalogueJump {
 .SettingsClose span {
     background: linear-gradient(currentColor, currentColor) center / 100% 2px no-repeat, linear-gradient(currentColor, currentColor) center / 2px 100% no-repeat;
     border: none
+}
+
+/* what a group of units measures: across space, planets, stars */
+.SettingsSubsection {
+    color: var(--galaxy-dim, rgba(220, 228, 255, .6));
+    font-size: .6rem;
+    font-weight: 500;
+    grid-column: 1 / -1;
+    letter-spacing: .22em;
+    margin: 6px 0 -2px;
+    text-transform: uppercase
+}
+
+.SettingsSubsection:first-child {
+    margin-top: 0
 }
 
 .SettingsSection {
@@ -1463,10 +1466,6 @@ div.CatalogueJump {
     transition: left .35s ease
 }
 
-.GalaxyDock.Collapsed ~ .GalaxyReadout {
-    left: calc(52px + var(--galaxy-gap) * 2)
-}
-
 .GalaxyScaleNote {
     bottom: calc(var(--galaxy-gap) + 40px);
     color: var(--galaxy-warm);
@@ -1496,7 +1495,8 @@ div.CatalogueJump {
     display: flex;
     overflow: hidden;
     position: absolute;
-    right: var(--galaxy-gap)
+    /* room for the eye button in the corner */
+    right: calc(var(--galaxy-gap) + 52px)
 }
 
 .GalaxyControls button {
@@ -1616,6 +1616,258 @@ div.CatalogueJump {
     text-transform: uppercase
 }
 
+/* ---------- the angle dial, beside the zoom buttons ---------- */
+
+.AngleDial {
+    align-items: center;
+    border-right: 1px solid var(--galaxy-line);
+    color: var(--galaxy-ink-dim);
+    display: flex;
+    gap: 5px;
+    height: 42px;
+    padding: 0 10px 0 9px
+}
+
+.AngleDial svg {
+    fill: none;
+    height: 26px;
+    overflow: visible;
+    width: 26px
+}
+
+.AngleDisk {
+    stroke: var(--galaxy-accent);
+    stroke-width: 1.3;
+    transition: ry .2s
+}
+
+.AnglePlane {
+    stroke: var(--galaxy-line-strong);
+    stroke-dasharray: 1.5 2;
+    stroke-width: .8
+}
+
+.AngleCore {
+    fill: var(--galaxy-warm);
+    filter: drop-shadow(0 0 2px var(--galaxy-warm))
+}
+
+.AngleValue {
+    font-size: .74rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .04em;
+    min-width: 2.6em;
+    text-align: right
+}
+
+/* ---------- hiding the interface ---------- */
+
+.UiToggle {
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    align-items: center;
+    background: var(--galaxy-glass);
+    border: 1px solid var(--galaxy-line);
+    border-radius: 50%;
+    bottom: var(--galaxy-gap);
+    color: var(--galaxy-ink);
+    cursor: pointer;
+    display: flex;
+    height: 44px;
+    justify-content: center;
+    position: absolute;
+    right: var(--galaxy-gap);
+    transition: background .2s, border-color .2s, opacity .3s;
+    width: 44px;
+    z-index: 30
+}
+
+.UiToggle:hover,
+.UiToggle:focus-visible {
+    background: rgba(255, 255, 255, .14);
+    border-color: var(--galaxy-line-strong);
+    outline: none
+}
+
+.UiToggle svg {
+    fill: none;
+    height: 20px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 1.5;
+    width: 20px
+}
+
+.UiToggle .UiHiddenIcon,
+.GalaxyView.UiHidden .UiToggle .UiShown {
+    display: none
+}
+
+.GalaxyView.UiHidden .UiToggle .UiHiddenIcon {
+    display: block
+}
+
+/* with the interface hidden the button itself steps back until it is wanted */
+.GalaxyView.UiHidden .UiToggle {
+    opacity: .45
+}
+
+.GalaxyView.UiHidden .UiToggle:hover,
+.GalaxyView.UiHidden .UiToggle:focus-visible {
+    opacity: 1
+}
+
+/* everything but the map, the loader and the button itself */
+.GalaxyView.UiHidden > :not(canvas):not(.UiToggle):not(.GalaxyLoader):not(dialog) {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden
+}
+
+/* ---------- catalogue rows: three distances; the open panel stays open ---------- */
+
+.CatalogueDistances {
+    display: grid;
+    gap: 2px 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 3px
+}
+
+.CatalogueDistances > span {
+    display: flex;
+    flex-direction: column;
+    min-width: 0
+}
+
+.CatalogueDistances b {
+    color: var(--galaxy-ink-faint);
+    font-size: .52rem;
+    font-weight: 500;
+    letter-spacing: .14em;
+    text-transform: uppercase
+}
+
+.CatalogueDistances i {
+    color: var(--galaxy-ink-dim);
+    font-size: .64rem;
+    font-style: normal;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap
+}
+
+/* a name with no room on the map: the icon stays, the name shows on hover */
+.GalaxyMarker.IconOnly .GalaxyMarkerText {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s
+}
+
+.GalaxyMarker.IconOnly:hover .GalaxyMarkerText,
+.GalaxyMarker.IconOnly:focus-visible .GalaxyMarkerText {
+    opacity: 1
+}
+
+.GalaxyMarker.IconOnly:hover {
+    z-index: 2
+}
+
+.CatalogueSub[hidden] {
+    display: none
+}
+
+.CataloguePanel:not(.Folded) .PanelFold {
+    cursor: default
+}
+
+.CataloguePanel:not(.Folded) .PanelChevron {
+    opacity: .35
+}
+
+/* ---------- neighbourhood members without a page ---------- */
+
+button.GalaxyMember {
+    cursor: pointer;
+    font-family: inherit
+}
+
+.GalaxyMember.MapOnly::before,
+.GalaxyMarkerDots i.MapOnly {
+    background: transparent;
+    border: 1px solid var(--member-color);
+    box-shadow: none;
+    box-sizing: border-box
+}
+
+.GalaxyMember.Fiction::before,
+.GalaxyMarkerDots i.Fiction {
+    background: transparent;
+    border: 1px dashed var(--member-color);
+    box-shadow: none;
+    box-sizing: border-box
+}
+
+.GalaxyMember.Fiction span {
+    color: #e6d8ff;
+    font-style: italic
+}
+
+/* ---------- bearings and sectors ---------- */
+
+.BearingTags {
+    inset: 0;
+    opacity: 0;
+    position: absolute;
+    transition: opacity .3s
+}
+
+.BearingTags.Visible {
+    opacity: 1
+}
+
+.BearingDot,
+.BearingTag {
+    left: 0;
+    position: absolute;
+    top: 0;
+    will-change: transform
+}
+
+/* the point every distance is measured from */
+.BearingDot::before {
+    background: var(--galaxy-warm);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px rgba(255, 217, 160, .18), 0 0 10px var(--galaxy-warm);
+    content: "";
+    height: 6px;
+    left: -3px;
+    position: absolute;
+    top: -3px;
+    width: 6px
+}
+
+.BearingTag {
+    color: rgba(255, 217, 160, .72);
+    font-size: .62em;
+    letter-spacing: .12em;
+    margin: -.7em 0 0 6px;
+    text-shadow: 0 0 4px #000, 0 0 10px #000;
+    text-transform: uppercase;
+    white-space: nowrap
+}
+
+.BearingTag.Core {
+    color: var(--galaxy-warm)
+}
+
+.GalaxyMarker.SectorLabel .GalaxyMarkerName {
+    color: rgba(158, 203, 255, .8);
+    font-size: .74em;
+    font-weight: 600;
+    letter-spacing: .18em
+}
+
 /* ---------- small windows ---------- */
 
 @media (max-width: 760px) {
@@ -1624,9 +1876,21 @@ div.CatalogueJump {
         --galaxy-dock: min(300px, calc(100vw - 20px))
     }
 
-    /* the open dock covers everything, the layers included */
+    /*
+     * The panels cannot be folded away, so on a phone they take the upper part of
+     * the screen under the layers and leave the lower part to the map. The eye
+     * button bottom right clears everything for a full view.
+     */
     .GalaxyDock {
+        height: 54%;
+        top: calc(var(--galaxy-gap) + 92px);
         z-index: 26
+    }
+
+    .IntroPanel .DockLead,
+    .IntroPanel .DockDetails,
+    .CataloguePanel .PanelFilters {
+        display: none
     }
 
     /* the legend shrinks to a tab under the layers; a tap opens it */
@@ -1671,14 +1935,20 @@ div.CatalogueJump {
         right: calc(var(--galaxy-gap) * 2 + 48px)
     }
 
-    /* the bottom edge is full, so on a phone the hint sits under the layers until
+    /* the bottom edge is full, so on a phone the hint sits under the panels until
        the first touch */
     .GalaxyHint {
         bottom: auto;
+        left: var(--galaxy-gap);
         max-width: 60vw;
-        right: var(--galaxy-gap);
-        top: calc(var(--galaxy-gap) + 92px);
+        right: auto;
+        text-align: left;
+        top: calc(var(--galaxy-gap) + 100px + 54%);
         transition: opacity .6s
+    }
+
+    .AngleDial .AngleValue {
+        display: none
     }
 
     /* long subtitles wrap rather than run off the screen */
@@ -1709,8 +1979,7 @@ div.CatalogueJump {
     }
 
     /* the dock would cover the map, so the readout goes above the zoom buttons */
-    .GalaxyReadout,
-    .GalaxyDock.Collapsed ~ .GalaxyReadout {
+    .GalaxyReadout {
         bottom: calc(var(--galaxy-gap) + 52px);
         left: auto;
         right: var(--galaxy-gap)
@@ -1734,5 +2003,181 @@ div.CatalogueJump {
 
     .LoaderArms {
         animation-duration: 60s
+    }
+}
+
+/* ---------- info card ---------- */
+
+/*
+ * What you are looking at, once you have flown up to it: right side, above the
+ * zoom controls, out of the way of the dock and the legend.
+ */
+.GalaxyInfo {
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    backdrop-filter: blur(20px) saturate(150%);
+    background: linear-gradient(160deg, rgba(40, 48, 78, .62), rgba(12, 15, 26, .86));
+    border: 1px solid var(--galaxy-line-strong);
+    border-radius: var(--galaxy-radius);
+    bottom: calc(var(--galaxy-gap) + 64px);
+    box-shadow: 0 24px 60px -20px rgba(0, 0, 0, .9), inset 0 1px 0 rgba(255, 255, 255, .08), inset 3px 0 0 -1px var(--info-color, #9ecbff);
+    color: var(--galaxy-ink);
+    max-height: calc(100% - var(--galaxy-gap) * 2 - 200px);
+    opacity: 0;
+    overflow: hidden auto;
+    pointer-events: none;
+    position: absolute;
+    right: var(--galaxy-gap);
+    transform: translateY(10px);
+    transition: opacity .35s, transform .35s;
+    width: 300px;
+    z-index: 23
+}
+
+.GalaxyInfo.Visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none
+}
+
+.GalaxyInfo.Fiction {
+    border-style: dashed
+}
+
+.InfoImage {
+    aspect-ratio: 16 / 10;
+    background: #05070d;
+    margin: 0;
+    overflow: hidden
+}
+
+.InfoImage {
+    position: relative
+}
+
+.InfoCredit {
+    background: linear-gradient(transparent, rgba(0, 0, 0, .75));
+    bottom: 0;
+    font-size: .58rem;
+    left: 0;
+    letter-spacing: .04em;
+    padding: 14px 10px 5px;
+    position: absolute;
+    right: 0;
+    text-align: right
+}
+
+.InfoCredit a {
+    color: rgba(230, 236, 255, .78);
+    text-decoration: none
+}
+
+.InfoCredit a:hover,
+.InfoCredit a:focus-visible {
+    color: #fff;
+    text-decoration: underline
+}
+
+.InfoImage img {
+    display: block;
+    height: 100%;
+    object-fit: cover;
+    width: 100%
+}
+
+.InfoBody {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px 16px
+}
+
+.InfoHead {
+    align-items: flex-start;
+    display: flex;
+    gap: 10px;
+    justify-content: space-between
+}
+
+.InfoKicker {
+    color: var(--info-color, #9ecbff);
+    font-size: .62rem;
+    font-weight: 500;
+    letter-spacing: .22em;
+    margin: 0 0 4px;
+    text-transform: uppercase
+}
+
+.InfoName {
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: .02em;
+    line-height: 1.15;
+    margin: 0
+}
+
+.GalaxyInfo.Fiction .InfoName {
+    color: #e6d8ff;
+    font-style: italic
+}
+
+.InfoClose {
+    flex: none
+}
+
+.InfoAbout {
+    color: rgba(226, 232, 255, .82);
+    font-size: .8rem;
+    line-height: 1.5;
+    margin: 0
+}
+
+.InfoAbout:empty {
+    display: none
+}
+
+.InfoFacts {
+    border-top: 1px solid var(--galaxy-line);
+    display: grid;
+    font-size: .74rem;
+    gap: 5px 12px;
+    grid-template-columns: auto 1fr;
+    margin: 0;
+    padding-top: 10px
+}
+
+.InfoFacts dt {
+    color: rgba(200, 210, 240, .58);
+    letter-spacing: .06em
+}
+
+.InfoFacts dd {
+    margin: 0;
+    text-align: right
+}
+
+@media (max-width: 760px) {
+    .GalaxyInfo {
+        bottom: calc(var(--galaxy-gap) + 104px);
+        left: var(--galaxy-gap);
+        max-height: 42vh;
+        width: auto
+    }
+
+    .InfoImage {
+        aspect-ratio: 16 / 7
+    }
+}
+
+/* short screens: a letterbox strip of the photo, so the text still fits */
+@media (max-height: 720px) {
+    .InfoImage {
+        aspect-ratio: 16 / 6
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .GalaxyInfo {
+        transform: none;
+        transition: opacity .2s
     }
 }

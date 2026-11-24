@@ -4,18 +4,27 @@
  * an open link as well. It knows nothing about the scene: the view hands it
  * entries and, a few times a second, asks it to re-sort by what is on screen.
  *
- * entry: { id, name, sub, color, style, filter, href, fly, inView(), distance, search }
- *   style   "page" | "map" | "fiction" | a deep-sky kind - sets the dot
- *   filter  which filter chip the entry belongs to
+ * entry: { id, name, sub, color, style, filter, href, fly, inView(), distance, search, position }
+ *   style     "page" | "map" | "fiction" | a deep-sky kind - sets the dot
+ *   filter    which filter chip the entry belongs to
+ *   position  where it is; with the distances option the row prints a line of
+ *             distances from it, refreshed as the view moves
  */
 /*
  * The catalogues share one column, so they open one at a time: unfolding one folds
- * the rest. Three open lists on a laptop screen left each about one row tall.
+ * the rest. Three open lists on a laptop screen left each about one row tall. One
+ * is always open: a header only unfolds, never folds, and the column never ends up
+ * as three bare headers.
  */
 const OPEN_GROUP = [];
 
+export function ensureOneOpen() {
+    if (OPEN_GROUP.length && OPEN_GROUP.every((c) => c.panel.classList.contains("Folded"))) OPEN_GROUP[0].setOpen(true);
+}
+
 export class Catalogue {
-    constructor(panel, { filters = [], storageKey }) {
+    constructor(panel, { filters = [], storageKey, distances = null }) {
+        this.distances = distances;
         this.panel = panel;
         this.list = panel.querySelector(".CatalogueList");
         this.search = panel.querySelector(".PanelSearch");
@@ -76,7 +85,9 @@ export class Catalogue {
         const anotherOpen = OPEN_GROUP.some((other) => !other.panel.classList.contains("Folded"));
         OPEN_GROUP.push(this);
         setOpen(saved === null ? !anotherOpen : saved === "1" && !anotherOpen);
-        fold.addEventListener("click", () => setOpen(panel.classList.contains("Folded")));
+        fold.addEventListener("click", () => {
+            if (panel.classList.contains("Folded")) setOpen(true);
+        });
     }
 
     setEntries(entries) {
@@ -95,7 +106,17 @@ export class Catalogue {
             }
             jump.innerHTML = '<span class="CatalogueDot"></span><span class="CatalogueText"><span class="CatalogueName"></span><span class="CatalogueSub"></span></span><span class="CatalogueSeen" aria-hidden="true"></span>';
             jump.querySelector(".CatalogueName").textContent = entry.name;
-            jump.querySelector(".CatalogueSub").textContent = entry.sub;
+            const sub = jump.querySelector(".CatalogueSub");
+            sub.textContent = entry.sub || "";
+            sub.hidden = !entry.sub;
+            let distanceLine = null;
+            if (this.distances && entry.position) {
+                // three short columns: label over value
+                distanceLine = document.createElement("span");
+                distanceLine.className = "CatalogueDistances";
+                distanceLine.innerHTML = "<span><b></b><i></i></span>".repeat(3);
+                jump.querySelector(".CatalogueText").appendChild(distanceLine);
+            }
             row.appendChild(jump);
             if (entry.href) {
                 const open = document.createElement("a");
@@ -107,7 +128,7 @@ export class Catalogue {
                 row.appendChild(open);
             }
             this.list.appendChild(row);
-            return { entry, row, seen: false, search: `${entry.name} ${entry.sub} ${entry.search || ""}`.toLowerCase() };
+            return { entry, row, distanceLine, seen: false, search: `${entry.name} ${entry.sub || ""} ${entry.search || ""}`.toLowerCase() };
         });
         this.applyFilter();
         this.refresh(true);
@@ -139,6 +160,18 @@ export class Catalogue {
      */
     refresh(force = false) {
         if (this.panel.classList.contains("Folded") && !force) return;
+        // the distances move with the view, so they are rewritten even when the order holds
+        if (this.distances) {
+            for (const item of this.rows) {
+                if (!item.distanceLine || item.row.hidden) continue;
+                const cells = item.distanceLine.children;
+                this.distances(item.entry).forEach(([label, value], i) => {
+                    const [name, figure] = cells[i].children;
+                    if (name.textContent !== label) name.textContent = label;
+                    if (figure.textContent !== value) figure.textContent = value;
+                });
+            }
+        }
         for (const item of this.rows) item.seen = Boolean(item.entry.inView?.());
         const sorted = [...this.rows].sort((a, b) => b.seen - a.seen || (a.entry.distance ?? Infinity) - (b.entry.distance ?? Infinity));
         const order = sorted.map((item) => `${item.entry.id}${item.seen ? "+" : ""}`).join("|");

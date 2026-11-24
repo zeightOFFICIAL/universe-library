@@ -3,16 +3,17 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { DATA, SUN, VIEW_SHIFT, NARROW_WIDTH, FOV, GALAXY_RADIUS, ARMS, ORION_SPUR, THREE_KPC_ARMS, BACKDROP, QUALITY, LITE, MAX_PIXEL_RATIO, WHITE, LOCAL_RINGS_LY, LOCAL_ENTER, LOCAL_FULL, LOCAL_MIN_DISTANCE, GALAXY_MIN_DISTANCE, SUN_VIEW, DEEP_SKY_LABEL_DISTANCE, OVERVIEW, START, START_PORTRAIT, PIVOT, SOFT_LAYER, SCRATCH_VECTOR, ORIGIN, EXTINCTION_RED, RAYCASTER, GALACTIC_PLANE, DEEP_SKY_STYLE } from "./config.js";
 import { pointsMaterial, glowSprite } from "./shaders.js";
 import { armPhase, armPoint, directionFromSun, truePosition, formatLy, smoothstep } from "./util.js";
-import { UNITS, UNIT_OPTIONS, DISPLAY, DISPLAY_OPTIONS, setUnits, setDisplay, LABEL_SCALE, onUnitsChange, onDisplayChange, formatMass, solarMasses } from "./units.js";
+import { UNITS, UNIT_OPTIONS, DISPLAY, DISPLAY_OPTIONS, setUnits, setDisplay, LABEL_SCALE, onUnitsChange, onDisplayChange, formatMass, solarMasses, formatStarSize, formatHorizon, solarRadii, schwarzschildKm, formatTemperature, formatLuminosity, formatSize, formatDistance } from "./units.js";
 import { buildBackdropVolume } from "./backdrop.js";
 import { buildGalaxyFromImage } from "./starfield.js";
 import { buildBackdropStars, buildGalaxyDots, buildCore, buildBulgeGlow, buildArmOutlines } from "./structures.js";
-import { buildDeepSky, buildGalaxies } from "./landmarks.js";
+import { buildDeepSky, buildGalaxies, buildStellarObjects } from "./landmarks.js";
 import { DUST, dustColumn, diskTransmission } from "./dust.js";
 import { buildLocal } from "./local.js";
 import { PostPipeline } from "./post.js";
 import { LABEL_SPOTS, Marker } from "./markers.js";
-import { Catalogue } from "./panels.js";
+import { Catalogue, ensureOneOpen } from "./panels.js";
+import { buildBearings, updateBearings, buildSectors, updateSectors, sectorName } from "./overlays.js";
 
 /* ---------- view ---------- */
 
@@ -127,6 +128,30 @@ export class GalaxyView {
             this.pointer = null;
         });
 
+        /*
+         * Labels take the pointer so they can be clicked, which used to mean a drag
+         * or a scroll that started on one went nowhere. Only the left button is
+         * theirs: the right and middle buttons and the wheel go on to the map, so
+         * turning and zooming work wherever the cursor happens to be.
+         */
+        this.labels.addEventListener("pointerdown", (event) => {
+            if (event.button === 0 || !event.target.closest(".GalaxyMarker")) return;
+            event.preventDefault();
+            this.canvas.dispatchEvent(new PointerEvent("pointerdown", event));
+        }, true);
+        this.labels.addEventListener("contextmenu", (event) => event.preventDefault());
+        this.labels.addEventListener("wheel", (event) => {
+            event.preventDefault();
+            this.canvas.dispatchEvent(new WheelEvent("wheel", event));
+        }, { passive: false });
+
+        // the bearings' dot and the names at the ends of their beams
+        this.bearingTags = document.createElement("div");
+        this.bearingTags.className = "BearingTags";
+        this.bearingTags.innerHTML = '<span class="BearingDot"></span><span class="BearingTag Core"></span><span class="BearingTag">90&deg;</span><span class="BearingTag">180&deg;</span><span class="BearingTag">270&deg;</span>';
+        this.labels.appendChild(this.bearingTags);
+        this.angleDial = document.getElementById("GALAXY_ANGLE");
+
         window.addEventListener("resize", () => this.resize());
         this.resize();
     }
@@ -171,12 +196,21 @@ export class GalaxyView {
         this.arms = buildArmOutlines();
         this.scene.add(this.arms.group);
 
+        // map overlays on their own layer switches (see overlays.js)
+        this.bearings = buildBearings();
+        this.scene.add(this.bearings.lines);
+        this.sectors = buildSectors();
+        this.scene.add(this.sectors.group);
+
         this.deepSky = (DATA.deepSky || [])
             .filter((o) => o.kind !== "structure")
             .map((o) => ({ ...o, position: truePosition(o.l, o.b, o.d) }));
         this.structures = (DATA.deepSky || []).filter((o) => o.kind === "structure");
         this.deepSkyPoints = buildDeepSky(this.deepSky);
         this.scene.add(this.deepSkyPoints.group);
+        // black holes, neutron stars and named stars outside the core (Sgr A* is drawn there)
+        this.stellarObjects = buildStellarObjects((DATA.stellarObjects || []).filter((o) => o.d < 20000 || Math.abs(o.l) > 0.5).map((o) => ({ ...o, position: truePosition(o.l, o.b, o.d) })));
+        this.scene.add(this.stellarObjects.group);
 
         this.galaxies = DATA.galaxies || [];
         const pole = DATA.celestialPole
@@ -259,7 +293,7 @@ export class GalaxyView {
              * their like, and plain dots made the named ones look like the only
              * nebulae in the galaxy.
              */
-            this.scatteredArt = buildDeepSky(galaxy.scattered.objects, { seed: 7311, amount: LITE ? 0.3 : 0.4, cores: false, haloFloor: 2 });
+            this.scatteredArt = buildDeepSky(galaxy.scattered.objects, { seed: 7311, amount: LITE ? 0.3 : 0.4, cores: false, haloFloor: 3, sizeScale: 2.6, cap: 160 });
             this.scatteredArt.group.renderOrder = 8;
             this.scene.add(this.scatteredArt.group);
             this.resize();
@@ -324,6 +358,18 @@ export class GalaxyView {
         this.registry = [];
         this.systemMarkers = new Map();
         this.places = [];
+        // everything that can open an info card when the camera comes up to it
+        this.infoItems = [];
+        const info = (item) => {
+            this.infoItems.push(item);
+            return item;
+        };
+        /*
+         * One rule for every star system beyond the Sun's neighbourhood, real or from
+         * a story: its name comes in once the camera is within about twice its
+         * distance from the Sun, between 4,000 and 24,000 ly.
+         */
+        const farFor = (ly) => THREE.MathUtils.clamp((ly / 1000) * 2.2, 4, 24);
         const add = (options) => {
             const marker = new Marker(options);
             this.labels.appendChild(marker.el);
@@ -421,11 +467,21 @@ export class GalaxyView {
          */
         const sun = this.visibleSystems().find((s) => s.placement.d === 0 && !s.placement.fictional);
         const neighbours = [...(sun ? [sun] : []), ...[...this.localSystems].sort((a, b) => a.placement.d - b.placement.d)];
-        const farthest = Math.max(0, ...this.localSystems.map((s) => s.placement.d));
+        /*
+         * Map-only systems and systems from fiction inside the neighbourhood belong
+         * to it too: listed after the systems with pages, each flying there.
+         */
+        const others = [
+            ...(DATA.planetarySystems || []).filter((s) => s.d < 1000).map((s) => ({ name: s.name, color: "#9ecbff", variant: "map", d: s.d, position: truePosition(s.l, s.b, s.d), close: THREE.MathUtils.clamp((s.d / 1000) * 0.5, 0.25, 1.5) })),
+            ...(DATA.fiction || [])
+                .filter((f) => f.type !== "object" && f.d !== undefined && f.d < 1000)
+                .map((f) => ({ name: f.name, color: "#c7a6ff", variant: "fiction", d: f.d, position: truePosition(f.l, f.b, f.d), close: Math.max((f.d / 1000) * 2.2, LOCAL_MIN_DISTANCE * 1.5) })),
+        ].sort((a, b) => a.d - b.d);
+        const farthest = Math.max(0, ...this.localSystems.map((s) => s.placement.d), ...others.map((o) => o.d));
         this.neighbourhood = add({
             position: SUN,
             name: "Solar Neighbourhood",
-            sub: `${neighbours.length} star systems within ${formatLy(farthest)}`,
+            sub: `${neighbours.length + others.length} star systems within ${formatLy(farthest)}`,
             level: "galaxy",
             color: "#9ecbff",
             onClick: () => this.flyToSun(),
@@ -435,7 +491,14 @@ export class GalaxyView {
                 color: s.color,
                 distance: s === sun ? "here" : formatLy(s.placement.d),
                 title: `${s === sun ? "The Solar System" : `${s.name}, ${formatLy(s.placement.d)} away`}: open its page`,
-            })),
+            })).concat(others.map((o) => ({
+                name: o.name,
+                color: o.color,
+                variant: o.variant,
+                distance: formatLy(o.d),
+                title: `${o.name}, ${formatLy(o.d)} away${o.variant === "fiction" ? ", from fiction" : ""}: fly there`,
+                fly: () => this.flyTo({ target: o.position.clone(), distance: o.close }),
+            }))),
         });
         if (sun) {
             const marker = add({ position: SUN, name: "Sun", sub: "Solar System · you are here", level: "local", href: sun.href, color: sun.color });
@@ -456,9 +519,10 @@ export class GalaxyView {
         }
         for (const s of this.visibleSystems().filter((s) => s.placement.fictional)) {
             const position = new THREE.Vector3(s.placement.x / 1000, 0, s.placement.z / 1000);
-            const sub = [s.placement.source, s.placement.note, "placed by eye"].filter(Boolean).join(" · ");
-            const marker = add({ position, name: s.name, sub, level: "any", layer: "fiction", href: s.href, color: s.color, variant: "fiction", far: 40, measureFrom: "camera" });
+            const marker = add({ position, name: s.name, sub: s.placement.source, level: "any", layer: "fiction", href: s.href, color: s.color, variant: "fiction", priority: 0.4 });
             this.systemMarkers.set(s.href, marker);
+            this.registry.push({ group: "Star systems", name: s.name, sub: s.placement.source, marker, fly: () => this.flyTo({ target: position.clone(), distance: 3 }) });
+            info({ name: s.name, kicker: `Star system from fiction · ${s.placement.source}`, color: s.color, position, close: 3, fiction: true, about: s.placement.note, facts: () => [["Placement", "By eye, from the story's own galaxy map"]] });
         }
 
         /*
@@ -468,17 +532,19 @@ export class GalaxyView {
          */
         for (const s of DATA.planetarySystems || []) {
             const position = truePosition(s.l, s.b, s.d);
-            const fly = () => this.flyTo({ target: position.clone(), distance: Math.max((s.d / 1000) * 0.5, 0.25) });
+            // close enough to see it among its neighbours, never so far that its card covers half the disk
+            const close = THREE.MathUtils.clamp((s.d / 1000) * 0.5, 0.25, 1.5);
+            const fly = () => this.flyTo({ target: position.clone(), distance: close });
+            info({ name: s.name, kicker: "Planetary system", color: "#9ecbff", position, close, about: s.note, facts: () => [["Distance", formatLy(s.d)]] });
             const marker = add({
                 position,
                 name: s.name,
                 // the map says where; the side panel says why it matters
                 sub: formatLy(s.d),
-                level: "any",
+                // with the Sun's neighbours in the local view, otherwise always named
+                level: s.d < 1000 ? "local" : "any",
                 variant: "map",
                 color: "#9ecbff",
-                far: Math.max(4, (s.d / 1000) * 2.2),
-                measureFrom: "camera",
                 priority: 0.4,
                 onClick: fly,
             });
@@ -493,23 +559,46 @@ export class GalaxyView {
         for (const f of DATA.fiction || []) {
             const anchored = f.d !== undefined;
             const position = anchored ? truePosition(f.l, f.b, f.d) : new THREE.Vector3(f.x / 1000, 0, f.z / 1000);
-            const near = anchored && f.d < 1000;
-            const fly = () => this.flyTo({ target: position.clone(), distance: anchored ? Math.max((f.d / 1000) * 2.2, LOCAL_MIN_DISTANCE * 1.5) : 8 });
+            const fromSun = anchored ? f.d : position.distanceTo(SUN) * 1000;
+            const isObject = f.type === "object";
+            /*
+             * A fictional star system is labelled exactly like a real one: those a
+             * story sets among the Sun's neighbours join the local view with the
+             * real neighbours, the rest come in by distance like the map-only
+             * systems. Only the dashed ring and the violet italic say "story".
+             */
+            const neighbour = anchored && f.d < 1000;
+            // inside the Solar System (a wormhole by Saturn): named only at that scale
+            const solar = anchored && f.d < 0.01;
+            const close = anchored ? Math.max((f.d / 1000) * 2.2, LOCAL_MIN_DISTANCE * 1.5) : isObject ? 1.2 : 3;
+            const fly = () => this.flyTo({ target: position.clone(), distance: close });
             const marker = add({
                 position,
                 name: f.name,
-                sub: [f.source, f.note, anchored ? "" : "placed by eye"].filter(Boolean).join(" · "),
-                level: "any",
+                sub: isObject ? f.source : neighbour ? `${f.source} · ${formatLy(f.d)}` : f.source,
+                level: neighbour ? "local" : "any",
                 layer: "fiction",
                 variant: "fiction",
-                object: f.type === "object",
+                object: isObject,
                 color: "#c7a6ff",
-                far: f.d < 0.01 ? 0.004 : near ? 1.6 : 40,
-                measureFrom: "camera",
-                priority: 0.8,
+                ...(solar ? { far: 0.004, measureFrom: "camera" } : {}),
+                priority: neighbour ? 0 : isObject ? 0.8 : 0.4,
                 onClick: fly,
             });
-            this.places.push({ kind: "fiction", type: f.type, data: f, marker, fly, position, distance: anchored ? f.d : position.distanceTo(SUN) * 1000 });
+            info({
+                name: f.name,
+                kicker: `${isObject ? "Place" : "Star system"} from fiction · ${f.source}`,
+                color: "#c7a6ff",
+                position,
+                close,
+                fiction: true,
+                about: f.note,
+                facts: () => [
+                    anchored ? ["Set at", `${f.anchor}, a real ${f.d < 0.01 ? "planet" : "star"}`] : ["Placement", "By eye, from the story's own galaxy map"],
+                    ["From the Sun", formatLy(fromSun)],
+                ],
+            });
+            this.places.push({ kind: "fiction", type: f.type, data: f, marker, fly, position, distance: fromSun, filter: "fiction" });
         }
 
         /*
@@ -520,12 +609,15 @@ export class GalaxyView {
         for (const c of DATA.spacecraft || []) {
             const ly = c.au / 63241;
             const position = truePosition(c.l, c.b, ly);
-            const fly = () => this.flyTo({ target: SUN.clone(), distance: (ly / 1000) * 3.2, polar: 1.1 });
+            const close = (ly / 1000) * 2;
+            const fly = () => this.flyTo({ target: position.clone(), distance: close, polar: 1.1 });
+            info({ name: c.name, kicker: "Spacecraft", color: "#e6eaf2", position, close, about: c.about || c.note, image: c.image, imageCredit: c.imageCredit, imageSource: c.imageSource, facts: () => [["From the Sun", formatLy(ly)], ["Light takes", `${(ly * 365.25 * 24).toFixed(1)} hours`]] });
             const marker = add({
                 position,
                 name: c.name,
                 sub: formatLy(ly),
                 level: "local",
+                layer: "objects",
                 object: true,
                 color: "#e6eaf2",
                 far: (ly / 1000) * 40,
@@ -533,7 +625,60 @@ export class GalaxyView {
                 priority: 0.6,
                 onClick: fly,
             });
-            this.places.push({ kind: "real", type: "object", data: { ...c, d: ly }, marker, fly, position, distance: ly });
+            this.places.push({ kind: "real", type: "object", data: { ...c, d: ly }, marker, fly, position, distance: ly, filter: "spacecraft" });
+        }
+
+        /*
+         * Black holes, neutron stars and remarkable single stars: real, named, and
+         * placed from their catalogue positions. Their names come in by distance
+         * like the map-only systems; each opens a card with its numbers.
+         */
+        const OBJECT_KINDS = {
+            blackhole: { label: "Black hole", color: "#ffad66" },
+            neutron: { label: "Neutron star", color: "#7fe7ff" },
+            star: { label: "Star", color: "#ffe9a8" },
+        };
+        for (const o of DATA.stellarObjects || []) {
+            const kind = OBJECT_KINDS[o.kind];
+            const core = o.d > 20000 && Math.abs(o.l) < 0.5 && Math.abs(o.b) < 0.5;
+            const position = core ? ORIGIN.clone() : truePosition(o.l, o.b, o.d);
+            const close = core ? 0.9 : 0.06;
+            const fly = () => this.flyTo({ target: position.clone(), distance: close });
+            const marker = add({
+                position,
+                name: o.name,
+                sub: `${kind.label} · ${formatLy(o.d)}`,
+                level: o.d < 1000 ? "local" : "any",
+                layer: "objects",
+                object: true,
+                color: kind.color,
+                // Sgr A* takes over from the Galactic Centre label as the camera closes in
+                ...(core ? { far: 14, measureFrom: "camera" } : {}),
+                priority: 0.6,
+                onClick: fly,
+            });
+            info({
+                name: o.name,
+                kicker: kind.label,
+                color: kind.color,
+                position,
+                close,
+                about: o.about,
+                image: o.image,
+                imageCredit: o.imageCredit,
+                imageSource: o.imageSource,
+                facts: () => {
+                    const rows = [["Distance", formatLy(o.d)]];
+                    if (o.mass) rows.push(["Mass", formatMass(solarMasses(o.mass))]);
+                    if (o.kind === "blackhole") rows.push(["Event horizon", `${formatHorizon(schwarzschildKm(o.mass))} radius`]);
+                    if (o.radiusKm) rows.push(["Diameter", formatSize(o.radiusKm * 2)]);
+                    if (o.radius) rows.push(["Radius", formatStarSize(solarRadii(o.radius))]);
+                    if (o.temperature) rows.push(["Surface", formatTemperature(o.temperature)]);
+                    if (o.luminosity) rows.push(["Brightness", formatLuminosity(o.luminosity)]);
+                    return rows;
+                },
+            });
+            this.places.push({ kind: "real", type: "object", data: o, marker, fly, position, distance: o.d, filter: o.kind, color: kind.color });
         }
 
         /*
@@ -543,6 +688,8 @@ export class GalaxyView {
          */
         for (const o of this.deepSky) {
             const style = DEEP_SKY_STYLE[o.kind];
+            // near enough that the painted cloud fills a good part of the view
+            const close = o.kind === "nebula" ? 0.32 : o.kind === "remnant" ? 0.22 : o.kind === "planetary" ? 0.12 : 0.2;
             const marker = add({
                 position: o.position,
                 name: o.name,
@@ -560,7 +707,24 @@ export class GalaxyView {
                 name: o.name,
                 sub: `${style.label} · ${formatLy(o.d)}`,
                 marker,
-                fly: () => this.flyTo({ target: o.position.clone(), distance: Math.max(o.d / 1000, 1.2) }),
+                fly: () => this.flyTo({ target: o.position.clone(), distance: close }),
+            });
+            info({
+                name: o.name,
+                kicker: style.label,
+                color: style.color,
+                position: o.position,
+                close,
+                about: o.about,
+                image: o.image,
+                imageCredit: o.imageCredit,
+                imageSource: o.imageSource,
+                alias: o.alias,
+                facts: () => [
+                    ["Distance", formatLy(o.d)],
+                    ...(o.size ? [["Across", `about ${formatDistance(o.size)}`]] : []),
+                    ["Catalogue", o.alias],
+                ],
             });
         }
         for (const g of this.galaxies) {
@@ -594,6 +758,10 @@ export class GalaxyView {
                 kind: "region",
             });
             this.registry.push({ group: "Nebulae & clusters", name: s.name, sub: s.alias, marker, fly: () => this.flyToSun() });
+        }
+        for (const label of this.sectors.labels) {
+            const marker = add({ position: label.position, name: label.name, level: "galaxy", layer: "sectors", kind: "region", priority: 3.5 });
+            marker.el.classList.add("SectorLabel");
         }
         for (const ly of LOCAL_RINGS_LY) {
             /*
@@ -664,6 +832,10 @@ export class GalaxyView {
                 case "_":
                     this.zoomBy(1 / 0.75);
                     break;
+                case "h":
+                case "H":
+                    this.setUiHidden(!this.uiHidden);
+                    break;
                 case "Home":
                     this.flyTo({ ...OVERVIEW, distance: this.framed(OVERVIEW.distance) });
                     break;
@@ -694,7 +866,7 @@ export class GalaxyView {
                     return;
             }
             event.preventDefault();
-            if (move) this.flyTo({ target, distance: s.radius, polar: move.polar ?? s.phi, azimuth: move.azimuth ?? s.theta }, 280);
+            if (move) this.flyTo({ target, distance: s.radius, polar: move.polar ?? s.phi, azimuth: move.azimuth ?? s.theta }, 280, { anchor: false });
         });
     }
 
@@ -704,29 +876,37 @@ export class GalaxyView {
          * list of places you can go: every star system, as a link to its page with
          * a button beside it that flies the camera there instead.
          */
-        const dock = document.getElementById("GALAXY_DOCK");
-        const toggle = document.getElementById("GALAXY_DOCK_TOGGLE");
-        const setCollapsed = (collapsed) => {
-            dock.classList.toggle("Collapsed", collapsed);
-            toggle.setAttribute("aria-expanded", String(!collapsed));
-        };
-        toggle.addEventListener("click", () => setCollapsed(!dock.classList.contains("Collapsed")));
-        // on a narrow window the dock would cover the map it is the index to
-        const narrow = window.matchMedia(`(max-width: ${NARROW_WIDTH}px)`);
-        if (narrow.matches) setCollapsed(true);
-        narrow.addEventListener("change", (event) => setCollapsed(event.matches));
+        /*
+         * The panels always stay. To see the map alone, one button bottom right
+         * hides everything else - panels, labels, layers, controls and the map
+         * overlays - and brings it all back.
+         */
+        this.uiToggle = document.getElementById("GALAXY_UI_TOGGLE");
+        this.uiToggle?.addEventListener("click", () => this.setUiHidden(!this.uiHidden));
 
         this.renderSystemList();
         this.bindLayers();
         this.bindLegend();
+        this.bindInfo();
         this.bindSettings();
 
         // a change of units relabels everything that prints a quantity
         onUnitsChange(() => {
+            // the card reprints its numbers in the new units
+            this.shownInfo = null;
             this.buildMarkers();
             this.renderSystemList();
             this.resize();
         });
+    }
+
+    setUiHidden(hidden) {
+        this.uiHidden = hidden;
+        this.root.classList.toggle("UiHidden", hidden);
+        if (!this.uiToggle) return;
+        this.uiToggle.setAttribute("aria-pressed", String(hidden));
+        this.uiToggle.title = hidden ? "Show everything again (H)" : "Hide everything but the map (H)";
+        this.uiToggle.setAttribute("aria-label", hidden ? "Show the interface" : "Hide the interface");
     }
 
     /*
@@ -735,18 +915,32 @@ export class GalaxyView {
      */
     renderSystemList() {
         if (!this.systemPanel) {
+            /*
+             * Every system and object row gives three distances: from the Sun, from
+             * the galactic centre, and from the point in the middle of the view -
+             * the one the readout and the bearings measure from - which follows the
+             * camera.
+             */
+            const distances = (entry) => {
+                const p = entry.position;
+                return [["Sol", formatLy(p.distanceTo(SUN) * 1000)], ["Core", formatLy(p.length() * 1000)], ["View", formatLy(p.distanceTo(this.controls.target) * 1000)]];
+            };
             this.systemPanel = new Catalogue(document.getElementById("PANEL_SYSTEMS"), {
                 storageKey: "galaxyPanel:systems",
-                filters: [["page", "With a page"], ["map", "Map only"], ["fiction", "Fiction"]],
+                filters: [["map", "Map only"], ["fiction", "Fiction"]],
+                distances,
             });
             this.objectPanel = new Catalogue(document.getElementById("PANEL_OBJECTS"), {
                 storageKey: "galaxyPanel:objects",
-                filters: [["real", "Real"], ["fiction", "Fiction"]],
+                filters: [["blackhole", "Black holes"], ["neutron", "Neutron stars"], ["star", "Stars"], ["spacecraft", "Spacecraft"], ["fiction", "Fiction"]],
+                distances,
             });
             this.landmarkPanel = new Catalogue(document.getElementById("PANEL_LANDMARKS"), {
                 storageKey: "galaxyPanel:landmarks",
                 filters: [["nebula", "Nebulae"], ["cluster", "Clusters"], ["remnant", "Supernovae"], ["planetary", "Planetary"], ["structure", "Structure"]],
             });
+            // one of the three is always open
+            ensureOneOpen();
         }
         const seen = (marker) => () => Boolean(marker?.inView);
         const systems = [];
@@ -758,7 +952,8 @@ export class GalaxyView {
             systems.push({
                 id: `page-${system.href}`,
                 name: home ? "Sun · Solar System" : system.name,
-                sub: fiction ? [system.placement.source, system.placement.note].filter(Boolean).join(" · ") : home ? "Home · you are here" : formatLy(system.placement.d),
+                sub: fiction ? [system.placement.source, system.placement.note].filter(Boolean).join(" · ") : home ? "Home · you are here" : "",
+                position: home ? SUN : marker.position,
                 search: fiction ? "fiction" : "",
                 color: system.color,
                 style: fiction ? "fiction" : "page",
@@ -778,11 +973,12 @@ export class GalaxyView {
             const entry = {
                 id: `${place.kind}-${d.name}`,
                 name: d.name,
-                sub: fiction ? [d.source, d.note].filter(Boolean).join(" · ") : `${formatLy(d.d)} · ${d.note}`,
-                search: fiction ? `fiction ${d.source}` : "",
-                color: place.kind === "map" ? "#9ecbff" : fiction ? "#c7a6ff" : "#e6eaf2",
+                sub: fiction ? [d.source, d.note].filter(Boolean).join(" · ") : d.note || "",
+                position: place.position,
+                search: fiction ? `fiction ${d.source}` : [d.kind === "blackhole" ? "black hole" : d.kind, d.note].filter(Boolean).join(" "),
+                color: place.color || (place.kind === "map" ? "#9ecbff" : fiction ? "#c7a6ff" : "#e6eaf2"),
                 style: place.type === "object" ? (fiction ? "fiction-object" : "object") : place.kind,
-                filter: place.type === "object" ? (fiction ? "fiction" : "real") : place.kind,
+                filter: place.filter || place.kind,
                 fly: place.fly,
                 inView: seen(place.marker),
                 distance: place.distance,
@@ -861,6 +1057,9 @@ export class GalaxyView {
             ["Real system, map only", "#9ecbff", "Ring Hollow", true],
             ["Place from fiction", "#c7a6ff", "Ring Fiction", true],
             ["Object: spacecraft or station", "#e6eaf2", "Diamond", true],
+            ["Black hole", "#ffad66", "Diamond", true],
+            ["Neutron star", "#7fe7ff", "Diamond"],
+            ["Remarkable star", "#ffe9a8", "Diamond"],
             ["Spiral arm", "#8fa7d8", "Dash", true],
             [DEEP_SKY_STYLE.nebula.label, DEEP_SKY_STYLE.nebula.color, "", true],
             [DEEP_SKY_STYLE.open.label, DEEP_SKY_STYLE.open.color, "", true],
@@ -911,7 +1110,7 @@ export class GalaxyView {
                 button.setAttribute("aria-pressed", String(on));
                 state.textContent = on ? "Shown · click to hide" : "Hidden · click to show";
             };
-            set(saved === null ? true : saved === "1");
+            set(saved === null ? button.dataset.default !== "off" : saved === "1");
             // a touch screen has no hover, so a tap shows the tooltip for a moment
             button.addEventListener("pointerup", (event) => {
                 if (event.pointerType === "mouse") return;
@@ -941,7 +1140,16 @@ export class GalaxyView {
         // one segmented control per option, for the units and the map alike
         const groups = (container, options, values, apply) => {
             if (!container) return;
+            let section = null;
             for (const [key, option] of Object.entries(options)) {
+                // a subheading each time the subject changes: across space, planets, stars
+                if (option.section && option.section !== section) {
+                    section = option.section;
+                    const heading = document.createElement("h4");
+                    heading.className = "SettingsSubsection";
+                    heading.textContent = section;
+                    container.appendChild(heading);
+                }
                 const group = document.createElement("fieldset");
                 group.className = "SettingGroup";
                 group.innerHTML = '<legend><span class="SettingName"></span><span class="SettingHint"></span></legend><div class="Segmented"></div>';
@@ -1048,7 +1256,13 @@ export class GalaxyView {
         this.controls.update();
     }
 
-    flyTo({ target, distance, polar, azimuth }, duration = 1600) {
+    /*
+     * anchor: the flight goes to a place, so the pivot may stay there even outside
+     * the Milky Way's pivot allowance - a halo globular 18,000 ly above the disk, or
+     * the Tarantula Nebula in the LMC. Zooms and keyboard nudges pass false.
+     */
+    flyTo({ target, distance, polar, azimuth }, duration = 1600, { anchor = true } = {}) {
+        if (anchor) this.destination = target.clone();
         if (this.reducedMotion?.matches || DISPLAY.motion === "cut") duration = 0;
         const from = this.spherical();
         // the near limit depends on where the flight ends, not where it starts
@@ -1062,6 +1276,8 @@ export class GalaxyView {
             fromSph: from,
             toSph,
         };
+        // the zoom limit lags the pivot by a frame, so a cut must not inherit the old one
+        this.controls.minDistance = Math.min(this.controls.minDistance, radius);
         this.lastInteraction = performance.now();
     }
 
@@ -1073,7 +1289,95 @@ export class GalaxyView {
      */
     minDistanceAt(target) {
         const away = smoothstep(1.2, 4, target.distanceTo(SUN));
-        return Math.exp(THREE.MathUtils.lerp(Math.log(LOCAL_MIN_DISTANCE), Math.log(GALAXY_MIN_DISTANCE), away));
+        let min = Math.exp(THREE.MathUtils.lerp(Math.log(LOCAL_MIN_DISTANCE), Math.log(GALAXY_MIN_DISTANCE), away));
+        /*
+         * Anything with a card can be flown right up to, wherever it is: the limit
+         * drops to a quarter of its close-up distance while the pivot is on it, and
+         * eases back as the pivot leaves.
+         */
+        for (const item of this.infoItems || []) {
+            const d = target.distanceTo(item.position);
+            if (d > item.close * 3) continue;
+            const near = 1 - smoothstep(item.close * 0.8, item.close * 3, d);
+            min = Math.min(min, Math.exp(THREE.MathUtils.lerp(Math.log(GALAXY_MIN_DISTANCE), Math.log(item.close * 0.25), near)));
+        }
+        return min;
+    }
+
+    /*
+     * The info card: when the camera has come up to something - the pivot on it and
+     * the camera within twice its close-up distance - a card says what it is, with a
+     * photograph where there is one. Measured a few times a second, not every frame.
+     */
+    updateInfo(now) {
+        if (now - (this.lastInfoUpdate || 0) < 220) return;
+        this.lastInfoUpdate = now;
+        const card = document.getElementById("GALAXY_INFO");
+        if (!card) return;
+        const target = this.controls.target;
+        let best = null;
+        let bestScore = Infinity;
+        for (const item of this.infoItems || []) {
+            if (item.fiction && this.layerState.fiction === false) continue;
+            const pivot = target.distanceTo(item.position);
+            if (pivot > item.close * 0.6) continue;
+            const camera = this.camera.position.distanceTo(item.position);
+            if (camera > item.close * 2) continue;
+            // the thing the pivot sits on wins; how close the camera is breaks ties
+            const score = pivot / item.close + 0.1 * (camera / item.close);
+            if (score < bestScore) {
+                bestScore = score;
+                best = item;
+            }
+        }
+        if (best === this.dismissedInfo) best = null;
+        else if (!best) this.dismissedInfo = null;
+        if (best === this.shownInfo) return;
+        this.shownInfo = best;
+        card.classList.toggle("Visible", Boolean(best));
+        if (!best) return;
+        this.renderInfo(card, best);
+    }
+
+    renderInfo(card, item) {
+        card.style.setProperty("--info-color", item.color || "#9ecbff");
+        card.classList.toggle("Fiction", Boolean(item.fiction));
+        const figure = card.querySelector(".InfoImage");
+        if (item.image) {
+            figure.hidden = false;
+            const img = figure.querySelector("img");
+            img.src = this.root.dataset.infoImages + item.image;
+            img.alt = item.name;
+            // every photograph says whose it is and under what licence, linked to its source
+            const credit = figure.querySelector(".InfoCredit a");
+            credit.textContent = item.imageCredit || "";
+            credit.href = item.imageSource || "#";
+            credit.hidden = !item.imageCredit;
+        } else {
+            figure.hidden = true;
+        }
+        card.querySelector(".InfoKicker").textContent = item.kicker;
+        card.querySelector(".InfoName").textContent = item.name;
+        card.querySelector(".InfoAbout").textContent = item.about || "";
+        const facts = card.querySelector(".InfoFacts");
+        facts.replaceChildren();
+        for (const [label, value] of item.facts ? item.facts() : []) {
+            const dt = document.createElement("dt");
+            dt.textContent = label;
+            const dd = document.createElement("dd");
+            dd.textContent = value;
+            facts.append(dt, dd);
+        }
+    }
+
+    bindInfo() {
+        const card = document.getElementById("GALAXY_INFO");
+        if (!card) return;
+        card.querySelector(".InfoClose").addEventListener("click", () => {
+            this.dismissedInfo = this.shownInfo;
+            this.shownInfo = null;
+            card.classList.remove("Visible");
+        });
     }
 
     flyToSun() {
@@ -1082,7 +1386,7 @@ export class GalaxyView {
 
     zoomBy(factor) {
         const s = this.spherical();
-        this.flyTo({ target: this.controls.target.clone(), distance: s.radius * factor }, 600);
+        this.flyTo({ target: this.controls.target.clone(), distance: s.radius * factor }, 600, { anchor: false });
     }
 
     stepFlight(now) {
@@ -1138,7 +1442,7 @@ export class GalaxyView {
         this.height = height;
         // point sizes are authored for a ~900px tall view seen from ~80 units away
         const scale = (height / 900) * this.renderer.getPixelRatio() * 80;
-        for (const m of [...Object.values(this.materials), this.local.dotMaterial, ...this.deepSkyPoints.materials, ...(this.scatteredArt?.materials || []), this.core.material, this.core.holeMaterial]) {
+        for (const m of [...Object.values(this.materials), this.local.dotMaterial, ...this.deepSkyPoints.materials, ...this.stellarObjects.materials, ...(this.scatteredArt?.materials || []), this.core.material, this.core.holeMaterial]) {
             m.uniforms.uScale.value = scale;
         }
         for (const key of ["gas", "bulge"]) this.materials[key].uniforms.uScale.value = scale * this.post.softScale;
@@ -1166,10 +1470,14 @@ export class GalaxyView {
         requestAnimationFrame((t) => this.frame(t));
 
         if (this.flight) this.stepFlight(now);
-        this.controls.update();
-
         const target = this.controls.target;
-        this.controls.minDistance = this.minDistanceAt(target);
+        /*
+         * The zoom limit is set before the controls apply it, not after: set late it
+         * belonged to the previous frame's pivot, so a cut landed at the old limit and
+         * a flight from afar was held at the galaxy's 0.8 until its last frame.
+         */
+        this.controls.minDistance = this.flight ? Math.min(this.minDistanceAt(target), this.flight.toSph.radius) : this.minDistanceAt(target);
+        this.controls.update();
         const cameraDistance = this.spherical().radius;
         /*
          * The local view goes down to a few light-years, a thousandth of the
@@ -1194,19 +1502,22 @@ export class GalaxyView {
          * shrinks the allowance, and a hard clamp would yank the view towards the
          * core; this glides it back over a handful of frames instead.
          */
+        // a place flown to keeps the pivot until it is panned well away from it
+        const anchored = this.flight || (this.destination && target.distanceTo(this.destination) < Math.max(cameraDistance * 1.5, 0.5));
         const flat = Math.hypot(target.x, target.z);
-        if (flat > pivotRadius) {
+        if (flat > pivotRadius && !anchored) {
             const scale = Math.max(pivotRadius, flat * 0.88) / flat;
             target.x *= scale;
             target.z *= scale;
         }
-        if (Math.abs(target.y) > pivotHeight) {
+        if (Math.abs(target.y) > pivotHeight && !anchored) {
             target.y = Math.sign(target.y) * Math.max(pivotHeight, Math.abs(target.y) * 0.88);
         }
         const sunDistance = this.camera.position.distanceTo(SUN);
         const local = 1 - smoothstep(LOCAL_FULL, LOCAL_ENTER, sunDistance);
 
-        this.local.group.visible = local > 0.01 && this.layerState.systems !== false;
+        const ui = !this.uiHidden;
+        this.local.group.visible = ui && local > 0.01 && this.layerState.systems !== false;
         for (const m of this.local.materials) m.opacity = 0.35 * local;
         this.local.dotMaterial.uniforms.uOpacity.value = local;
         this.materials.gas.uniforms.uOpacity.value = 1 - 0.6 * local;
@@ -1343,9 +1654,10 @@ export class GalaxyView {
          * your way along an arm is most of what the outline is for.
          */
         const armLines = 0.24 * (1 - local) * smoothstep(9, 30, cameraDistance) * smoothstep(0.05, 0.2, elevation);
-        this.arms.group.visible = this.layerState.arms !== false && armLines > 0.002;
+        this.arms.group.visible = ui && this.layerState.arms !== false && armLines > 0.002;
         this.arms.material.opacity = armLines;
-        this.core.shellMaterial.opacity = 0.3 * (1 - local) * (this.layerState.arms !== false ? 1 : 0);
+        this.core.shellMaterial.opacity = 0.3 * (1 - local) * (ui && this.layerState.arms !== false ? 1 : 0);
+        this.updateOverlays(target, cameraDistance, elevation, local, ui);
 
         /*
          * The core obeys the same dust as everything else, which until now it did not:
@@ -1496,6 +1808,12 @@ export class GalaxyView {
                         break;
                     }
                 }
+                /*
+                 * Every system and object stays on the map whenever the Sun does, so
+                 * one with no room for its name keeps its icon and shows the name on
+                 * hover; only a page's name is drawn over the others regardless.
+                 */
+                marker.iconOnly = !placed && !marker.href;
                 if (!placed) {
                     marker.side = 1;
                     marker.shift = 0;
@@ -1503,23 +1821,98 @@ export class GalaxyView {
                     marker.boxY = marker.screenY + marker.anchorShift;
                 }
                 marker.keep = true;
+                if (marker.iconOnly) continue;
             }
             if (marker.keep) kept.push(marker);
         }
         for (const marker of this.markers) marker.apply(Boolean(marker.candidate && marker.keep), this.iconHalf);
 
         this.updateCatalogues(now);
+        this.updateInfo(now);
 
         // near the Sun the cursor reads off the plane the Sun sits in, 65 ly up,
         // which at local scale is a big difference
         const probe = this.pointerOnPlane(local > 0.5 ? SUN.y : 0) || target;
         const label = probe === target ? "Target" : "Cursor";
         const fromSun = probe.distanceTo(SUN) * 1000;
-        this.readout.textContent = local > 0.5
+        const sector = this.layerState.sectors ? sectorName(probe) : null;
+        this.readout.textContent = (local > 0.5
             ? `${label} · ${formatLy(fromSun < 1 ? 0 : fromSun)} from Sol · true scale`
-            : `${label} · ${formatLy(Math.round(probe.length() * 1000))} from core · ${formatLy(Math.round(fromSun))} from Sol`;
+            : `${label} · ${formatLy(Math.round(probe.length() * 1000))} from core · ${formatLy(Math.round(fromSun))} from Sol`) + (sector ? ` · Sector ${sector}` : "");
 
         this.post.render(this.scene, this.camera);
+    }
+
+    /*
+     * The bearings and the sector grid follow the pivot. Both are map furniture, so
+     * they go with the interface, and the grid - 10,000 ly squares - bows out in
+     * the local view and as the disk turns edge-on, where it is one line.
+     */
+    updateOverlays(target, cameraDistance, elevation, local, ui) {
+        const bearings = ui && this.layerState.bearings !== false;
+        this.bearings.lines.visible = bearings;
+        this.bearingTags.classList.toggle("Visible", bearings);
+        if (bearings) {
+            const length = cameraDistance * 0.3;
+            const { ends, toCore } = updateBearings(this.bearings, target, length);
+            this.bearings.material.opacity = 0.55 * (0.35 + 0.65 * smoothstep(0.03, 0.2, elevation));
+            const tags = this.bearingTags.children;
+            const place = (el, point) => {
+                const p = point.clone().project(this.camera);
+                const shown = p.z < 1 && Math.abs(p.x) < 1.05 && Math.abs(p.y) < 1.05;
+                el.style.visibility = shown ? "visible" : "hidden";
+                if (shown) el.style.transform = `translate(${((p.x * 0.5 + 0.5) * this.width).toFixed(1)}px, ${((-p.y * 0.5 + 0.5) * this.height).toFixed(1)}px)`;
+            };
+            place(tags[0], target);
+            ends.forEach((end, i) => place(tags[i + 1], end));
+            // on the centre itself the first beam has no core to reach: it is just 0 degrees
+            const core = toCore < 0.0005 ? "0°" : `Core · ${formatLy(toCore * 1000)}`;
+            if (tags[1].textContent !== core) tags[1].textContent = core;
+        }
+        const sectors = ui && this.layerState.sectors === true && local < 0.99;
+        this.sectors.group.visible = sectors;
+        if (sectors) {
+            const fade = (1 - local) * smoothstep(0.04, 0.2, elevation);
+            this.sectors.material.opacity = 0.3 * fade;
+            this.sectors.cellMaterial.opacity = 0.05 * fade;
+            updateSectors(this.sectors, target);
+        }
+        this.updateAngle(target);
+    }
+
+    /*
+     * The angle dial beside the zoom buttons: the disk as an ellipse that flattens
+     * as the view tilts towards edge-on, the angle above the plane in degrees, and a
+     * dot on the rim on the side the galactic centre lies.
+     */
+    updateAngle(target) {
+        if (!this.angleDial) return;
+        const s = this.spherical();
+        const above = 90 - THREE.MathUtils.radToDeg(s.phi);
+        const squash = Math.max(Math.cos(s.phi), 0.04);
+        // where the core is, in the camera's own left-right and into-the-screen
+        const toCore = new THREE.Vector3(-target.x, 0, -target.z);
+        let dot = null;
+        if (toCore.lengthSq() > 1e-8) {
+            toCore.normalize();
+            const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0).setY(0).normalize();
+            const forward = new THREE.Vector3().crossVectors(this.camera.up, right).normalize();
+            dot = [9 * toCore.dot(right), -9 * squash * toCore.dot(forward)];
+        }
+        const key = `${Math.round(above)}|${squash.toFixed(2)}|${dot ? dot.map((v) => v.toFixed(1)).join(",") : "-"}`;
+        if (key === this.angleKey) return;
+        this.angleKey = key;
+        this.angleDial.querySelector(".AngleDisk").setAttribute("ry", (9 * squash).toFixed(2));
+        const core = this.angleDial.querySelector(".AngleCore");
+        core.style.display = dot ? "" : "none";
+        if (dot) {
+            core.setAttribute("cx", dot[0].toFixed(2));
+            core.setAttribute("cy", dot[1].toFixed(2));
+        }
+        this.angleDial.querySelector(".AngleValue").textContent = `${Math.round(above)}°`;
+        const text = `Seen from ${Math.round(above)}° above the plane of the disk (90° is straight down, 0° edge-on). The dot is the side the galactic centre is on.`;
+        this.angleDial.title = text;
+        this.angleDial.setAttribute("aria-label", text);
     }
 
     start() {

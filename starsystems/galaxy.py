@@ -31,7 +31,8 @@ GALAXY_PLACEMENT = {
     "Polaris": {"l": 123.28, "b": 26.46, "d": 433.0},
     # "label" overrides the display name where the URL-safe DB name cannot carry it
     "BarnardsStar": {"l": 31.01, "b": 14.06, "d": 5.96, "label": "Barnard's Star"},
-    "Trebia": {"fictional": True, "source": "Mass Effect", "note": "Palaven, the turian homeworld", "x": 21_000, "z": -9_000},
+    # Apien Crest, read off the Mass Effect 3 galaxy map like the places in FICTIONAL_PLACES
+    "Trebia": {"fictional": True, "source": "Mass Effect", "note": "Palaven, the turian homeworld · Apien Crest", "x": -26_500, "z": 21_500},
 }
 
 # Landmarks drawn at their true positions, as a reference for where our systems sit.
@@ -105,6 +106,79 @@ DEEP_SKY = [
     # nearest clusters are the Hyades and the Pleiades.
     {"name": "Local Bubble", "alias": "Local cavity", "kind": "structure", "l": 0.0, "b": 0.0, "d": 0.0, "radius": 500},
 ]
+
+# A line or two on each landmark for the card that opens when you fly up to one.
+# "size" is the real extent in light-years, roughly, where it is known; the map
+# draws everything bigger than life, and the card says the true figure. An image
+# is shown when static/Images/DeepSky/<alias as a slug>.jpg exists (see views.py).
+DEEP_SKY_ABOUT = {
+    "Orion Nebula": ("The nearest big star nursery, visible to the naked eye as the middle 'star' of Orion's sword. Its young Trapezium stars light the gas from inside.", 24),
+    "Horsehead Nebula": ("A dark cloud of dust shaped like a horse's head, seen against glowing hydrogen behind it.", 3.5),
+    "Rosette Nebula": ("A flower of glowing gas around a hollow carved out by the winds of the young cluster at its heart.", 130),
+    "Cone Nebula": ("A tall, dark pillar of gas and dust in a region full of newborn stars, next to the Christmas Tree Cluster.", 7),
+    "Eagle Nebula": ("Home of the 'Pillars of Creation', columns of gas where new stars are still forming.", 70),
+    "Lagoon Nebula": ("A huge glowing cloud in Sagittarius, crossed by a dark lane of dust that gives it its name.", 110),
+    "Trifid Nebula": ("A rare mix of three kinds of nebula in one: glowing red gas, blue reflected light and dark dust lanes.", 42),
+    "Omega Nebula": ("Also called the Swan Nebula, one of the brightest and most massive star-forming regions in the galaxy.", 15),
+    "Carina Nebula": ("One of the largest nebulae in the sky, four times the size of Orion's. It hides Eta Carinae, a star that may explode soon.", 460),
+    "NGC 3603": ("The densest concentration of massive stars in the visible Milky Way, a young cluster blowing out a giant cavity.", 50),
+    "W51 Complex": ("A giant molecular cloud on the far side of the galaxy, among the most active star factories we know of.", 300),
+    "Bubble Nebula": ("A shell blown by the wind of a single hot, massive star, 40 times heavier than the Sun.", 7),
+    "North America Nebula": ("A glowing cloud whose dark lanes trace the outline of the North American continent.", 90),
+    "Heart Nebula": ("A heart-shaped cloud of glowing hydrogen shaped by the young stars of the cluster Melotte 15.", 200),
+    "Soul Nebula": ("The Heart Nebula's neighbour, a star-forming region with several young clusters inside.", 150),
+    "California Nebula": ("A long ribbon of glowing gas, lit by a single fierce star, Xi Persei.", 100),
+    "Flaming Star Nebula": ("Lit by a runaway star, AE Aurigae, flung out of the Orion region millions of years ago.", 5),
+    "Iris Nebula": ("A reflection nebula: dust that does not glow by itself but scatters the blue light of a nearby star.", 6),
+    "Elephant's Trunk": ("A long dark pillar of gas and dust inside a large glowing region in Cepheus, with stars forming at its tip.", 20),
+    "Pac-Man Nebula": ("A glowing cloud with a dark wedge cut out of it, lit by the young cluster IC 1590.", 48),
+    "Rho Ophiuchi Clouds": ("One of the nearest star-forming regions, a colourful mix of dark, glowing and reflecting clouds.", 15),
+    "Cat's Paw Nebula": ("A star-forming region whose glowing bubbles look like a paw print.", 50),
+    "Running Chicken Nebula": ("A large glowing cloud in Centaurus, with small dark globules where stars may still form.", 75),
+    "Tarantula Nebula": ("In the Large Magellanic Cloud, outside our galaxy: the most active star-forming region in the Local Group.", 1_000),
+    "Crab Nebula": ("The wreck of a star whose explosion was recorded by astronomers in 1054. A spinning neutron star powers it from the centre.", 11),
+    "Veil Nebula": ("Delicate filaments from a supernova that exploded about 10,000 to 20,000 years ago.", 110),
+    "Vela Supernova Remnant": ("One of the closest supernova remnants, about 11,000 years old, with the Vela pulsar inside.", 100),
+    "Cassiopeia A": ("The youngest known remnant of a supernova in our galaxy, whose light reached Earth around 1680.", 10),
+    "Tycho's Supernova": ("The remains of the star Tycho Brahe saw explode in 1572, which showed that the heavens do change.", 20),
+    "Kepler's Supernova": ("The last supernova seen in our galaxy with the naked eye, in 1604.", 14),
+    "Helix Nebula": ("One of the closest planetary nebulae: the outer layers of a dying Sun-like star, nicknamed the Eye of God.", 2.5),
+    "Ring Nebula": ("A glowing ring of gas puffed off by a dying star, now a white dwarf at its centre.", 2.6),
+    "Dumbbell Nebula": ("The first planetary nebula ever found, in 1764, shaped like an apple core.", 2.8),
+    "Cat's Eye Nebula": ("One of the most intricate planetary nebulae, with shells, jets and knots from a dying star.", 0.4),
+    "Butterfly Nebula": ("Two wings of gas thrown out by one of the hottest stars known, hidden behind a dusty belt.", 3),
+    "Owl Nebula": ("A round planetary nebula with two dark patches that look like an owl's eyes.", 1.8),
+    "Ghost of Jupiter": ("A planetary nebula about the size Jupiter appears in a small telescope, hence its name.", 1.3),
+    "Pleiades": ("The Seven Sisters: a young cluster of hot blue stars, still passing through a cloud of dust that reflects their light.", 43),
+    "Hyades": ("The nearest open cluster to the Sun, forming the V-shaped face of Taurus the bull.", 20),
+    "Beehive Cluster": ("A swarm of about a thousand stars in Cancer, visible to the naked eye as a faint cloud.", 23),
+    "Coma Star Cluster": ("A large, loose cluster that makes up most of the constellation Coma Berenices.", 22),
+    "Butterfly Cluster": ("An open cluster in Scorpius whose brightest stars trace a butterfly's wings.", 12),
+    "Ptolemy Cluster": ("A bright open cluster recorded by Ptolemy around the year 130.", 25),
+    "NGC 3532": ("One of the richest open clusters in the southern sky, nicknamed the Wishing Well Cluster.", 20),
+    "Jewel Box": ("A young cluster of brilliant blue and red supergiants, described by John Herschel as a casket of gems.", 20),
+    "Wild Duck Cluster": ("One of the richest and most compact open clusters, whose bright stars form a V like a flight of ducks.", 25),
+    "Double Cluster": ("Two young clusters side by side in Perseus, visible together with the naked eye.", 70),
+    "Southern Pleiades": ("A bright, young southern cluster, sometimes called the Theta Carinae Cluster.", 9),
+    "Westerlund 1": ("The most massive young cluster in the galaxy, packed with supergiants and hypergiants.", 6),
+    "M35": ("A rich open cluster in Gemini, with an older, more distant cluster, NGC 2158, seen beside it.", 23),
+    "Omega Centauri": ("The largest globular cluster in the galaxy, with about ten million stars. It may be the core of a swallowed dwarf galaxy.", 150),
+    "Great Cluster": ("The finest globular cluster in the northern sky, target of a radio message sent from Arecibo in 1974.", 145),
+    "47 Tucanae": ("The second brightest globular cluster, a dense ball of old stars beside the Small Magellanic Cloud.", 120),
+    "M4": ("One of the nearest globular clusters, where very old white dwarfs have been used to date the galaxy.", 75),
+    "M22": ("One of the brightest globular clusters, among the first ever discovered, in 1665.", 100),
+    "NGC 6397": ("One of the two nearest globular clusters, about 13.4 billion years old.", 70),
+    "M5": ("One of the oldest globular clusters in the galaxy, about 13 billion years old.", 165),
+    "M15": ("One of the densest globular clusters, whose core may have collapsed.", 175),
+    "M2": ("A large, rich globular cluster in Aquarius with about 150,000 stars.", 175),
+    "M79": ("An unusual globular cluster that may have come from another galaxy that the Milky Way absorbed.", 118),
+    "Intergalactic Wanderer": ("One of the most distant globular clusters of the Milky Way, so far out it was once thought to be free of it.", 500),
+    "Local Bubble": ("The cavity of thin, hot gas the Sun sits in, blown by supernovae over the last 15 million years.", 1_000),
+}
+for _entry in DEEP_SKY:
+    _about = DEEP_SKY_ABOUT.get(_entry["name"])
+    if _about:
+        _entry["about"], _entry["size"] = _about
 
 # Galaxies, built as oriented 3D star discs rather than camera-facing images.
 # "display" is the distance we draw them at, in light-years: the satellites sit at
@@ -203,26 +277,102 @@ PLANETARY_SYSTEMS = [
 # (dashed, violet, its own layer). "type" sorts each into the Star systems or the
 # Objects panel. Where the story names a real star the place sits at it ("anchor",
 # l/b/d computed from J2000 RA/Dec like everything else); otherwise x/z (ly,
-# galactocentric) are placed by eye from the source's own galaxy map, and say so.
-# Trebia, which has a page, lives in GALAXY_PLACEMENT instead.
+# galactocentric) are placed by eye, and say so.
+#
+# Mass Effect: read off the Mass Effect 3 galaxy map (core at the top, the Arcturus
+# Stream below it), deprojected for its tilt and scaled so the Arcturus Stream lands
+# on the Sun. That map is drawn from galactic north like ours. The Omega Nebula is
+# not on the ME3 map, so Omega comes from the Mass Effect 2 map, beside the
+# Hourglass Nebula towards the core. Trebia, which has a page, lives in
+# GALAXY_PLACEMENT instead.
 FICTIONAL_PLACES = [
-    {"type": "system", "name": "Widow", "source": "Mass Effect", "note": "The Citadel, in the Serpent Nebula", "x": 8_000, "z": 14_000},
-    {"type": "system", "name": "Sahrabarik", "source": "Mass Effect", "note": "Omega station, Terminus Systems", "x": -14_000, "z": 12_000},
-    {"type": "system", "name": "Aralakh", "source": "Mass Effect", "note": "Tuchanka, the krogan homeworld", "x": 16_000, "z": 2_000},
+    {"type": "system", "name": "Widow", "source": "Mass Effect", "note": "The Citadel, in the Serpent Nebula", "x": -14_000, "z": 5_000},
+    {"type": "system", "name": "Sahrabarik", "source": "Mass Effect", "note": "Omega station, Omega Nebula, Terminus Systems", "x": -6_000, "z": -11_000},
+    {"type": "system", "name": "Aralakh", "source": "Mass Effect", "note": "Tuchanka, the krogan homeworld · Krogan DMZ", "x": -15_500, "z": 10_000},
+    {"type": "system", "name": "Hercules", "source": "Mass Effect", "note": "Feros · Attican Beta, Attican Traverse", "x": 28_000, "z": 18_000},
+    {"type": "system", "name": "Utopia", "source": "Mass Effect", "note": "Eden Prime · Exodus Cluster", "x": 7_000, "z": 25_500},
     {"type": "system", "name": "40 Eridani", "source": "Star Trek", "note": "Vulcan", "anchor": "40 Eridani A", "l": 200.75, "b": -38.05, "d": 16.3},
+    {"type": "system", "name": "Epsilon Indi", "source": "Halo", "note": "Harvest, where the Covenant war began", "anchor": "Epsilon Indi", "l": 336.19, "b": -48.04, "d": 11.9},
     {"type": "system", "name": "Epsilon Eridani", "source": "Halo", "note": "Reach", "anchor": "Epsilon Eridani", "l": 195.84, "b": -48.05, "d": 10.5},
+    {"type": "system", "name": "Zeta Reticuli", "source": "Alien", "note": "LV-426, where the derelict ship was found", "anchor": "Zeta² Reticuli", "l": 278.97, "b": -47.22, "d": 39.3},
+    {"type": "system", "name": "Delta Pavonis", "source": "Dune", "note": "Caladan, the Atreides homeworld", "anchor": "Delta Pavonis", "l": 329.77, "b": -32.42, "d": 19.9},
+    {"type": "system", "name": "36 Ophiuchi", "source": "Dune", "note": "Giedi Prime, the Harkonnen homeworld", "anchor": "36 Ophiuchi", "l": 358.28, "b": 6.88, "d": 19.5},
     {"type": "system", "name": "Canopus", "source": "Dune", "note": "Arrakis", "anchor": "Canopus", "l": 261.21, "b": -25.29, "d": 310},
+    {"type": "system", "name": "Vega", "source": "Contact", "note": "Source of the Message", "anchor": "Vega", "l": 67.45, "b": 19.24, "d": 25},
+    {"type": "system", "name": "Trantor", "source": "Foundation", "note": "Capital of the Galactic Empire, near the core", "x": 0, "z": 3_000},
+    {"type": "system", "name": "Terminus", "source": "Foundation", "note": "The Foundation's world, at the galaxy's rim", "x": -38_000, "z": 24_000},
+    {"type": "system", "name": "Cadia", "source": "Warhammer 40,000", "note": "Fortress world at the Eye of Terror", "x": -16_000, "z": 32_000},
+    {"type": "system", "name": "Macragge", "source": "Warhammer 40,000", "note": "Ultramar, on the Eastern Fringe", "x": 34_000, "z": 14_000},
     {"type": "object", "name": "Arcturus Station", "source": "Mass Effect", "note": "Alliance capital station", "anchor": "Arcturus", "l": 15.05, "b": 69.11, "d": 36.7},
-    {"type": "object", "name": "Collector Base", "source": "Mass Effect", "note": "Beyond the Omega-4 Relay, near the core", "x": 1_500, "z": 2_500},
-    {"type": "object", "name": "Gargantua's wormhole", "source": "Interstellar", "note": "By Saturn; Gargantua lies beyond it", "anchor": "Saturn", "l": 0.0, "b": 0.0, "d": 0.00015},
+    {"type": "object", "name": "Collector Base", "source": "Mass Effect", "note": "Beyond the Omega-4 Relay, near the core", "x": -1_500, "z": -2_500},
+    {"type": "object", "name": "Charon Relay", "source": "Mass Effect", "note": "The mass relay hidden in Pluto's moon Charon", "anchor": "Pluto", "l": 21.11, "b": -29.9, "d": 0.00055},
+    {"type": "object", "name": "Gargantua's wormhole", "source": "Interstellar", "note": "By Saturn; Gargantua lies beyond it", "anchor": "Saturn", "l": 106.62, "b": -60.87, "d": 0.00015},
+    {"type": "object", "name": "The monolith at Jupiter", "source": "2001: A Space Odyssey", "note": "Big Brother, waiting in orbit", "anchor": "Jupiter", "l": 199.76, "b": 21.93, "d": 0.000082},
+    {"type": "object", "name": "Babylon 5", "source": "Babylon 5", "note": "The last of the Babylon stations, orbiting Epsilon III", "anchor": "Epsilon Eridani", "l": 195.84, "b": -48.05, "d": 10.5},
+    {"type": "object", "name": "Battle of Wolf 359", "source": "Star Trek", "note": "Where the Borg destroyed 39 starships", "anchor": "Wolf 359", "l": 244.06, "b": 56.12, "d": 7.86},
 ]
 
 # Real objects that are not star systems. The Voyagers' directions are where they
 # are heading as seen from the Sun (RA/Dec converted as above); distances in AU for
 # late 2026, when Voyager 1 passes one light-day.
 SPACECRAFT = [
-    {"name": "Voyager 1", "note": "Farthest human-made object, about one light-day out", "l": 33.13, "b": 26.78, "au": 173},
-    {"name": "Voyager 2", "note": "Left the heliosphere in 2018", "l": 337.63, "b": -32.75, "au": 142},
+    {"name": "Voyager 1", "note": "Farthest human-made object, about one light-day out", "about": "Launched in 1977, it flew past Jupiter and Saturn and crossed into interstellar space in 2012. It still sends data home.", "l": 33.13, "b": 26.78, "au": 173},
+    {"name": "Voyager 2", "note": "Left the heliosphere in 2018", "about": "The only spacecraft to have visited Uranus and Neptune. It left the Sun's bubble of wind in 2018.", "l": 337.63, "b": -32.75, "au": 142},
+    {"name": "Pioneer 10", "note": "Silent since 2003, heading for Aldebaran", "about": "The first spacecraft to cross the asteroid belt and fly past Jupiter. It carries a plaque for anyone who finds it.", "l": 177.81, "b": -9.13, "au": 143},
+    {"name": "Pioneer 11", "note": "Silent since 1995, heading towards Aquila", "about": "The first spacecraft to fly past Saturn, in 1979. Its position is now estimated, not measured.", "l": 25.33, "b": -4.03, "au": 122},
+    {"name": "New Horizons", "note": "Flew past Pluto in 2015 and Arrokoth in 2019", "about": "Gave us the first close look at Pluto, with its heart-shaped glacier, then the most distant object ever visited.", "l": 20.55, "b": -22.14, "au": 64},
+]
+
+# Real things in the galaxy that are not star systems we have pages for: black holes,
+# neutron stars and remarkable single stars. l/b computed from J2000 RA/Dec with the
+# same transform (it reproduces Sgr A* and the Pleiades); d in light-years. Masses in
+# Suns, radii in Suns, temperatures in kelvin, luminosities in Suns - the card prints
+# them in the units chosen in Settings.
+STELLAR_OBJECTS = [
+    {"name": "Sagittarius A*", "kind": "blackhole", "note": "The black hole at the centre of the galaxy", "l": 0.0, "b": 0.0, "d": 26_700, "mass": 4.3e6,
+     "about": "A supermassive black hole four million times the mass of the Sun. Stars orbiting it proved it is there; the Event Horizon Telescope imaged its shadow in 2022."},
+    {"name": "Cygnus X-1", "kind": "blackhole", "note": "The first black hole ever identified", "l": 71.34, "b": 3.07, "d": 7_200, "mass": 21,
+     "about": "Found in 1964 as a strong X-ray source: gas pulled off a blue supergiant heats up as it spirals into an unseen companion of 21 Suns."},
+    {"name": "V404 Cygni", "kind": "blackhole", "note": "A black hole that flares up every few decades", "l": 73.12, "b": -2.09, "d": 7_800, "mass": 9,
+     "about": "Feeds on a companion star in bursts; its 2015 outburst made it briefly the brightest X-ray source in the sky."},
+    {"name": "A0620-00", "kind": "blackhole", "note": "One of the nearest known black holes", "l": 209.96, "b": -6.54, "d": 3_300, "mass": 6.6,
+     "about": "Revealed by an X-ray outburst in 1975, it orbits a small orange star every 7.75 hours."},
+    {"name": "Gaia BH1", "kind": "blackhole", "note": "The nearest known black hole", "l": 22.63, "b": 18.05, "d": 1_560, "mass": 9.6,
+     "about": "A dormant black hole found in 2022 only by the wobble it gives a Sun-like star, measured by the Gaia spacecraft."},
+    {"name": "Gaia BH2", "kind": "blackhole", "note": "A quiet black hole with a red giant partner", "l": 310.4, "b": 2.78, "d": 3_800, "mass": 8.9,
+     "about": "Like Gaia BH1, it gives off no X-rays at all and was found only from its companion's motion."},
+    {"name": "Gaia BH3", "kind": "blackhole", "note": "The most massive stellar black hole in the galaxy", "l": 51.67, "b": -3.49, "d": 1_926, "mass": 33,
+     "about": "Found in 2024 in Gaia data: 33 Suns, probably left by a metal-poor star from the galaxy's early days."},
+    {"name": "GRS 1915+105", "kind": "blackhole", "note": "A microquasar with jets near light speed", "l": 45.37, "b": -0.22, "d": 28_000, "mass": 12,
+     "about": "Fires jets that appeared to move faster than light, an illusion of their near-light speed towards us."},
+    {"name": "Vela Pulsar", "kind": "neutron", "note": "Spins 11 times a second", "l": 263.55, "b": -2.79, "d": 950, "mass": 1.4, "radiusKm": 12,
+     "about": "The collapsed core of the star that made the Vela supernova remnant, a city-sized ball of neutrons."},
+    {"name": "Crab Pulsar", "kind": "neutron", "note": "Spins 30 times a second", "l": 184.56, "b": -5.78, "d": 6_500, "mass": 1.4, "radiusKm": 12,
+     "about": "Left by the supernova of 1054, it powers the whole Crab Nebula with its wind of particles."},
+    {"name": "SGR 1806-20", "kind": "neutron", "note": "A magnetar, the strongest magnet known", "l": 10.0, "b": -0.24, "d": 28_000, "mass": 1.4, "radiusKm": 10,
+     "about": "Its giant flare in 2004 lit up Earth's upper atmosphere from across the galaxy, in a tenth of a second."},
+    {"name": "RX J1856.5-3754", "kind": "neutron", "note": "One of the nearest neutron stars", "l": 358.6, "b": -17.21, "d": 400, "mass": 1.5, "radiusKm": 14, "temperature": 700_000,
+     "about": "One of the 'Magnificent Seven', lone neutron stars seen only by their heat."},
+    {"name": "Hulse–Taylor Pulsar", "kind": "neutron", "note": "First proof of gravitational waves", "l": 49.97, "b": 2.12, "d": 21_000, "mass": 1.44, "radiusKm": 12,
+     "about": "Two neutron stars spiralling together exactly as gravitational waves predict; a Nobel prize in 1993."},
+    {"name": "Betelgeuse", "kind": "star", "note": "Red supergiant, Orion's shoulder", "l": 199.79, "b": -8.96, "d": 548, "mass": 18, "radius": 760, "temperature": 3_600, "luminosity": 120_000,
+     "about": "So large that it would swallow Jupiter's orbit. It will end as a supernova within the next hundred thousand years."},
+    {"name": "Rigel", "kind": "star", "note": "Blue supergiant, Orion's foot", "l": 209.24, "b": -25.25, "d": 860, "mass": 21, "radius": 79, "temperature": 12_100, "luminosity": 120_000,
+     "about": "The brightest star in Orion, a young giant burning through its fuel in a few million years."},
+    {"name": "Deneb", "kind": "star", "note": "One of the most luminous stars we can see", "l": 84.28, "b": 2.0, "d": 2_600, "mass": 19, "radius": 200, "temperature": 8_500, "luminosity": 196_000,
+     "about": "A white supergiant so bright that it is among the 20 brightest stars in our sky from over 2,000 light-years away."},
+    {"name": "Eta Carinae", "kind": "star", "note": "A pair of giant stars on the edge of exploding", "l": 287.6, "b": -0.63, "d": 7_500, "mass": 100, "radius": 240, "temperature": 35_000, "luminosity": 5_000_000,
+     "about": "Its 1843 'Great Eruption' threw out the Homunculus Nebula and briefly made it the second brightest star in the sky."},
+    {"name": "VY Canis Majoris", "kind": "star", "note": "One of the largest stars known", "l": 239.35, "b": -5.07, "d": 3_900, "mass": 17, "radius": 1_420, "temperature": 3_490, "luminosity": 270_000,
+     "about": "A red hypergiant losing its outer layers in huge arcs and clumps of gas."},
+    {"name": "UY Scuti", "kind": "star", "note": "A red supergiant of uncertain, enormous size", "l": 19.14, "b": -0.47, "d": 5_900, "mass": 8, "radius": 909, "temperature": 3_550, "luminosity": 86_000,
+     "about": "Once listed as the largest star known; its distance, and so its size, are still debated."},
+    {"name": "WR 104", "kind": "star", "note": "A pinwheel of dust around two hot stars", "l": 6.44, "b": -0.49, "d": 8_000, "temperature": 45_000,
+     "about": "Two massive stars whose colliding winds make dust in a spiral that turns every eight months."},
+    {"name": "Tabby's Star", "kind": "star", "note": "The star that dims for no clear reason", "l": 80.04, "b": 6.64, "d": 1_470, "mass": 1.43, "radius": 1.58, "temperature": 6_750, "luminosity": 4.7,
+     "about": "Its light dropped by up to 22% at irregular times. Dust is the likeliest answer; it once prompted talk of alien megastructures."},
+    {"name": "Methuselah Star", "kind": "star", "note": "One of the oldest stars known", "l": 356.31, "b": 33.61, "d": 200, "mass": 0.8, "radius": 2.0, "temperature": 5_780, "luminosity": 4.6,
+     "about": "HD 140283 is around 12 billion years old, nearly as old as the universe itself."},
 ]
 
 CELESTIAL_POLE_GALACTIC = {"l": 122.93192, "b": 27.12825}
@@ -241,5 +391,7 @@ IMAGE_CREDITS = (
     "Heritage (STScI/AURA), NASA/JPL-Caltech (Spitzer, IC 342), SSRO/PROMPT/CTIO "
     "(NGC 253, CC BY 4.0), ESO/MPIfR/NASA-CXC composite (Centaurus A, CC BY 4.0), "
     "ESA/NASA (M101, CC BY 4.0), Adam Evans (M31, CC BY 2.0). Centaurus A combines "
-    "optical, submillimetre and X-ray data, so its jets are not a visible-light view."
+    "optical, submillimetre and X-ray data, so its jets are not a visible-light view. "
+    "Photographs on the info cards come from Wikimedia Commons (NASA, ESA, ESO, NOIRLab "
+    "and amateur astronomers); each card names its author and licence."
 )
