@@ -110,7 +110,7 @@ export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: draw
         for (let i = 0; i < knots; i++) {
             p.set(normal(), normal() * 0.5, normal()).multiplyScalar(art.spread * 0.45).add(o.position);
             tint(i + 1).lerp(white, 0.3);
-            details.add(p, color, size(art.knotSize), between(art.knotAlpha) * quiet * 0.8);
+            details.add(p, color, size(art.knotSize), between(art.knotAlpha) * quiet);
         }
         if (art.ring) rings.add(o.position, new THREE.Color(style.color).convertSRGBToLinear(), art.ring * sizeScale * (0.7 + 0.3 * amount), art.ringAlpha * Math.pow(amount, 1.6) * ART_BRIGHTNESS);
         const memberCount = Math.round((art.members || 0) * amount * (filler ? 0.5 : 1));
@@ -120,9 +120,9 @@ export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: draw
             p.set(normal(), normal(), normal()).normalize().multiplyScalar(r).add(o.position);
             color.set(art.memberTint || style.color).convertSRGBToLinear().lerp(white, 0.3 + 0.45 * random());
             const bright = !filler && random() < 0.15;
-            members.add(p, color, filler ? 2.2 + 2.6 * random() : (bright ? 3 + 1.5 * random() : 1.6 + 1.6 * random()), (bright ? 0.85 : 0.55 + 0.35 * random()) * (filler ? 0.6 : 1) * ART_BRIGHTNESS);
+            members.add(p, color, filler ? 2.2 + 2.6 * random() : (bright ? 3 + 1.5 * random() : 1.6 + 1.6 * random()), (bright ? 1 : 0.55 + 0.35 * random()) * (filler ? 0.6 : 1) * ART_BRIGHTNESS);
             // the brightest members get a small glow of their own, like a photograph's
-            if (bright) details.add(p, color, 0.09 * sizeScale, 0.1 * ART_BRIGHTNESS);
+            if (bright) details.add(p, color, 0.09 * sizeScale, 0.16 * ART_BRIGHTNESS);
         }
     }
 
@@ -132,13 +132,8 @@ export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: draw
     // detail has no floor: from across the galaxy it folds into the envelope
     const detailMaterial = pointsMaterial({ maxSize: cap * 0.8, minSize: 0, nearFade: 0.01, sharpness: 2.6, soft: true, cloud: 0.85 });
     const ringMaterial = pointsMaterial({ maxSize: cap * 0.7, minSize: 5, nearFade: 0.01, ring: true });
-    /*
-     * Member stars only resolve up close; from afar they fold into the core point.
-     * Kept as small and sharp as the 0.8.2.7 ones (7px, not 13): at 13px the named
-     * clusters added twice the light the whole painted layer used to, and read as
-     * brighter than the galaxy around them. The spread and count stay.
-     */
-    const memberMaterial = pointsMaterial(filler ? { maxSize: 6, minSize: 0, nearFade: 0.002, sharpness: 14 } : { maxSize: 7, minSize: 0, nearFade: 0.002, sharpness: 12 });
+    // member stars only resolve up close; from afar they fold into the core point
+    const memberMaterial = pointsMaterial(filler ? { maxSize: 6, minSize: 0, nearFade: 0.002, sharpness: 14 } : { maxSize: 13, minSize: 0, nearFade: 0.002, sharpness: 7 });
 
     const group = new THREE.Group();
     const points = new THREE.Points(cores.geometry(), material);

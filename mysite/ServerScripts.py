@@ -26,7 +26,7 @@ def get_sql_system_links() -> list[dict]:
 
     This is all the main page needs of a system: the galaxy view places a marker
     from the href and labels it with the name. Adding a system is still a matter
-    of adding a row plus a GALAXY_PLACEMENT entry.
+    of adding a row plus a galaxy_placement row.
     """
     a_links = []
     for row in Systems.objects.all():

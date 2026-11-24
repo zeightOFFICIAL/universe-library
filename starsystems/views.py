@@ -10,16 +10,16 @@ from mysite.PredefinedSystems.SolarSystem import System as Solar
 from starsystems.galaxy import (
     BACKGROUND_GALAXY_IMAGES,
     CELESTIAL_POLE_GALACTIC,
-    DEEP_SKY,
-    FICTIONAL_PLACES,
     GALAXIES,
-    GALAXY_PLACEMENT,
     IMAGE_CREDITS,
-    PLANETARY_SYSTEMS,
-    SPACECRAFT,
-    STELLAR_OBJECTS,
     SUN_HEIGHT_ABOVE_PLANE_LY,
     SUN_TO_GALACTIC_CENTRE_LY,
+    deep_sky,
+    fictional_places,
+    galaxy_placement,
+    planetary_systems,
+    spacecraft,
+    stellar_objects,
 )
 from starsystems.image_sources import IMAGE_SOURCES
 from mysite.ServerScripts import (
@@ -31,7 +31,7 @@ from mysite.ServerScripts import (
 
 # The two systems that are Python rather than database rows. Everything the main
 # page needs of a system is its name, its page and its accent colour; where it sits
-# in the galaxy comes from GALAXY_PLACEMENT, keyed by the same href.
+# in the galaxy comes from the galaxy_placement table, keyed by the same href.
 PREDEFINED_SYSTEM_LINKS = [
     {"name": "Solar", "href": "Solar", "color": "#FBAB7E", "ready": True},
     {"name": "Alpha Centauri", "href": "AlphaCentauri", "color": "#FF0000", "ready": True},
@@ -69,23 +69,25 @@ def with_images(entries):
 def universe_page(request) -> HttpResponse:
     links = PREDEFINED_SYSTEM_LINKS + get_sql_system_links()
     Head = '<meta charset="UTF-8" name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="../static/Icons/LogoStrip.ico" charset="UTF-8"><title>Universe Library</title>'
+    # the places come from the database on every request, so a new row shows at once
+    placement = galaxy_placement()
     galaxy = {
         "sunDistance": SUN_TO_GALACTIC_CENTRE_LY,
         "sunHeight": SUN_HEIGHT_ABOVE_PLANE_LY,
-        "deepSky": with_images(DEEP_SKY),
+        "deepSky": with_images(deep_sky()),
         "galaxies": GALAXIES,
-        "planetarySystems": PLANETARY_SYSTEMS,
-        "fiction": FICTIONAL_PLACES,
-        "spacecraft": with_images(SPACECRAFT),
-        "stellarObjects": with_images(STELLAR_OBJECTS),
+        "planetarySystems": planetary_systems(),
+        "fiction": fictional_places(),
+        "spacecraft": with_images(spacecraft()),
+        "stellarObjects": with_images(stellar_objects()),
         "celestialPole": CELESTIAL_POLE_GALACTIC,
         "backgroundGalaxies": BACKGROUND_GALAXY_IMAGES,
         "credits": IMAGE_CREDITS,
         "systems": [
-            dict(link, name=GALAXY_PLACEMENT[link["href"]].get("label", link["name"]), placement=GALAXY_PLACEMENT[link["href"]])
+            dict(link, name=placement[link["href"]].get("label", link["name"]), placement=placement[link["href"]])
             for link in links
-            if link["href"] in GALAXY_PLACEMENT
-            and not GALAXY_PLACEMENT[link["href"]].get("hidden")
+            if link["href"] in placement
+            and not placement[link["href"]].get("hidden")
         ],
     }
     return render(request, "Universe.html", {"head": Head, "galaxy": galaxy})

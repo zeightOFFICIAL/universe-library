@@ -11,13 +11,13 @@ import { ORIGIN } from "./config.js";
  * degrees is the way the disk rotates). They are as long as about a third of the
  * view, so they read the same at every zoom.
  *
- * Sectors: a grid of 10,000 ly squares over the disk, letters A-J across and
- * numbers 1-10 from the far side of the core towards the Sun, so the Sun is in F8.
+ * Sectors: a grid of 5,000 ly squares over the disk, letters A-T across and
+ * numbers 1-20 from the far side of the core towards the Sun, so the Sun is in K16.
  * The two lines through the centre are drawn bolder: they split the disk into
  * four quadrants. The square under the pivot is lit, and the view puts its name
  * in the readout.
  */
-export const SECTOR = { size: 10, count: 10 };
+export const SECTOR = { size: 5, count: 20 };
 const HALF = (SECTOR.size * SECTOR.count) / 2;
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 

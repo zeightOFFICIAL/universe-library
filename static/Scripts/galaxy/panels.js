@@ -111,10 +111,9 @@ export class Catalogue {
             sub.hidden = !entry.sub;
             let distanceLine = null;
             if (this.distances && entry.position) {
-                // three short columns: label over value
+                // short columns, label over value, filled in by refresh()
                 distanceLine = document.createElement("span");
                 distanceLine.className = "CatalogueDistances";
-                distanceLine.innerHTML = "<span><b></b><i></i></span>".repeat(3);
                 jump.querySelector(".CatalogueText").appendChild(distanceLine);
             }
             row.appendChild(jump);
@@ -164,8 +163,12 @@ export class Catalogue {
         if (this.distances) {
             for (const item of this.rows) {
                 if (!item.distanceLine || item.row.hidden) continue;
+                const values = this.distances(item.entry);
+                if (item.distanceLine.children.length !== values.length) item.distanceLine.innerHTML = "<span><b></b><i></i></span>".repeat(values.length);
                 const cells = item.distanceLine.children;
-                this.distances(item.entry).forEach(([label, value], i) => {
+                values.forEach(([label, value, wide], i) => {
+                    // a wide figure takes the whole row
+                    cells[i].classList.toggle("Wide", Boolean(wide));
                     const [name, figure] = cells[i].children;
                     if (name.textContent !== label) name.textContent = label;
                     if (figure.textContent !== value) figure.textContent = value;

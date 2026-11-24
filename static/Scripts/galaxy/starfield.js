@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { GALAXY_TINT, BACKDROP, STAR_ALPHA, HAZE_ALPHA, INTER_ARM_TINT, ARM_OUTER_EDGE, ARM_INNER_EDGE, THICK_DISK_TINT, CIRRUS_VIOLET, CIRRUS_BLUE, HALO_TINT, WHITE, STAR_TINTS, DEEP_SKY_STYLE } from "./config.js";
+import { EXTREME, GALAXY_TINT, BACKDROP, STAR_ALPHA, HAZE_ALPHA, INTER_ARM_TINT, ARM_OUTER_EDGE, ARM_INNER_EDGE, THICK_DISK_TINT, CIRRUS_VIOLET, CIRRUS_BLUE, HALO_TINT, WHITE, STAR_TINTS, DEEP_SKY_STYLE } from "./config.js";
 import { rand, gauss, smoothstep, Layer } from "./util.js";
 import { BACKDROP_MATRIX } from "./backdrop.js";
 
@@ -265,7 +265,8 @@ export function buildGalaxyFromImage(image) {
     const p = new THREE.Vector3();
     const stars = new Layer(BACKDROP.stars + BACKDROP.thickDisk + BACKDROP.halo, STAR_ALPHA);
     const gas = new Layer(BACKDROP.gas + BACKDROP.cirrus + BACKDROP.interArm, HAZE_ALPHA);
-    const knots = new Layer(BACKDROP.knots);
+    // extreme draws half again the knots, each fainter, so the arms keep their exposure
+    const knots = new Layer(BACKDROP.knots, EXTREME ? 1 / 1.5 : 1);
     const color = new THREE.Color();
 
     const centre = (sampler.n - 1) / 2;

@@ -81,3 +81,104 @@ class ValueRow(models.Model):
     class Meta:
         managed = False
         db_table = 'value_row'
+
+
+# ---------- the galaxy map's places (tables made 2026-11-24; see AGENTS.md) ----------
+# Plain column names, unlike the system-page tables. Empty columns are NULL and are
+# left out of what the page receives, so the map tells "not set" from zero.
+
+
+class GalaxyPlacement(models.Model):
+    href = models.TextField(primary_key=True)
+    label = models.TextField(blank=True, null=True)
+    l = models.FloatField(blank=True, null=True)
+    b = models.FloatField(blank=True, null=True)
+    d = models.FloatField(blank=True, null=True)
+    x = models.FloatField(blank=True, null=True)
+    z = models.FloatField(blank=True, null=True)
+    fictional = models.IntegerField(default=0)
+    source = models.TextField(blank=True, null=True)
+    note = models.TextField(blank=True, null=True)
+    hidden = models.IntegerField(default=0)
+    sort = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = 'galaxy_placement'
+
+
+class DeepSky(models.Model):
+    name = models.TextField()
+    alias = models.TextField(blank=True, null=True)
+    kind = models.TextField()
+    l = models.FloatField(blank=True, null=True)
+    b = models.FloatField(blank=True, null=True)
+    d = models.FloatField(blank=True, null=True)
+    radius = models.FloatField(blank=True, null=True)
+    about = models.TextField(blank=True, null=True)
+    size = models.FloatField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'deep_sky'
+
+
+class PlanetarySystem(models.Model):
+    name = models.TextField()
+    note = models.TextField(blank=True, null=True)
+    l = models.FloatField()
+    b = models.FloatField()
+    d = models.FloatField()
+
+    class Meta:
+        managed = False
+        db_table = 'planetary_systems'
+
+
+class FictionPlace(models.Model):
+    type = models.TextField()
+    name = models.TextField()
+    source = models.TextField()
+    note = models.TextField(blank=True, null=True)
+    anchor = models.TextField(blank=True, null=True)
+    l = models.FloatField(blank=True, null=True)
+    b = models.FloatField(blank=True, null=True)
+    d = models.FloatField(blank=True, null=True)
+    x = models.FloatField(blank=True, null=True)
+    z = models.FloatField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'fiction_places'
+
+
+class Spacecraft(models.Model):
+    name = models.TextField()
+    note = models.TextField(blank=True, null=True)
+    about = models.TextField(blank=True, null=True)
+    l = models.FloatField()
+    b = models.FloatField()
+    au = models.FloatField()
+
+    class Meta:
+        managed = False
+        db_table = 'spacecraft'
+
+
+class StellarObject(models.Model):
+    name = models.TextField()
+    kind = models.TextField()
+    note = models.TextField(blank=True, null=True)
+    about = models.TextField(blank=True, null=True)
+    l = models.FloatField()
+    b = models.FloatField()
+    d = models.FloatField()
+    mass = models.FloatField(blank=True, null=True)
+    radius = models.FloatField(blank=True, null=True)
+    radius_km = models.FloatField(blank=True, null=True)
+    temperature = models.FloatField(blank=True, null=True)
+    luminosity = models.FloatField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'stellar_objects'

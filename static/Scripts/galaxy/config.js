@@ -130,16 +130,20 @@ export const BACKDROP = {
  *
  * Picked automatically from the device; ?quality=lite or ?quality=full overrides it
  * and is remembered, ?quality=auto forgets the override.
+ *
+ * "extreme" is never picked automatically, only by hand (Settings, or
+ * ?quality=extreme): two and a half times the stars, each fainter so the exposure
+ * holds, and half again the haze. About 6 million points, for a strong GPU.
  */
 export function detectQuality() {
     let override = null;
     try {
         const asked = new URLSearchParams(window.location.search).get("quality");
         if (asked === "auto") localStorage.removeItem("galaxyQuality");
-        else if (asked === "lite" || asked === "full") localStorage.setItem("galaxyQuality", asked);
+        else if (asked === "lite" || asked === "full" || asked === "extreme") localStorage.setItem("galaxyQuality", asked);
         override = localStorage.getItem("galaxyQuality");
     } catch (e) {}
-    if (override === "lite" || override === "full") return { tier: override, auto: false };
+    if (override === "lite" || override === "full" || override === "extreme") return { tier: override, auto: false };
     const phone = window.matchMedia("(pointer: coarse)").matches && Math.min(window.screen.width, window.screen.height) < 600;
     const fewCores = (navigator.hardwareConcurrency || 8) <= 4;
     const littleMemory = (navigator.deviceMemory || 8) <= 4;
@@ -147,14 +151,30 @@ export function detectQuality() {
 }
 export const QUALITY = detectQuality();
 export const LITE = QUALITY.tier === "lite";
-// fraction of the stars and of the haze kept in the lite tier; alphas rise to match
-export const STAR_DENSITY = LITE ? 0.45 : 1;
-export const HAZE_DENSITY = LITE ? 0.6 : 1;
+export const EXTREME = QUALITY.tier === "extreme";
+// fraction of the stars and of the haze kept per tier; alphas move the other way to match
+export const STAR_DENSITY = LITE ? 0.45 : EXTREME ? 2.5 : 1;
+export const HAZE_DENSITY = LITE ? 0.6 : EXTREME ? 2 : 1;
 for (const key of ["stars", "thickDisk", "halo"]) BACKDROP[key] = Math.round(BACKDROP[key] * STAR_DENSITY);
 for (const key of ["gas", "cirrus", "interArm"]) BACKDROP[key] = Math.round(BACKDROP[key] * HAZE_DENSITY);
 export const STAR_ALPHA = 1 / STAR_DENSITY;
 export const HAZE_ALPHA = 1 / HAZE_DENSITY;
-export const MAX_PIXEL_RATIO = LITE ? 1.5 : 2;
+export const MAX_PIXEL_RATIO = LITE ? 1.5 : EXTREME ? 3 : 2;
+/*
+ * Extreme is about the picture, not just the count:
+ *   - supersampled: it renders at 1.5x the screen's own pixel ratio (up to 3), so a
+ *     star is a resolved point rather than a pixel, and the browser scales it down
+ *   - the haze, the bulge glow and the off-plane sheets render at full resolution
+ *     instead of half (SOFT_SCALE)
+ *   - seven backdrop slices instead of five, for a smoother disk from the side
+ *   - one more bloom level, for a wider, softer glow round the core and bright knots
+ *   - twice the haze, and 1.5x the star-forming knots, each fainter to match
+ */
+export const PIXEL_RATIO = EXTREME ? Math.min(Math.max(window.devicePixelRatio || 1, 1) * 1.5, MAX_PIXEL_RATIO) : Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO);
+if (EXTREME) {
+    BACKDROP.slices = 7;
+    BACKDROP.knots = Math.round(BACKDROP.knots * 1.5);
+}
 
 /*
  * The bulge as a volume. The point cloud in buildCore() gives it grain, but grain is
@@ -222,7 +242,8 @@ export const LOCAL_MIN_DISTANCE = 0.000002;
 export const GALAXY_MIN_DISTANCE = 0.8;
 // where the Sun button lands: every one of our systems in frame
 export const SUN_VIEW = { distance: 0.95, polar: 1.0 };
-export const DEEP_SKY_LABEL_DISTANCE = 45;
+// nebula and cluster names come in from this far away (camera to object, scene units)
+export const DEEP_SKY_LABEL_DISTANCE = 80;
 
 export const OVERVIEW = { target: new THREE.Vector3(0, 0, 0), distance: 85, polar: 0.9, azimuth: 0.45 };
 /*
@@ -323,7 +344,7 @@ export const PIVOT = {
  * the bloom. Measured, haze alone was 5-12ms of the frame at full resolution.
  */
 export const SOFT_LAYER = 1;
-export const SOFT_SCALE = 0.5;
+export const SOFT_SCALE = EXTREME ? 1 : 0.5;
 
 export const SCRATCH_VECTOR = new THREE.Vector3();
 export const ORIGIN = new THREE.Vector3(0, 0, 0);

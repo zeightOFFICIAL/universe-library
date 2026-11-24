@@ -821,35 +821,6 @@ div.CatalogueJump {
     margin: 8px
 }
 
-/* jump chips */
-
-.DockChips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px
-}
-
-.DockChip {
-    background: rgba(255, 255, 255, .05);
-    border: 1px solid var(--galaxy-line);
-    border-radius: 999px;
-    color: var(--galaxy-ink);
-    cursor: pointer;
-    font-family: inherit;
-    font-size: .76rem;
-    letter-spacing: .03em;
-    padding: 6px 12px;
-    transition: background .2s, border-color .2s, color .2s
-}
-
-.DockChip:hover,
-.DockChip:focus-visible {
-    background: rgba(158, 203, 255, .16);
-    border-color: rgba(158, 203, 255, .55);
-    color: #fff;
-    outline: none
-}
-
 /* ---------- layers: a row of icons, top right, with settings at the end ---------- */
 
 .GalaxyLayers {
@@ -994,6 +965,16 @@ div.CatalogueJump {
     text-transform: uppercase
 }
 
+/* a legend key's swatches; a stellar object has one per kind */
+.LegendDots {
+    align-items: center;
+    display: inline-flex;
+    flex: none;
+    gap: 1px;
+    justify-content: center;
+    min-width: 34px
+}
+
 .LegendDot {
     background: var(--legend-color);
     border-radius: 50%;
@@ -1070,8 +1051,6 @@ div.CatalogueJump {
     letter-spacing: 0
 }
 
-.GalaxyLegend:hover .LegendHead::after,
-.GalaxyLegend:focus-within .LegendHead::after,
 .GalaxyLegend.Open .LegendHead::after {
     content: "  –"
 }
@@ -1097,13 +1076,11 @@ div.CatalogueJump {
     gap: 8px
 }
 
-/* only the main keys until the legend is hovered, focused or opened */
+/* only the main keys until the legend is opened (a click; hovering does nothing) */
 .LegendList li:not(.Primary) {
     display: none
 }
 
-.GalaxyLegend:hover .LegendList li,
-.GalaxyLegend:focus-within .LegendList li,
 .GalaxyLegend.Open .LegendList li {
     display: flex
 }
@@ -1128,15 +1105,7 @@ div.CatalogueJump {
 
 /* ---------- markers for map-only systems and fiction ---------- */
 
-/* a real system with no page yet: a hollow ring and plain text, no card */
-.GalaxyMarker.MapOnly .GalaxyMarkerIcon {
-    box-shadow: none
-}
-
-.GalaxyMarker.MapOnly .GalaxyMarkerIcon::after {
-    display: none
-}
-
+/* a real system with no page yet: the same ring as any system, plain text, no card */
 .GalaxyMarker.MapOnly .GalaxyMarkerText {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -1616,6 +1585,55 @@ div.GalaxyMarker.Object .GalaxyMarkerText {
     text-transform: uppercase
 }
 
+/* ---------- readout and coordinates, side by side along the bottom ---------- */
+
+.GalaxyStatus {
+    align-items: center;
+    bottom: var(--galaxy-gap);
+    display: flex;
+    flex-wrap: wrap-reverse;
+    gap: 8px;
+    left: calc(var(--galaxy-dock) + var(--galaxy-gap) * 2);
+    max-width: calc(100% - var(--galaxy-dock) - var(--galaxy-gap) * 3 - 330px);
+    position: absolute
+}
+
+.GalaxyStatus .GalaxyReadout {
+    bottom: auto;
+    left: auto;
+    position: static
+}
+
+.GalaxyCoords {
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    background: var(--galaxy-glass);
+    border: 1px solid var(--galaxy-line);
+    border-radius: 999px;
+    color: var(--galaxy-ink-dim);
+    font-size: .68rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .06em;
+    padding: 7px 14px;
+    white-space: nowrap
+}
+
+@media (max-width: 760px) {
+    .GalaxyStatus {
+        align-items: flex-end;
+        bottom: calc(var(--galaxy-gap) + 52px);
+        flex-direction: column;
+        left: auto;
+        max-width: calc(100% - var(--galaxy-gap) * 2);
+        right: var(--galaxy-gap)
+    }
+
+    .GalaxyCoords {
+        font-size: .6rem;
+        white-space: normal
+    }
+}
+
 /* ---------- the angle dial, beside the zoom buttons ---------- */
 
 .AngleDial {
@@ -1729,8 +1747,12 @@ div.GalaxyMarker.Object .GalaxyMarkerText {
 .CatalogueDistances {
     display: grid;
     gap: 2px 8px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     margin-top: 3px
+}
+
+.CatalogueDistances > span.Wide {
+    grid-column: 1 / -1
 }
 
 .CatalogueDistances > span {
@@ -2180,4 +2202,214 @@ button.GalaxyMember {
         transform: none;
         transition: opacity .2s
     }
+}
+
+/* ---------- layer groups: the pieces, navigation, then fiction on top ---------- */
+
+.LayerDivider {
+    align-self: stretch;
+    background: var(--galaxy-line);
+    flex: none;
+    margin: 6px 4px;
+    width: 1px
+}
+
+/* ---------- the small card offers the full view ---------- */
+
+.InfoExpand {
+    background: rgba(255, 255, 255, .06);
+    border: 1px solid var(--galaxy-line);
+    border-radius: 999px;
+    color: var(--galaxy-ink);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .74rem;
+    letter-spacing: .04em;
+    margin-top: 12px;
+    padding: 7px 14px;
+    transition: background .2s, border-color .2s
+}
+
+.InfoExpand:hover,
+.InfoExpand:focus-visible {
+    background: rgba(255, 255, 255, .14);
+    border-color: color-mix(in srgb, var(--info-color, #9ecbff) 60%, transparent);
+    outline: none
+}
+
+.InfoExpand[hidden] {
+    display: none
+}
+
+/* ---------- arriving somewhere: a glass panel on the right, the sky all round it ---------- */
+
+/*
+ * The photograph is in the sky now (photos.js), so the panel is text only: frosted
+ * glass at the right edge, the stars and the place itself visible through and
+ * around it. The rest of the interface steps away until Back.
+ */
+.GalaxyDetail {
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    backdrop-filter: blur(18px) saturate(160%);
+    animation: DetailIn .45s ease;
+    background: linear-gradient(165deg, rgba(60, 70, 110, .26), rgba(14, 16, 30, .42));
+    border: 1px solid rgba(255, 255, 255, .14);
+    border-radius: 22px;
+    box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .85), inset 0 1px 0 rgba(255, 255, 255, .14), inset 0 0 0 1px rgba(255, 255, 255, .03);
+    color: var(--galaxy-ink);
+    max-height: calc(100% - var(--galaxy-gap) * 4);
+    overflow: hidden auto;
+    position: absolute;
+    right: calc(var(--galaxy-gap) * 2);
+    top: 50%;
+    transform: translateY(-50%);
+    width: min(400px, 36%);
+    z-index: 40
+}
+
+/* a thin line of the place's own colour down the left edge */
+.GalaxyDetail::before {
+    background: linear-gradient(transparent, var(--info-color, #9ecbff), transparent);
+    bottom: 18%;
+    content: "";
+    left: 0;
+    opacity: .8;
+    position: absolute;
+    top: 18%;
+    width: 2px
+}
+
+.GalaxyDetail[hidden] {
+    display: none
+}
+
+@keyframes DetailIn {
+    from {
+        opacity: 0;
+        transform: translate(24px, -50%)
+    }
+}
+
+.DetailText {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 26px 30px 28px
+}
+
+.DetailBack {
+    align-self: flex-start;
+    background: rgba(255, 255, 255, .07);
+    border: 1px solid rgba(255, 255, 255, .16);
+    border-radius: 999px;
+    color: var(--galaxy-ink);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: .78rem;
+    letter-spacing: .04em;
+    margin-bottom: 14px;
+    padding: 8px 16px;
+    transition: background .2s, border-color .2s
+}
+
+.DetailBack:hover,
+.DetailBack:focus-visible {
+    background: rgba(255, 255, 255, .16);
+    border-color: rgba(255, 255, 255, .32);
+    outline: none
+}
+
+.DetailText .InfoKicker {
+    color: var(--info-color, #9ecbff);
+    font-size: .7rem;
+    letter-spacing: .24em;
+    margin: 0;
+    text-shadow: 0 0 12px rgba(0, 0, 0, .6);
+    text-transform: uppercase
+}
+
+.DetailName {
+    font-size: 2rem;
+    font-weight: 500;
+    letter-spacing: .03em;
+    line-height: 1.1;
+    margin: 0 0 6px;
+    text-shadow: 0 2px 18px rgba(0, 0, 0, .55)
+}
+
+.DetailAbout {
+    color: rgba(230, 236, 255, .86);
+    font-size: .95rem;
+    line-height: 1.6;
+    margin: 0 0 8px;
+    text-shadow: 0 1px 10px rgba(0, 0, 0, .6)
+}
+
+.DetailText .InfoFacts {
+    font-size: .84rem
+}
+
+.InfoPhotoCredit {
+    color: var(--galaxy-ink-faint);
+    font-size: .64rem;
+    letter-spacing: .03em;
+    line-height: 1.4;
+    margin: 8px 0 0
+}
+
+.InfoPhotoCredit[hidden] {
+    display: none
+}
+
+.InfoPhotoCredit a {
+    color: var(--galaxy-ink-dim);
+    /* the site-wide a {} rule sets a vmin size */
+    font-size: inherit;
+    text-decoration: none
+}
+
+.InfoPhotoCredit a:hover,
+.InfoPhotoCredit a:focus-visible {
+    color: #fff;
+    text-decoration: underline
+}
+
+/* the rest of the interface steps away while the panel is open */
+.GalaxyView.DetailOpen > :not(canvas):not(.GalaxyDetail):not(.GalaxyLoader):not(dialog) {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden
+}
+
+@media (max-width: 760px) {
+    .GalaxyDetail {
+        bottom: var(--galaxy-gap);
+        left: var(--galaxy-gap);
+        max-height: 55%;
+        right: var(--galaxy-gap);
+        top: auto;
+        transform: none;
+        width: auto
+    }
+
+    @keyframes DetailIn {
+        from {
+            opacity: 0
+        }
+    }
+
+    .DetailName {
+        font-size: 1.5rem
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .GalaxyDetail {
+        animation: none
+    }
+}
+
+/* no hover pop-ups on the layer buttons (owner, 2026-11-24): the text stays for screen readers */
+.LayerTip {
+    display: none !important
 }

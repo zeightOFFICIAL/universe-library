@@ -58,12 +58,6 @@
                     </header>
                     <div class="DockBody" id="GALAXY_DOCK_BODY">
                         <p class="DockLead">A map of our galaxy. Choose a place to visit, or wander.</p>
-                        <div class="DockChips">
-                            <button type="button" class="DockChip" data-action="overview">Whole galaxy</button>
-                            <button type="button" class="DockChip" data-action="sun">The Sun</button>
-                            <button type="button" class="DockChip" data-action="core">Galactic core</button>
-                            <button type="button" class="DockChip" data-action="edge">Edge-on</button>
-                        </div>
                         <details class="DockDetails">
                             <summary>About this map</summary>
                             <p class="GalaxyPanelNote">Positions of landmarks are real, and around the Sun so are the distances: the local view is at true scale. The far galaxies are drawn closer than they are, and say so. Nebulae and clusters are painted rather than measured, and the unnamed ones across the disk stand for the many we do not list. Places from fiction are drawn dashed and violet; where a story names a real star they sit at it, otherwise they are placed by eye. The spiral-arm outlines are fitted to the artwork, which is an impression rather than a survey. {{ galaxy.credits }}</p>
@@ -109,7 +103,6 @@
                 </section>
             </aside>
             <aside class="GalaxyInfo" id="GALAXY_INFO" aria-live="polite" aria-label="About this place">
-                <figure class="InfoImage" hidden><img alt="" decoding="async"><figcaption class="InfoCredit"><a target="_blank" rel="noopener"></a></figcaption></figure>
                 <div class="InfoBody">
                     <header class="InfoHead">
                         <div>
@@ -120,13 +113,21 @@
                     </header>
                     <p class="InfoAbout"></p>
                     <dl class="InfoFacts"></dl>
+                    <p class="InfoPhotoCredit" hidden>Photo in the sky: <a target="_blank" rel="noopener"></a></p>
+                    <button type="button" class="InfoExpand" hidden>Read more <span aria-hidden="true">&rarr;</span></button>
                 </div>
             </aside>
+            <section class="GalaxyDetail" id="GALAXY_DETAIL" aria-label="About this place" hidden>
+                <div class="DetailText">
+                    <button type="button" class="DetailBack"><span aria-hidden="true">&larr;</span> Back to the map</button>
+                    <p class="InfoKicker"></p>
+                    <h2 class="DetailName"></h2>
+                    <p class="DetailAbout"></p>
+                    <dl class="InfoFacts"></dl>
+                    <p class="InfoPhotoCredit" hidden>Photo in the sky: <a target="_blank" rel="noopener"></a></p>
+                </div>
+            </section>
             <nav class="GalaxyLayers" aria-label="Layers">
-                <button type="button" class="LayerToggle" data-layer="systems" aria-pressed="true" aria-label="Star systems" aria-describedby="TIP_SYSTEMS">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><ellipse cx="12" cy="12" rx="9" ry="4.2" transform="rotate(-20 12 12)"/><circle cx="20" cy="9" r="1.3" fill="currentColor" stroke="none"/></svg>
-                    <span class="LayerTip" id="TIP_SYSTEMS" role="tooltip"><strong>Star systems</strong><span class="TipText">Places you can open. From afar, the systems around the Sun share one marker, the Solar Neighbourhood - hover it to list them, or zoom in to see each at its true distance.</span><span class="TipState"></span></span>
-                </button>
                 <button type="button" class="LayerToggle" data-layer="arms" aria-pressed="true" aria-label="Galaxy structure" aria-describedby="TIP_ARMS">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12.2c.9-.6.6-2-.5-2.2-1.7-.3-3 1.4-2.6 3 .5 2.3 3.3 3.2 5.2 2.1 2.7-1.5 2.9-5.3.8-7.3C12.4 5.5 7.5 6 5.4 9.3 3 13 4.9 18 9 19.3c3.4 1.1 7.3-.2 9.6-2.9"/></svg>
                     <span class="LayerTip" id="TIP_ARMS" role="tooltip"><strong>Galaxy structure</strong><span class="TipText">The Milky Way's arms with their outlines, its core - the galactic centre, the bulge and the nuclear star cluster - and the galaxies around us. Arm names fade as you go edge-on or come in close; a galaxy behind the disk's dust loses its name.</span><span class="TipState"></span></span>
@@ -135,21 +136,27 @@
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3.5l1.4 4.6L16 9.5l-4.6 1.4L10 15.5l-1.4-4.6L4 9.5l4.6-1.4z" fill="currentColor" stroke="none"/><circle cx="17.5" cy="16.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="14" cy="19.5" r="1" fill="currentColor" stroke="none"/><circle cx="19.5" cy="12.5" r=".9" fill="currentColor" stroke="none"/></svg>
                     <span class="LayerTip" id="TIP_DEEPSKY" role="tooltip"><strong>Nebulae &amp; clusters</strong><span class="TipText">Names of real nebulae, star clusters and the remains of dead stars, from the Pleiades to the Crab. Positions are true; the look is painted, with clusters spread wider than life. Each name appears as the camera comes near it.</span><span class="TipState"></span></span>
                 </button>
+                <button type="button" class="LayerToggle" data-layer="systems" aria-pressed="true" aria-label="Star systems" aria-describedby="TIP_SYSTEMS">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><ellipse cx="12" cy="12" rx="9" ry="4.2" transform="rotate(-20 12 12)"/><circle cx="20" cy="9" r="1.3" fill="currentColor" stroke="none"/></svg>
+                    <span class="LayerTip" id="TIP_SYSTEMS" role="tooltip"><strong>Star systems</strong><span class="TipText">Star systems, real and - with the Fiction switch - from stories. Those near the Sun share its label until you zoom in far enough to see them apart; hover the Sun to list them.</span><span class="TipState"></span></span>
+                </button>
                 <button type="button" class="LayerToggle" data-layer="objects" aria-pressed="true" aria-label="Objects" aria-describedby="TIP_OBJECTS">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5l4.5 7.5-4.5 7.5-4.5-7.5z"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M3.5 12h2M18.5 12h2"/></svg>
                     <span class="LayerTip" id="TIP_OBJECTS" role="tooltip"><strong>Objects</strong><span class="TipText">Things that are not star systems: black holes, neutron stars, remarkable stars like Betelgeuse, and our spacecraft. Fly up to one to open its card.</span><span class="TipState"></span></span>
+                </button>
+                <span class="LayerDivider" aria-hidden="true"></span>
+                <button type="button" class="LayerToggle" data-layer="sectors" data-default="off" aria-pressed="false" aria-label="Sectors" aria-describedby="TIP_SECTORS">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM12 4v16M4 12h16"/><path d="M8 4v16M16 4v16M4 8h16M4 16h16" opacity=".45"/></svg>
+                    <span class="LayerTip" id="TIP_SECTORS" role="tooltip"><strong>Sectors</strong><span class="TipText">A grid over the disk in squares 5,000 ly wide: letters A to T across, numbers 1 to 20 from the far side of the core towards the Sun. The bold lines through the centre split it into four quadrants. The Sun is in K16; the readout names the sector you are looking at.</span><span class="TipState"></span></span>
                 </button>
                 <button type="button" class="LayerToggle" data-layer="bearings" aria-pressed="true" aria-label="Bearings" aria-describedby="TIP_BEARINGS">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M12 9V2.5M12 15v6.5M9 12H2.5M15 12h6.5"/><path d="M12 2.5l-1.6 2.4h3.2z" fill="currentColor"/></svg>
                     <span class="LayerTip" id="TIP_BEARINGS" role="tooltip"><strong>Bearings</strong><span class="TipText">The point in the middle of the view - the one the distances below are measured from - with four beams in the plane: one to the galactic centre, then 90&deg;, 180&deg; and 270&deg; from it, turning the way the galaxy does.</span><span class="TipState"></span></span>
                 </button>
-                <button type="button" class="LayerToggle" data-layer="sectors" data-default="off" aria-pressed="false" aria-label="Sectors" aria-describedby="TIP_SECTORS">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM12 4v16M4 12h16"/><path d="M8 4v16M16 4v16M4 8h16M4 16h16" opacity=".45"/></svg>
-                    <span class="LayerTip" id="TIP_SECTORS" role="tooltip"><strong>Sectors</strong><span class="TipText">A grid over the disk in squares 10,000 ly wide: letters A to J across, numbers 1 to 10 from the far side of the core towards the Sun. The bold lines through the centre split it into four quadrants. The Sun is in F8; the readout names the sector you are looking at.</span><span class="TipState"></span></span>
-                </button>
+                <span class="LayerDivider" aria-hidden="true"></span>
                 <button type="button" class="LayerToggle" data-layer="fiction" aria-pressed="true" aria-label="Fiction" aria-describedby="TIP_FICTION">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5c-2-1.6-5-2-8-1.5v13c3-.5 6-.1 8 1.5 2-1.6 5-2 8-1.5V5c-3-.5-6-.1-8 1.5z"/><path d="M12 6.5V20"/><path d="M16.5 9.2l.5 1.2 1.2.2-.9.8.3 1.2-1.1-.6-1.1.6.3-1.2-.9-.8 1.2-.2z" fill="currentColor" stroke="none"/></svg>
-                    <span class="LayerTip" id="TIP_FICTION" role="tooltip"><strong>Fiction</strong><span class="TipText">Star systems and places from stories set in the Milky Way - Mass Effect, Star Trek, Halo, Dune, Alien, Foundation, Warhammer 40,000 and more - drawn dashed and violet. Where a story names a real star the place sits there; otherwise it is placed from the story's own galaxy map, or by eye.</span><span class="TipState"></span></span>
+                    <span class="LayerTip" id="TIP_FICTION" role="tooltip"><strong>Fiction</strong><span class="TipText">Adds places from stories to the star systems and objects layers - never shown on its own. Star systems and places from stories set in the Milky Way - Mass Effect, Star Trek, Halo, Dune, Alien, Foundation, Warhammer 40,000 and more - drawn dashed and violet. Where a story names a real star the place sits there; otherwise it is placed from the story's own galaxy map, or by eye.</span><span class="TipState"></span></span>
                 </button>
             </nav>
             <aside class="GalaxyLegend" id="GALAXY_LEGEND" aria-label="Legend">
@@ -183,7 +190,10 @@
                     <button type="submit" class="SettingsDone">Done</button>
                 </form>
             </dialog>
-            <div class="GalaxyReadout" id="GALAXY_READOUT"></div>
+            <div class="GalaxyStatus">
+                <div class="GalaxyReadout" id="GALAXY_READOUT"></div>
+                <div class="GalaxyCoords" id="GALAXY_COORDS" aria-label="Coordinates in thousands of light-years from the galactic core, and the sector"></div>
+            </div>
             <div class="GalaxyScaleNote" id="GALAXY_SCALE_NOTE">Local view · true scale · rings at 10, 100 and 1,000 ly</div>
             <div class="GalaxyHint">Drag to move · right-drag to tilt · scroll to zoom</div>
             <div class="GalaxyControls">

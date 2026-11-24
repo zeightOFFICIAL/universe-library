@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { LITE, SOFT_LAYER, SOFT_SCALE } from "./config.js";
+import { LITE, EXTREME, SOFT_LAYER, SOFT_SCALE } from "./config.js";
 import { smoothstep } from "./util.js";
 
 /* ---------- HDR: float target, bloom, tone curve ---------- */
@@ -149,7 +149,7 @@ export const POST = {
     threshold: 0.62,
     knee: 0.45,
     // the widest bloom level is a few blurry pixels on a phone; lite drops it
-    levels: LITE ? 5 : 6,
+    levels: LITE ? 5 : EXTREME ? 7 : 6,
     saturation: 1.16,
     vignette: 0.22,
     shadowTint: new THREE.Color(0.004, 0.005, 0.012),

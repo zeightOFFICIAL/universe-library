@@ -35,6 +35,8 @@ export class Marker {
         object = false,
     }) {
         this.position = position;
+        this.name = name;
+        this.object = object;
         this.level = level;
         this.kind = kind;
         // where a link label sits relative to its icon: side 1 = right, -1 = left,
@@ -165,6 +167,15 @@ export class Marker {
             pinned = false;
             setOpen(false);
         });
+    }
+
+    // a new subtitle; the box is measured again on the next frame
+    setSub(text) {
+        const sub = this.el.querySelector(".GalaxyMarkerSub");
+        if (!sub) return;
+        sub.textContent = text;
+        this.width = 0;
+        this.height = 0;
     }
 
     // how much of the label the camera distance allows, 0..1
