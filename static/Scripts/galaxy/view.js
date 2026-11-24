@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { DATA, SUN, VIEW_SHIFT, NARROW_WIDTH, FOV, GALAXY_RADIUS, ARMS, ORION_SPUR, THREE_KPC_ARMS, BACKDROP, QUALITY, LITE, PIXEL_RATIO, WHITE, LOCAL_RINGS_LY, LOCAL_ENTER, LOCAL_FULL, LOCAL_MIN_DISTANCE, GALAXY_MIN_DISTANCE, SUN_VIEW, DEEP_SKY_LABEL_DISTANCE, OVERVIEW, START, START_PORTRAIT, PIVOT, SOFT_LAYER, SCRATCH_VECTOR, ORIGIN, EXTINCTION_RED, RAYCASTER, GALACTIC_PLANE, DEEP_SKY_STYLE } from "./config.js";
+import { DATA, SUN, VIEW_SHIFT, NARROW_WIDTH, FOV, GALAXY_RADIUS, ARMS, ORION_SPUR, THREE_KPC_ARMS, BACKDROP, QUALITY, LITE, EXTREME, PIXEL_RATIO, WHITE, LOCAL_RINGS_LY, LOCAL_ENTER, LOCAL_FULL, LOCAL_MIN_DISTANCE, GALAXY_MIN_DISTANCE, SUN_VIEW, DEEP_SKY_LABEL_DISTANCE, OVERVIEW, START, START_PORTRAIT, PIVOT, SOFT_LAYER, SCRATCH_VECTOR, ORIGIN, EXTINCTION_RED, RAYCASTER, GALACTIC_PLANE, DEEP_SKY_STYLE } from "./config.js";
 import { pointsMaterial, glowSprite } from "./shaders.js";
 import { armPhase, armPoint, directionFromSun, truePosition, formatLy, smoothstep } from "./util.js";
 import { UNITS, UNIT_OPTIONS, DISPLAY, DISPLAY_OPTIONS, setUnits, setDisplay, LABEL_SCALE, onUnitsChange, onDisplayChange, formatMass, solarMasses, formatStarSize, formatHorizon, solarRadii, schwarzschildKm, formatTemperature, formatLuminosity, formatSize, formatDistance } from "./units.js";
@@ -233,6 +233,8 @@ export class GalaxyView {
          */
         new THREE.TextureLoader(this.loadingManager).load(this.root.dataset.backdrop, (texture) => {
             texture.colorSpace = THREE.SRGBColorSpace;
+            // extreme: the sharpest filtering the GPU offers, for the painting seen at a slant
+            if (EXTREME) texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
             this.setLoaderStep("Building the star field");
             this.setLoaderProgress(0.6);
             /*
@@ -297,7 +299,12 @@ export class GalaxyView {
              * their like, and plain dots made the named ones look like the only
              * nebulae in the galaxy.
              */
-            this.scatteredArt = buildDeepSky(galaxy.scattered.objects, { seed: 7311, amount: LITE ? 0.3 : 0.4, cores: false, haloFloor: 3, sizeScale: 2.6, cap: 160 });
+            /*
+             * spots: the clusters out there get the same member stars as the named ones
+             * near the Sun (owner, 2026-11-24: the same spots around the galaxy); the
+             * wide-view fade below keeps them from glittering from afar.
+             */
+            this.scatteredArt = buildDeepSky(galaxy.scattered.objects, { seed: 7311, amount: LITE ? 0.4 : 0.6, cores: false, haloFloor: 3, sizeScale: 2.6, cap: 160, spots: true });
             this.scatteredArt.group.renderOrder = 8;
             this.scene.add(this.scatteredArt.group);
             this.resize();
@@ -564,6 +571,10 @@ export class GalaxyView {
                 close,
                 fiction: true,
                 about: f.note,
+                // a reference picture from the story: shown in the card, never hung in the sky
+                image: f.image,
+                imageCredit: f.imageCredit,
+                imageSource: f.imageSource,
                 facts: () => [
                     anchored ? ["Set at", `${f.anchor}, a real ${f.d < 0.01 ? "planet" : "star"}`] : ["Placement", "By eye, from the story's own galaxy map"],
                     ["From the Sun", formatLy(fromSun)],
@@ -870,7 +881,6 @@ export class GalaxyView {
         // a change of units relabels everything that prints a quantity
         onUnitsChange(() => {
             // the card reprints its numbers in the new units
-            this.shownInfo = null;
             this.buildMarkers();
             this.renderSystemList();
             this.resize();
@@ -882,7 +892,6 @@ export class GalaxyView {
         this.root.classList.toggle("UiHidden", hidden);
         if (!this.uiToggle) return;
         this.uiToggle.setAttribute("aria-pressed", String(hidden));
-        this.uiToggle.title = hidden ? "Show everything again (H)" : "Hide everything but the map (H)";
         this.uiToggle.setAttribute("aria-label", hidden ? "Show the interface" : "Hide the interface");
     }
 
@@ -1179,7 +1188,7 @@ export class GalaxyView {
                 ["full", "Full", "2.3 million stars"],
                 ["lite", "Lighter", "for phones and older laptops"],
                 // never chosen automatically: only here, by hand
-                ["extreme", "Extreme", "6 million stars, supersampled - for a strong graphics card"],
+                ["extreme", "Extreme", "the best picture: 7 million stars, supersampled - for a strong graphics card"],
             ];
             for (const [value, name, note] of choices) {
                 const label = document.createElement("label");
@@ -1300,8 +1309,8 @@ export class GalaxyView {
     updateInfo(now) {
         if (now - (this.lastInfoUpdate || 0) < 220) return;
         this.lastInfoUpdate = now;
-        const card = document.getElementById("GALAXY_INFO");
-        if (!card) return;
+        // a place opens only when flown to; nothing pops up on the way past
+        if (!this.arrivedAt || this.detailItem) return;
         const target = this.controls.target;
         let best = null;
         let bestScore = Infinity;
@@ -1319,24 +1328,13 @@ export class GalaxyView {
             }
         }
         /*
-         * Flown to on purpose - a row, a label, a member chip - and it has a photograph:
-         * the full view opens instead of the small card. Passing near something while
-         * moving about only brings up the small card, which has a button for it.
+         * Flown to on purpose - a row in the panels or a label on the map - the place
+         * opens: its photograph in the sky and the glass panel beside it. Passing near
+         * something while moving about shows nothing (owner, 2026-11-24: no pop-ups).
          */
-        const arrived = this.arrivedAt && now - this.arrivedAt < 1500;
+        const arrived = now - this.arrivedAt < 1500;
         this.arrivedAt = null;
-        if (this.detailItem) return;
-        if (arrived && best && this.destination && best.position.distanceTo(this.destination) < best.close * 0.6) {
-            this.openDetail(best);
-            return;
-        }
-        if (best === this.dismissedInfo) best = null;
-        else if (!best) this.dismissedInfo = null;
-        if (best === this.shownInfo) return;
-        this.shownInfo = best;
-        card.classList.toggle("Visible", Boolean(best));
-        if (!best) return;
-        this.renderInfo(card, best);
+        if (arrived && best && this.destination && best.position.distanceTo(this.destination) < best.close * 0.6) this.openDetail(best);
     }
 
     renderInfo(card, item) {
@@ -1350,12 +1348,26 @@ export class GalaxyView {
             const link = credit.querySelector("a");
             link.textContent = item.imageCredit;
             link.href = item.imageSource || "#";
+            credit.firstChild.textContent = item.fiction ? "Reference image: " : "Photo in the sky: ";
+        }
+        /*
+         * Fiction's pictures are game art, film stills and covers: not light on black,
+         * so they are not hung in the sky (DESIGN.md, Imagery) but framed in the card,
+         * always with the reference under them.
+         */
+        const figure = card.querySelector(".InfoFigure");
+        if (figure) {
+            const framed = Boolean(item.fiction && item.image);
+            figure.hidden = !framed;
+            if (framed) {
+                const img = figure.querySelector("img");
+                img.src = this.root.dataset.infoImages + item.image;
+                img.alt = `${item.name}, from ${item.kicker.split(" · ").pop()}`;
+            }
         }
         card.querySelector(".InfoKicker").textContent = item.kicker;
         card.querySelector(".InfoName, .DetailName").textContent = item.name;
         card.querySelector(".InfoAbout, .DetailAbout").textContent = item.about || "";
-        const expand = card.querySelector(".InfoExpand");
-        if (expand) expand.hidden = false;
         const facts = card.querySelector(".InfoFacts");
         facts.replaceChildren();
         for (const [label, value] of item.facts ? item.facts() : []) {
@@ -1368,14 +1380,6 @@ export class GalaxyView {
     }
 
     bindInfo() {
-        const card = document.getElementById("GALAXY_INFO");
-        if (!card) return;
-        card.querySelector(".InfoClose").addEventListener("click", () => {
-            this.dismissedInfo = this.shownInfo;
-            this.shownInfo = null;
-            card.classList.remove("Visible");
-        });
-        card.querySelector(".InfoExpand").addEventListener("click", () => this.shownInfo && this.openDetail(this.shownInfo));
         this.detail = document.getElementById("GALAXY_DETAIL");
         this.detail.querySelector(".DetailBack").addEventListener("click", () => this.closeDetail());
         window.addEventListener("keydown", (event) => {
@@ -1393,15 +1397,11 @@ export class GalaxyView {
         this.renderInfo(this.detail, item);
         this.detail.hidden = false;
         this.root.classList.add("DetailOpen");
-        document.getElementById("GALAXY_INFO").classList.remove("Visible");
-        this.shownInfo = null;
         this.detail.querySelector(".DetailBack").focus({ preventScroll: true });
     }
 
     closeDetail() {
         if (!this.detailItem) return;
-        // the small card does not pop straight back up for the same place
-        this.dismissedInfo = this.detailItem;
         this.detailItem = null;
         this.detail.hidden = true;
         this.root.classList.remove("DetailOpen");
@@ -1409,6 +1409,30 @@ export class GalaxyView {
     }
 
     // the projection shift that parks the pivot right of centre (see resize)
+    /*
+     * While a place is open the view is held on it (owner, 2026-11-24): no turning,
+     * a small nudge of the picture left, right, up and down (a tenth of its close-up
+     * distance), and a little zoom either way. The photo is made for this one angle,
+     * so holding it is what lets it sit seamlessly in the sky. Back lets go.
+     */
+    holdView(target) {
+        const c = this.controls;
+        const item = this.detailItem;
+        const held = Boolean(item && !this.flight);
+        c.enableRotate = !held;
+        c.maxDistance = held ? item.close * 1.5 : PIVOT.maxDistance;
+        if (!held) return;
+        c.minDistance = item.close * 0.55;
+        const off = SCRATCH_VECTOR.subVectors(target, item.position);
+        const limit = item.close * 0.1;
+        const length = off.length();
+        if (length > limit) {
+            off.multiplyScalar((length - limit) / length);
+            target.sub(off);
+            this.camera.position.sub(off);
+        }
+    }
+
     // positive moves the pivot right of centre, negative left
     applyShift(shift) {
         this.shift = shift;
@@ -1519,7 +1543,7 @@ export class GalaxyView {
         requestAnimationFrame((t) => this.frame(t));
 
         if (this.flight) this.stepFlight(now);
-        this.photos?.update(this.camera);
+        this.photoFade = this.photos?.update(this.camera, this.detailItem) || 0;
         // glide the view across when the full view opens or closes
         const wantShift = this.detailItem ? this.detailShift() : this.baseShift;
         if (Math.abs(wantShift - this.shift) > 0.5) {
@@ -1533,7 +1557,9 @@ export class GalaxyView {
          * a flight from afar was held at the galaxy's 0.8 until its last frame.
          */
         this.controls.minDistance = this.flight ? Math.min(this.minDistanceAt(target), this.flight.toSph.radius) : this.minDistanceAt(target);
+        this.holdView(target);
         this.controls.update();
+        this.holdView(target);
         const cameraDistance = this.spherical().radius;
         /*
          * The local view goes down to a few light-years, a thousandth of the
@@ -1774,13 +1800,15 @@ export class GalaxyView {
          * back to the filler's weight (0.15: 4.7 against 2.5-5); close in they are
          * at full strength.
          */
-        for (const m of this.deepSkyPoints.materials) m.uniforms.uOpacity.value = 1 - 0.85 * wide;
+        // and while a photograph is up close, the painted version steps back from it
+        for (const m of this.deepSkyPoints.materials) m.uniforms.uOpacity.value = (1 - 0.85 * wide) * (1 - 0.9 * this.photoFade);
         if (this.scatteredPoints) {
             this.scatteredPoints.visible = local < 0.999;
-            this.materials.scattered.uniforms.uOpacity.value = (1 - local) * (1 - 0.6 * wide);
+            // the unnamed objects' centre dots, at half strength like the named ones (DOT_BRIGHTNESS)
+            this.materials.scattered.uniforms.uOpacity.value = 0.5 * (1 - local) * (1 - 0.6 * wide);
             this.scatteredArt.group.visible = local < 0.999;
             for (const m of this.scatteredArt.materials) m.uniforms.uOpacity.value = 1 - local;
-            this.scatteredArt.materials[4].uniforms.uOpacity.value = (1 - local) * (1 - 0.8 * wide);
+            this.scatteredArt.materials[4].uniforms.uOpacity.value = (1 - local) * (1 - 0.9 * wide);
         }
         this.galaxyGroup.group.visible = true;
         /*
@@ -2033,7 +2061,6 @@ export class GalaxyView {
         }
         this.angleDial.querySelector(".AngleValue").textContent = `${Math.round(above)}°`;
         const text = `Seen from ${Math.round(above)}° above the plane of the disk (90° is straight down, 0° edge-on). The dot is the side the galactic centre is on.`;
-        this.angleDial.title = text;
         this.angleDial.setAttribute("aria-label", text);
     }
 

@@ -12,9 +12,13 @@ import * as THREE from "three";
  *     the camera moves round it, which gives a flat picture some depth
  *   - a second, larger and blurred copy behind it is the glow that joins it to
  *     the painted cloud around it
- * It comes in as the camera approaches (from 6 to 2.2 times the place's close-up
- * distance) and steps aside when the camera is almost inside it. Textures load
- * only on approach, so the page itself still fetches none of them.
+ * A photo shows only for the place that is open - flown to from a row or a label,
+ * its glass panel up - never on the way past (owner, 2026-11-24). It is large (four
+ * fifths of the view's height at the arrival distance), a rounded square with a
+ * soft vignette over its outer two fifths, and while it is up the view is held
+ * (view.holdView): no turning, only small nudges and a little zoom, so the picture
+ * is always seen square on. Textures load when a place opens, so the page itself
+ * fetches none of them.
  */
 const VERTEX = /* glsl */ `
     uniform vec2 uSize;
@@ -37,15 +41,17 @@ const FRAGMENT = /* glsl */ `
     varying vec2 vUv;
     void main() {
         vec2 p = vUv * 2.0 - 1.0;
-        float r = length(p);
+        // a rounded square rather than a circle: the corners of the picture stay
+        vec2 a4 = p * p * p * p;
+        float r = pow(a4.x + a4.y, 0.25);
         if (r > 1.0) discard;
         // a slight turn that grows towards the rim, and a drift that the centre resists
-        float a = uSwirl * r * r;
-        vec2 q = mat2(cos(a), -sin(a), sin(a), cos(a)) * p + uDrift * r;
+        float turn = uSwirl * r * r;
+        vec2 q = mat2(cos(turn), -sin(turn), sin(turn), cos(turn)) * p + uDrift * r;
         vec2 uv = q * 0.5 + 0.5;
         vec3 c = texture2D(uMap, clamp(uv, 0.0, 1.0), uBias).rgb;
         // the photo's own sky is never quite black: lift it out so only the object adds light
-        c = max(c - 0.035, 0.0) * 1.04;
+        c = max(c - 0.05, 0.0) * 1.06;
         float mask = 1.0 - smoothstep(uEdge, 1.0, r);
         gl_FragColor = vec4(c * mask * uOpacity, 1.0);
     }
@@ -71,18 +77,22 @@ function photoMaterial({ bias, swirl, edge }) {
     });
 }
 
-// how large the photo hangs, against the distance a flight stops at
-const SIZE = 0.5;
-const HALO = 1.9;
-const PEAK = 0.62;
+// how large the photo hangs, against the distance a flight stops at (where the
+// view is 0.93 of it tall): two thirds of the height, and never wider than the view
+const SIZE = 0.8;
+const MAX_WIDTH = 1.05;
+const HALO = 1.5;
+const PEAK = 0.78;
+const SCRATCH = new THREE.Vector3();
 
 export class SkyPhotos {
     constructor(items, baseUrl) {
         this.group = new THREE.Group();
         this.loader = new THREE.TextureLoader();
-        this.photos = items.filter((item) => item.image).map((item) => {
-            const main = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), photoMaterial({ bias: 0, swirl: 0.12, edge: 0.55 }));
-            const halo = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), photoMaterial({ bias: 4.5, swirl: -0.2, edge: 0.15 }));
+        // fiction's pictures are framed in the card instead (see view.renderInfo)
+        this.photos = items.filter((item) => item.image && !item.fiction).map((item) => {
+            const main = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), photoMaterial({ bias: 0, swirl: 0.04, edge: 0.58 }));
+            const halo = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), photoMaterial({ bias: 4.5, swirl: -0.12, edge: 0.2 }));
             for (const [mesh, order] of [[halo, 5], [main, 6]]) {
                 mesh.position.copy(item.position);
                 mesh.frustumCulled = false;
@@ -98,34 +108,46 @@ export class SkyPhotos {
         photo.state = "loading";
         this.loader.load(photo.url, (texture) => {
             texture.colorSpace = THREE.NoColorSpace;
-            texture.anisotropy = 4;
+            texture.anisotropy = 8;
             photo.aspect = texture.image.width / Math.max(texture.image.height, 1);
             for (const mesh of [photo.main, photo.halo]) mesh.material.uniforms.uMap.value = texture;
             photo.state = "ready";
         });
     }
 
-    update(camera) {
-        const toCamera = new THREE.Vector3();
+    /*
+     * Only the place that is open (flown to, its panel showing) shows its photo
+     * (owner, 2026-11-24: on a click or a jump, never on the way past). It eases in
+     * and out rather than switching. Returns how far in it is, 0..1.
+     */
+    update(camera, focus) {
+        let shown = 0;
         for (const photo of this.photos) {
             const { item } = photo;
+            const open = Boolean(focus && focus.name === item.name);
+            if (open && photo.state === "idle") this.load(photo);
             const distance = camera.position.distanceTo(item.position);
-            if (photo.state === "idle" && distance < item.close * 9) this.load(photo);
-            const fade = photo.state === "ready" ? (1 - THREE.MathUtils.smoothstep(distance, item.close * 2.2, item.close * 6)) * THREE.MathUtils.smoothstep(distance, item.close * 0.1, item.close * 0.35) : 0;
-            const visible = fade > 0.003;
-            photo.main.visible = photo.halo.visible = visible;
-            if (!visible) continue;
-            // landscape photos keep their shape; the height is what is set
-            const height = item.close * SIZE;
-            toCamera.subVectors(camera.position, item.position).normalize();
-            // against fixed axes, so going round it moves the picture against its halo
-            const drift = [toCamera.x * 0.05, toCamera.z * 0.05];
-            for (const [mesh, scale, opacity] of [[photo.main, 1, PEAK], [photo.halo, HALO, 0.16]]) {
+            const want = open && photo.state === "ready" ? (1 - THREE.MathUtils.smoothstep(distance, item.close * 1.8, item.close * 3)) * THREE.MathUtils.smoothstep(distance, item.close * 0.12, item.close * 0.35) : 0;
+            photo.level = (photo.level || 0) + (want - (photo.level || 0)) * 0.12;
+            if (photo.level < 0.003 && want === 0) {
+                photo.level = 0;
+                photo.main.visible = photo.halo.visible = false;
+                continue;
+            }
+            photo.main.visible = photo.halo.visible = true;
+            shown = Math.max(shown, photo.level);
+            // landscape photos keep their shape; the height is what is set, unless too wide
+            const height = Math.min(item.close * SIZE, (item.close * MAX_WIDTH) / photo.aspect);
+            const toCamera = SCRATCH.subVectors(camera.position, item.position).normalize();
+            // against fixed axes, so the small nudges the panel allows shift it against its halo
+            const drift = [toCamera.x * 0.025, toCamera.z * 0.025];
+            for (const [mesh, scale, opacity] of [[photo.main, 1, PEAK], [photo.halo, HALO, 0.14]]) {
                 const u = mesh.material.uniforms;
                 u.uSize.value.set(height * photo.aspect * scale * 0.5, height * scale * 0.5);
-                u.uOpacity.value = opacity * fade;
+                u.uOpacity.value = opacity * photo.level;
                 u.uDrift.value.set(scale === 1 ? drift[0] : -drift[0] * 0.5, scale === 1 ? drift[1] : -drift[1] * 0.5);
             }
         }
+        return shown;
     }
 }

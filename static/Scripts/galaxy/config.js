@@ -153,27 +153,30 @@ export const QUALITY = detectQuality();
 export const LITE = QUALITY.tier === "lite";
 export const EXTREME = QUALITY.tier === "extreme";
 // fraction of the stars and of the haze kept per tier; alphas move the other way to match
-export const STAR_DENSITY = LITE ? 0.45 : EXTREME ? 2.5 : 1;
-export const HAZE_DENSITY = LITE ? 0.6 : EXTREME ? 2 : 1;
+export const STAR_DENSITY = LITE ? 0.45 : EXTREME ? 3 : 1;
+export const HAZE_DENSITY = LITE ? 0.6 : EXTREME ? 2.5 : 1;
 for (const key of ["stars", "thickDisk", "halo"]) BACKDROP[key] = Math.round(BACKDROP[key] * STAR_DENSITY);
 for (const key of ["gas", "cirrus", "interArm"]) BACKDROP[key] = Math.round(BACKDROP[key] * HAZE_DENSITY);
 export const STAR_ALPHA = 1 / STAR_DENSITY;
 export const HAZE_ALPHA = 1 / HAZE_DENSITY;
 export const MAX_PIXEL_RATIO = LITE ? 1.5 : EXTREME ? 3 : 2;
 /*
- * Extreme is about the picture, not just the count:
- *   - supersampled: it renders at 1.5x the screen's own pixel ratio (up to 3), so a
+ * Extreme is the best picture this page can make, at any cost (owner, 2026-11-24):
+ *   - supersampled: it renders at twice the screen's own pixel ratio (up to 3), so a
  *     star is a resolved point rather than a pixel, and the browser scales it down
+ *   - three times the stars, 2.5 times the haze, twice the star-forming knots and
+ *     twice the shell stars and galaxy dots round the disk, each fainter to match
  *   - the haze, the bulge glow and the off-plane sheets render at full resolution
  *     instead of half (SOFT_SCALE)
- *   - seven backdrop slices instead of five, for a smoother disk from the side
+ *   - nine backdrop slices instead of five, for a smooth disk from the side
  *   - one more bloom level, for a wider, softer glow round the core and bright knots
- *   - twice the haze, and 1.5x the star-forming knots, each fainter to match
+ *   - the sharpest texture filtering the GPU has, on the backdrop and the photos
  */
-export const PIXEL_RATIO = EXTREME ? Math.min(Math.max(window.devicePixelRatio || 1, 1) * 1.5, MAX_PIXEL_RATIO) : Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO);
+export const PIXEL_RATIO = EXTREME ? Math.min(Math.max(window.devicePixelRatio || 1, 1) * 2, MAX_PIXEL_RATIO) : Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO);
+export const SURROUNDINGS_DENSITY = EXTREME ? 2 : 1;
 if (EXTREME) {
-    BACKDROP.slices = 7;
-    BACKDROP.knots = Math.round(BACKDROP.knots * 1.5);
+    BACKDROP.slices = 9;
+    BACKDROP.knots = Math.round(BACKDROP.knots * 2);
 }
 
 /*
@@ -223,10 +226,20 @@ export const STAR_TINTS = [
  * A slight violet cast over the whole galaxy - the painting, the stars and the haze
  * sampled from it. Nobody has seen the Milky Way from outside, so its colour is an
  * expectation, not a measurement, and the house look leans violet. Channel gains,
- * balanced so luminance stays where it was (0.2126 R + 0.7152 G + 0.0722 B = 0.99).
+ * balanced so luminance stays where it was (0.2126 R + 0.7152 G + 0.0722 B = 1.00).
+ * Warmer since 2026-11-24 (was 1.07, 0.955, 1.13): more pink and red, still violet.
  * Not applied to the nebulae, the core points or the photographs of other galaxies.
  */
-export const GALAXY_TINT = new THREE.Color(1.07, 0.955, 1.13);
+export const GALAXY_TINT = new THREE.Color(1.15, 0.94, 1.12);
+/*
+ * What dust takes out of the light, per channel, as multiples of the green optical
+ * depth. Real dust reddens strongly (about 0.75 : 1 : 1.32), which made every lane
+ * rust-brown; the owner asked for black dust (2026-11-24), so it is nearly neutral
+ * now - a lane is dark first and only faintly warm. Used by the stars, the haze and
+ * the backdrop alike.
+ */
+export const DUST_COLOR = [0.88, 1.0, 1.14];
+export const DUST_COLOR_GLSL = `vec3(${DUST_COLOR.map((v) => v.toFixed(2)).join(", ")})`;
 
 export const LOCAL_RINGS_LY = [10, 100, 1000];
 /*

@@ -1,11 +1,12 @@
 import * as THREE from "three";
-import { GALAXY_RADIUS, ARMS, ORION_SPUR, BAR_ANGLE, BACKDROP, BULGE, WHITE } from "./config.js";
+import { GALAXY_RADIUS, ARMS, ORION_SPUR, BAR_ANGLE, BACKDROP, BULGE, WHITE, SURROUNDINGS_DENSITY } from "./config.js";
 import { pointsMaterial, glowSprite } from "./shaders.js";
 import { rand, gauss, armPhase, armPoint, smoothstep, Layer } from "./util.js";
 
 export function buildBackdropStars() {
-    const count = 26000;
-    const layer = new Layer(count);
+    // extreme draws twice as many, each half as bright
+    const count = Math.round(26000 * SURROUNDINGS_DENSITY);
+    const layer = new Layer(count, 1 / SURROUNDINGS_DENSITY);
     const white = new THREE.Color(1.0, 0.97, 0.93);
     const blue = new THREE.Color(0.62, 0.74, 1.0);
     const warm = new THREE.Color(1.0, 0.78, 0.58);
@@ -24,8 +25,8 @@ export function buildBackdropStars() {
  * the Milky Way and the named neighbours.
  */
 export function buildGalaxyDots() {
-    const count = 1600;
-    const layer = new Layer(count);
+    const count = Math.round(1600 * SURROUNDINGS_DENSITY);
+    const layer = new Layer(count, 1 / SURROUNDINGS_DENSITY);
     const color = new THREE.Color();
     const amber = new THREE.Color(1.0, 0.86, 0.66);
     const pale = new THREE.Color(0.86, 0.88, 1.0);

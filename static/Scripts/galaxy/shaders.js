@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { rand, smoothstep } from "./util.js";
 import { DUST } from "./dust.js";
+import { DUST_COLOR, DUST_COLOR_GLSL } from "./config.js";
 
 /*
  * A small tiling noise texture for the haze. The wisps used to be computed in the
@@ -200,7 +201,7 @@ export const VERTEX_SHADER = /* glsl */ `
          * two pows: this runs on every one of 2.3M vertices every frame, and a pow
          * is two transcendentals wearing one name.
          */
-        vColor = color * vec3(exp(0.75 * vTau), lane, exp(1.32 * vTau));
+        vColor = color * vec3(exp(${DUST_COLOR[0].toFixed(2)} * vTau), lane, exp(${DUST_COLOR[2].toFixed(2)} * vTau));
         vAlpha = min(alpha * uGain, 1.0) * smoothstep(uNearFade * 0.25, uNearFade, dist) * vExtinction;
         gl_Position = projectionMatrix * mv;
     }
@@ -270,7 +271,7 @@ export const FRAGMENT_SHADER = /* glsl */ `
             float y = vWorldY + (0.5 - gl_PointCoord.y) * vWorldSize * uUpY;
             float exitY = y + vInside * (uCamY - y);
             float tau = max(-uSoftLane * vLen * laneDensity(y, exitY, uLaneHeight), -uLaneFloor);
-            color *= exp(tau * vec3(0.75, 1.0, 1.32));
+            color *= exp(tau * ${DUST_COLOR_GLSL});
         }
         #endif
         gl_FragColor = vec4(color, a);

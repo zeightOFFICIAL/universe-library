@@ -101,7 +101,7 @@ export class Catalogue {
             jump.className = "CatalogueJump";
             if (entry.fly) {
                 jump.type = "button";
-                jump.title = `Show ${entry.name} on the map`;
+                jump.setAttribute("aria-label", `Show ${entry.name} on the map`);
                 jump.addEventListener("click", () => entry.fly());
             }
             jump.innerHTML = '<span class="CatalogueDot"></span><span class="CatalogueText"><span class="CatalogueName"></span><span class="CatalogueSub"></span></span><span class="CatalogueSeen" aria-hidden="true"></span>';
@@ -121,8 +121,7 @@ export class Catalogue {
                 const open = document.createElement("a");
                 open.className = "CatalogueOpen";
                 open.href = entry.href;
-                open.title = `Open ${entry.name}`;
-                open.setAttribute("aria-label", open.title);
+                open.setAttribute("aria-label", `Open ${entry.name}`);
                 open.innerHTML = '<span aria-hidden="true">&rarr;</span>';
                 row.appendChild(open);
             }

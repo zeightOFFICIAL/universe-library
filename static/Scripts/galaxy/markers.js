@@ -131,7 +131,7 @@ export class Marker {
                     member.fly?.();
                 });
             }
-            link.title = member.title;
+            link.setAttribute("aria-label", member.title);
             link.style.setProperty("--member-color", member.color);
             link.innerHTML = "<span></span><small></small>";
             link.firstChild.textContent = member.name;

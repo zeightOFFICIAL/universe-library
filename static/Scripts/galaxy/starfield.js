@@ -265,8 +265,8 @@ export function buildGalaxyFromImage(image) {
     const p = new THREE.Vector3();
     const stars = new Layer(BACKDROP.stars + BACKDROP.thickDisk + BACKDROP.halo, STAR_ALPHA);
     const gas = new Layer(BACKDROP.gas + BACKDROP.cirrus + BACKDROP.interArm, HAZE_ALPHA);
-    // extreme draws half again the knots, each fainter, so the arms keep their exposure
-    const knots = new Layer(BACKDROP.knots, EXTREME ? 1 / 1.5 : 1);
+    // extreme draws twice the knots, each fainter, so the arms keep their exposure
+    const knots = new Layer(BACKDROP.knots, EXTREME ? 1 / 2 : 1);
     const color = new THREE.Color();
 
     const centre = (sampler.n - 1) / 2;

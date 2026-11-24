@@ -36,7 +36,7 @@ export const DUST = {
     laneDepth: 0.1,
     laneFloor: 2.3,
     // the arm lanes: far stronger per unit column, because a lane is dense
-    armDepth: 5.18,
+    armDepth: 6.2,
     /*
      * How deeply the artwork's own lanes are darkened; this is the one that shows.
      * It is an optical depth now, not a fraction, so the number jumped when the law
@@ -45,7 +45,7 @@ export const DUST = {
      * transmission 0.12 instead of the old hard zero - darker in practice, and still
      * coloured, which the clipped version could not be.
      */
-    backdropDepth: 2.1,
+    backdropDepth: 2.7,
     // and how hard the mid-plane sheet is cut when the disk is seen edge-on
     planeLaneDepth: 1.3,
 };

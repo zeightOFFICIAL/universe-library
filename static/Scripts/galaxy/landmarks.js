@@ -24,6 +24,12 @@ import { rand, gauss, mulberry32, directionFromSun, truePosition, Layer } from "
  */
 // one dial for how loud the painted layer is against the star field
 const ART_BRIGHTNESS = 0.78;
+/*
+ * The hard points - cluster member stars and each object's centre dot - at half the
+ * strength they had (owner, 2026-11-24: the bright dots read too strong). The soft
+ * envelopes and wisps keep ART_BRIGHTNESS alone.
+ */
+const DOT_BRIGHTNESS = 0.5;
 
 const ARTISTIC = {
     nebula: {
@@ -64,9 +70,11 @@ const ARTISTIC = {
  * caller already draws each object's point; haloFloor is the smallest an envelope
  * may shrink to on screen; sizeScale enlarges everything (the filler is only seen
  * from afar, so it is drawn larger and capped lower); cap is the envelope's largest
- * size on screen, in pixels.
+ * size on screen, in pixels; spots gives thinned objects the named ones' member
+ * stars - the full count for their amount, bright ones among them, the same size -
+ * so a cluster anywhere on the disk looks like one near the Sun.
  */
-export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: drawCores = true, haloFloor = 8, sizeScale = 1, cap = 520 } = {}) {
+export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: drawCores = true, haloFloor = 8, sizeScale = 1, cap = 520, spots = false } = {}) {
     const random = mulberry32(seed);
     const between = ([lo, hi]) => lo + (hi - lo) * random();
     const normal = () => {
@@ -74,8 +82,8 @@ export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: draw
         while (u === 0) u = random();
         return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * random());
     };
-    // the unnamed filler keeps small, quiet member stars: there are two thousand of them
-    const filler = amount < 0.9;
+    // thinned objects keep small, quiet member stars, unless asked for the named look
+    const filler = amount < 0.9 && !spots;
     const quiet = (0.45 + 0.55 * amount) * ART_BRIGHTNESS;
 
     const cores = new Layer(objects.length);
@@ -91,7 +99,7 @@ export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: draw
     for (const o of objects) {
         const style = DEEP_SKY_STYLE[o.kind];
         const art = ARTISTIC[o.kind];
-        if (drawCores) cores.add(o.position, new THREE.Color(style.color).convertSRGBToLinear(), style.size * 0.5, 0.62);
+        if (drawCores) cores.add(o.position, new THREE.Color(style.color).convertSRGBToLinear(), style.size * 0.5, 0.62 * DOT_BRIGHTNESS);
         if (!art) continue;
         // the first tint of each kind rotates, so the filler is not all one pink
         const offset = Math.floor(random() * art.tints.length);
@@ -120,9 +128,9 @@ export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: draw
             p.set(normal(), normal(), normal()).normalize().multiplyScalar(r).add(o.position);
             color.set(art.memberTint || style.color).convertSRGBToLinear().lerp(white, 0.3 + 0.45 * random());
             const bright = !filler && random() < 0.15;
-            members.add(p, color, filler ? 2.2 + 2.6 * random() : (bright ? 3 + 1.5 * random() : 1.6 + 1.6 * random()), (bright ? 1 : 0.55 + 0.35 * random()) * (filler ? 0.6 : 1) * ART_BRIGHTNESS);
+            members.add(p, color, filler ? 2.2 + 2.6 * random() : (bright ? 3 + 1.5 * random() : 1.6 + 1.6 * random()), (bright ? 1 : 0.55 + 0.35 * random()) * (filler ? 0.6 : spots ? 0.7 : 1) * ART_BRIGHTNESS * DOT_BRIGHTNESS);
             // the brightest members get a small glow of their own, like a photograph's
-            if (bright) details.add(p, color, 0.09 * sizeScale, 0.16 * ART_BRIGHTNESS);
+            if (bright) details.add(p, color, 0.09 * sizeScale, 0.16 * ART_BRIGHTNESS * DOT_BRIGHTNESS);
         }
     }
 
@@ -133,7 +141,8 @@ export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: draw
     const detailMaterial = pointsMaterial({ maxSize: cap * 0.8, minSize: 0, nearFade: 0.01, sharpness: 2.6, soft: true, cloud: 0.85 });
     const ringMaterial = pointsMaterial({ maxSize: cap * 0.7, minSize: 5, nearFade: 0.01, ring: true });
     // member stars only resolve up close; from afar they fold into the core point
-    const memberMaterial = pointsMaterial(filler ? { maxSize: 6, minSize: 0, nearFade: 0.002, sharpness: 14 } : { maxSize: 13, minSize: 0, nearFade: 0.002, sharpness: 7 });
+    // spots sit between the two: the named look, a little smaller and sharper, since there are thousands
+    const memberMaterial = pointsMaterial(filler ? { maxSize: 6, minSize: 0, nearFade: 0.002, sharpness: 14 } : spots ? { maxSize: 8, minSize: 0, nearFade: 0.002, sharpness: 10 } : { maxSize: 13, minSize: 0, nearFade: 0.002, sharpness: 7 });
 
     const group = new THREE.Group();
     const points = new THREE.Points(cores.geometry(), material);

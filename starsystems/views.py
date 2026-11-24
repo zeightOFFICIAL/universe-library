@@ -68,7 +68,7 @@ def with_images(entries):
 
 def universe_page(request) -> HttpResponse:
     links = PREDEFINED_SYSTEM_LINKS + get_sql_system_links()
-    Head = '<meta charset="UTF-8" name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="../static/Icons/LogoStrip.ico" charset="UTF-8"><title>Universe Library</title>'
+    Head = '<meta charset="UTF-8" name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="../static/Icons/UniverseFavicon.svg" type="image/svg+xml"><link rel="icon" href="../static/Icons/UniverseFavicon.ico" sizes="16x16 32x32 48x48"><link rel="apple-touch-icon" href="../static/Icons/UniverseLogo-180.png"><meta name="theme-color" content="#05070d"><title>Universe Library</title>'
     # the places come from the database on every request, so a new row shows at once
     placement = galaxy_placement()
     galaxy = {
@@ -77,7 +77,7 @@ def universe_page(request) -> HttpResponse:
         "deepSky": with_images(deep_sky()),
         "galaxies": GALAXIES,
         "planetarySystems": planetary_systems(),
-        "fiction": fictional_places(),
+        "fiction": with_images(fictional_places()),
         "spacecraft": with_images(spacecraft()),
         "stellarObjects": with_images(stellar_objects()),
         "celestialPole": CELESTIAL_POLE_GALACTIC,

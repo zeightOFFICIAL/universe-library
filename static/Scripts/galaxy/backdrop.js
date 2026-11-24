@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { BACKDROP, SOFT_LAYER, GALAXY_TINT } from "./config.js";
+import { BACKDROP, SOFT_LAYER, GALAXY_TINT, DUST_COLOR_GLSL } from "./config.js";
 import { rand, smoothstep } from "./util.js";
 
 /* ---------- the backdrop, as a stack of slices ---------- */
@@ -126,7 +126,7 @@ export const BACKDROP_FRAGMENT = /* glsl */ `
          */
         c *= uTint;
         float tau = dust + lane;
-        c *= exp(-tau * vec3(0.75, 1.0, 1.32));
+        c *= exp(-tau * ${DUST_COLOR_GLSL});
 
         gl_FragColor = vec4(c * uOpacity * edge * tearMask * (1.0 - uCoreFade * coreMask * 0.93), 1.0);
     }
