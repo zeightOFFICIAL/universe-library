@@ -19,7 +19,8 @@
         <div id="GALAXY_VIEW" class="GalaxyView"
              data-backdrop="{% static 'Images/GalaxyBackdrop.jpg' %}"
              data-galaxies="{% static 'Images/Galaxies/' %}"
-             data-info-images="{% static 'Images/DeepSky/' %}">
+             data-info-images="{% static 'Images/DeepSky/' %}"
+             data-exoplanets="{% static 'Data/exoplanets.json' %}">
             <canvas id="GALAXY_CANVAS" tabindex="0" role="application" aria-roledescription="galaxy map"
                     aria-label="Map of the Milky Way. Arrow keys move, Shift and arrow keys turn and tilt, plus and minus zoom, Home shows the whole galaxy."></canvas>
             <div class="GalaxyLoader" id="GALAXY_LOADER">
@@ -84,15 +85,19 @@
                     </div>
                 </section>
             </aside>
-            <figure class="DetailPhoto" id="GALAXY_PHOTO" hidden><img alt="" decoding="async"></figure>
+            <svg class="DetailLeader" id="GALAXY_LEADER" aria-hidden="true">
+                <defs><linearGradient id="GALAXY_LEADER_FADE" gradientUnits="userSpaceOnUse"><stop offset="0" class="LeaderStop0"/><stop offset=".55" class="LeaderStop1"/><stop offset="1" class="LeaderStop2"/></linearGradient></defs>
+                <path class="LeaderLine" pathLength="1"/>
+            </svg>
             <section class="GalaxyDetail" id="GALAXY_DETAIL" aria-label="About this place" hidden>
                 <div class="DetailText">
                     <button type="button" class="DetailBack"><span aria-hidden="true">&larr;</span> Back to the map</button>
+                    <figure class="DetailFigure" hidden><img class="DetailImage" alt="" decoding="async"><figcaption class="DetailCredit"><a target="_blank" rel="noopener"></a></figcaption></figure>
                     <p class="InfoKicker"></p>
                     <h2 class="DetailName"></h2>
                     <p class="DetailAbout"></p>
                     <dl class="InfoFacts"></dl>
-                    <p class="InfoPhotoCredit" hidden>Photo: <a target="_blank" rel="noopener"></a></p>
+                    <a class="DetailPage" hidden>Open the <span class="DetailPageName"></span> page <span aria-hidden="true">&rarr;</span></a>
                 </div>
             </section>
             <nav class="GalaxyLayers" aria-label="Layers">
@@ -106,27 +111,45 @@
                 </button>
                 <button type="button" class="LayerToggle" data-layer="systems" aria-pressed="true" aria-label="Star systems" aria-describedby="TIP_SYSTEMS">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><ellipse cx="12" cy="12" rx="9" ry="4.2" transform="rotate(-20 12 12)"/><circle cx="20" cy="9" r="1.3" fill="currentColor" stroke="none"/></svg>
-                    <span class="LayerTip" id="TIP_SYSTEMS" role="tooltip"><strong>Star systems</strong><span class="TipText">Star systems, real and - with the Fiction switch - from stories. Those near the Sun share its label until you zoom in far enough to see them apart; hover the Sun to list them.</span><span class="TipState"></span></span>
+                    <span class="LayerTip" id="TIP_SYSTEMS" role="tooltip"><strong>Star systems</strong><span class="TipText">Star systems, real and - with the Fiction switch - from stories. Every one keeps its dot; its name comes in as the camera nears it. Click one to fly there; a system with a page has a button to it.</span><span class="TipState"></span></span>
                 </button>
                 <button type="button" class="LayerToggle" data-layer="objects" aria-pressed="true" aria-label="Objects" aria-describedby="TIP_OBJECTS">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5l4.5 7.5-4.5 7.5-4.5-7.5z"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M3.5 12h2M18.5 12h2"/></svg>
-                    <span class="LayerTip" id="TIP_OBJECTS" role="tooltip"><strong>Objects</strong><span class="TipText">Things that are not star systems: black holes, neutron stars, remarkable stars like Betelgeuse, and our spacecraft. Fly up to one to open its card.</span><span class="TipState"></span></span>
+                    <span class="LayerTip" id="TIP_OBJECTS" role="tooltip"><strong>Objects</strong><span class="TipText">Things that are not star systems: black holes, neutron stars, remarkable stars like Betelgeuse, and our spacecraft. Click one to fly there and see it drawn.</span><span class="TipState"></span></span>
+                </button>
+                <button type="button" class="LayerToggle" data-layer="catalogue" aria-pressed="true" aria-label="Planet catalogue" aria-describedby="TIP_CATALOGUE">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><ellipse cx="12" cy="12" rx="9.5" ry="3.1" transform="rotate(-18 12 12)"/><circle cx="19" cy="5.5" r="1" fill="currentColor" stroke="none"/></svg>
+                    <span class="LayerTip" id="TIP_CATALOGUE" role="tooltip"><strong>Planet catalogue</strong><span class="TipText">Every star known to have planets, from the NASA Exoplanet Archive (November 2026): about 4,800 stars with 6,400 planets. Positions to a tenth of a degree and distances to the light-year - enough for a map of the galaxy, not a star chart. Nearly all are within a few thousand light-years: Kepler's one patch of sky holds half, microlensing reaches towards the bulge. Colour: teal transit, gold wobble (radial velocity), pink microlensing, blue imaging.</span><span class="TipState"></span></span>
+                </button>
+                <button type="button" class="LayerToggle" data-layer="planets" data-default="off" aria-pressed="false" aria-label="Planet surveys" aria-describedby="TIP_PLANETS">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M6.5 11.2L20 5.5M6.5 12.8L20 18.5" /><path d="M20 5.5v13" stroke-dasharray="1.6 2"/></svg>
+                    <span class="LayerTip" id="TIP_PLANETS" role="tooltip"><strong>Planet surveys</strong><span class="TipText">A sketch of how far each way of finding planets reaches: radial velocity a couple of hundred light-years, TESS about a thousand, Kepler one narrow cone to five thousand, microlensing towards the bulge. Drawn from each survey's direction and reach, so no dot is a real planet; the Planet catalogue layer has the real ones. Off at load.</span><span class="TipState"></span></span>
                 </button>
                 <span class="LayerDivider" aria-hidden="true"></span>
                 <button type="button" class="LayerToggle" data-layer="sectors" data-default="off" aria-pressed="false" aria-label="Sectors" aria-describedby="TIP_SECTORS">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM12 4v16M4 12h16"/><path d="M8 4v16M16 4v16M4 8h16M4 16h16" opacity=".45"/></svg>
                     <span class="LayerTip" id="TIP_SECTORS" role="tooltip"><strong>Sectors</strong><span class="TipText">A grid over the disk in squares 5,000 ly wide: letters A to T across, numbers 1 to 20 from the far side of the core towards the Sun. The bold lines through the centre split it into four quadrants. The Sun is in K16; the readout names the sector you are looking at.</span><span class="TipState"></span></span>
                 </button>
-                <button type="button" class="LayerToggle" data-layer="bearings" aria-pressed="true" aria-label="Bearings" aria-describedby="TIP_BEARINGS">
+                <button type="button" class="LayerToggle" data-layer="bearings" data-default="off" aria-pressed="false" aria-label="Bearings" aria-describedby="TIP_BEARINGS">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M12 9V2.5M12 15v6.5M9 12H2.5M15 12h6.5"/><path d="M12 2.5l-1.6 2.4h3.2z" fill="currentColor"/></svg>
                     <span class="LayerTip" id="TIP_BEARINGS" role="tooltip"><strong>Bearings</strong><span class="TipText">The point in the middle of the view - the one the distances below are measured from - with four beams in the plane: one to the galactic centre, then 90&deg;, 180&deg; and 270&deg; from it, turning the way the galaxy does.</span><span class="TipState"></span></span>
+                </button>
+                <button type="button" class="LayerToggle" data-layer="earth" aria-pressed="true" aria-label="From Earth" aria-describedby="TIP_EARTH">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="19" r="1.8" fill="currentColor" stroke="none"/><path d="M5 13.5a5.5 5.5 0 0 1 5.5 5.5M5 8.5a10.5 10.5 0 0 1 10.5 10.5M5 3.5a15.5 15.5 0 0 1 15.5 15.5"/></svg>
+                    <span class="LayerTip" id="TIP_EARTH" role="tooltip"><strong>From Earth</strong><span class="TipText">How far our history reaches. Each ring is as far as light travels between an event on Earth and now: light reaching us from 57 ly away set off while Apollo 11 was on the Moon, and the galactic centre's in the last Ice Age. And our own signals going out: the radio bubble of our broadcasts since 1936, and the Arecibo message, sent to M13 in 1974.</span><span class="TipState"></span></span>
                 </button>
                 <span class="LayerDivider" aria-hidden="true"></span>
                 <button type="button" class="LayerToggle" data-layer="fiction" aria-pressed="true" aria-label="Fiction" aria-describedby="TIP_FICTION">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5c-2-1.6-5-2-8-1.5v13c3-.5 6-.1 8 1.5 2-1.6 5-2 8-1.5V5c-3-.5-6-.1-8 1.5z"/><path d="M12 6.5V20"/><path d="M16.5 9.2l.5 1.2 1.2.2-.9.8.3 1.2-1.1-.6-1.1.6.3-1.2-.9-.8 1.2-.2z" fill="currentColor" stroke="none"/></svg>
                     <span class="LayerTip" id="TIP_FICTION" role="tooltip"><strong>Fiction</strong><span class="TipText">Adds places from stories to the star systems and objects layers - never shown on its own. Star systems and places from stories set in the Milky Way - Mass Effect, Star Trek, Halo, Dune, Alien, Foundation, Warhammer 40,000 and more - drawn dashed and violet. Where a story names a real star the place sits there; otherwise it is placed from the story's own galaxy map, or by eye.</span><span class="TipState"></span></span>
                 </button>
+                <span class="LayerDivider" aria-hidden="true"></span>
+                <button type="button" class="LayerToggle" data-layer="territories" aria-pressed="true" aria-label="Territories" aria-describedby="TIP_TERRITORIES">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V3.5M6 4.5h11l-2.6 4L17 12.5H6"/></svg>
+                    <span class="LayerTip" id="TIP_TERRITORIES" role="tooltip"><strong>Territories</strong><span class="TipText">Nations and factions: the space each holds, filled in its colour with a border round it, and the places it holds in its colour.</span><span class="TipState"></span></span>
+                </button>
             </nav>
+            <div class="GalaxyLayerTip" id="GALAXY_LAYER_TIP" aria-hidden="true" hidden></div>
             <aside class="GalaxyLegend" id="GALAXY_LEGEND" aria-label="Legend">
                 <button type="button" class="LegendHead" aria-expanded="true" aria-controls="GALAXY_LEGEND_LIST">Legend</button>
                 <ul class="LegendList" id="GALAXY_LEGEND_LIST"></ul>
@@ -134,7 +157,7 @@
             <div class="GalaxySettingsPanel">
                 <button type="button" class="LayerToggle SettingsOpen" id="GALAXY_SETTINGS_OPEN" aria-haspopup="dialog" aria-expanded="false" aria-label="Settings" aria-describedby="TIP_SETTINGS">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/></svg>
-                    <span class="LayerTip" id="TIP_SETTINGS" role="tooltip"><strong>Settings</strong><span class="TipText">Units, label size, which systems to show, camera moves and detail. Remembered on this device.</span></span>
+                    <span class="LayerTip" id="TIP_SETTINGS" role="tooltip"><strong>Settings</strong><span class="TipText">Units, label size, which systems to show, camera moves, twinkling and detail. Remembered on this device.</span></span>
                 </button>
             </div>
             <dialog class="GalaxySettings" id="GALAXY_SETTINGS" aria-labelledby="GALAXY_SETTINGS_TITLE">

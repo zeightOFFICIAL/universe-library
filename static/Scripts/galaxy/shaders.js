@@ -174,14 +174,26 @@ export const VERTEX_SHADER = /* glsl */ `
         float size = mix(aSize, aSize * uScale / dist, uAttenuate);
         float alpha = aAlpha;
         /*
-         * Twinkling: two slow sines per star, at rates and phases from a hash of its
-         * position, multiplied so the waver never repeats in step. Only about half the
-         * stars take part, most of those faintly. Off when uTwinkle is 0.
+         * Twinkling, strong enough to see (owner, 2026-11-26: the first version was
+         * weak or absent - it scaled alpha, which is clamped to 1 a few lines down,
+         * so every star bright enough to notice lost it). It now scales the colour,
+         * which the HDR target does not clamp. Every star shimmers on two sines of
+         * its own (rates and phases from a hash of its position), and one in twelve
+         * glints: a short flare every few seconds, brighter and a little bigger,
+         * which the bloom catches. Off when uTwinkle is 0.
          */
+        float twinkle = 1.0;
         if (uTwinkle > 0.0) {
             float h = fract(sin(dot(position, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-            float w = sin(uTime * (0.7 + 2.1 * h) + h * 40.0) * sin(uTime * (0.23 + 0.45 * h) + h * 11.0);
-            alpha *= 1.0 + uTwinkle * smoothstep(0.45, 1.0, h) * w;
+            float h2 = fract(h * 91.7);
+            float w = 0.6 * sin(uTime * (0.9 + 2.6 * h) + h * 40.0) + 0.4 * sin(uTime * (2.3 + 3.1 * h2) + h2 * 23.0);
+            twinkle = 1.0 + uTwinkle * 0.55 * w;
+            if (h2 > 0.92) {
+                float glint = pow(max(sin(uTime * (0.45 + 0.9 * h) + h * 60.0), 0.0), 14.0);
+                twinkle += uTwinkle * 3.2 * glint;
+                size *= 1.0 + 0.9 * uTwinkle * glint;
+            }
+            twinkle = max(twinkle, 0.15);
         }
         // keep sub-pixel points as dim 1px points instead of losing them
         if (size < 1.0) {
@@ -213,7 +225,7 @@ export const VERTEX_SHADER = /* glsl */ `
          * two pows: this runs on every one of 2.3M vertices every frame, and a pow
          * is two transcendentals wearing one name.
          */
-        vColor = color * vec3(exp(${DUST_COLOR[0].toFixed(2)} * vTau), lane, exp(${DUST_COLOR[2].toFixed(2)} * vTau));
+        vColor = color * vec3(exp(${DUST_COLOR[0].toFixed(2)} * vTau), lane, exp(${DUST_COLOR[2].toFixed(2)} * vTau)) * twinkle;
         vAlpha = min(alpha * uGain, 1.0) * smoothstep(uNearFade * 0.25, uNearFade, dist) * vExtinction;
         gl_Position = projectionMatrix * mv;
     }

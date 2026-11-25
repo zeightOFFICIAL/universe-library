@@ -35,6 +35,8 @@ def get_sql_system_links() -> list[dict]:
                 "name": row.name_name,
                 "href": row.name_name.replace(" ", ""),
                 "color": row.prime_color_any,
+                # the galaxy's panel for the system shows this when you fly there
+                "about": row.short_desc_text or "",
                 # a system with no objects and no panels has a page with nothing on it
                 "ready": Objects.objects.filter(system=row.pk).exists()
                 or Panels.objects.filter(parent_system=row.pk).exists(),

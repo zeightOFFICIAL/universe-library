@@ -167,19 +167,11 @@ export const DISPLAY_OPTIONS = {
             { value: "cut", label: "Cut", example: "jump straight there" },
         ],
     },
-    photo: {
-        label: "Photos",
-        hint: "When you open a place",
-        choices: [
-            { value: "fill", label: "Fill", example: "covers the left of the screen" },
-            { value: "fit", label: "Fit", example: "the whole picture, uncropped" },
-        ],
-    },
     twinkle: {
         label: "Twinkling",
-        hint: "Stars glimmer a little",
+        hint: "Stars shimmer, and now and then one glints",
         choices: [
-            { value: "on", label: "On", example: "a faint shimmer" },
+            { value: "on", label: "On", example: "a living sky" },
             { value: "off", label: "Off", example: "still stars" },
         ],
     },
@@ -196,7 +188,7 @@ export const DISPLAY_OPTIONS = {
 export const LABEL_SCALE = { small: 0.86, medium: 1, large: 1.2 };
 
 const DISPLAY_KEY = "galaxyDisplay";
-const DISPLAY_DEFAULTS = { labelSize: "medium", emptySystems: "show", motion: "fly", photo: "fill", twinkle: "on", turn: "off" };
+const DISPLAY_DEFAULTS = { labelSize: "medium", emptySystems: "show", motion: "fly", twinkle: "on", turn: "off" };
 
 function loadDisplay() {
     const display = { ...DISPLAY_DEFAULTS };

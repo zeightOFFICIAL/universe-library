@@ -101,6 +101,8 @@ class GalaxyPlacement(models.Model):
     note = models.TextField(blank=True, null=True)
     hidden = models.IntegerField(default=0)
     sort = models.IntegerField()
+    # the star or stars drawn when you fly there: "temperature K:radius in Suns", comma-separated
+    stars = models.TextField(blank=True, null=True)
 
     class Meta:
         managed = False
@@ -129,10 +131,37 @@ class PlanetarySystem(models.Model):
     l = models.FloatField()
     b = models.FloatField()
     d = models.FloatField()
+    # as galaxy_placement.stars, or "pulsar"
+    stars = models.TextField(blank=True, null=True)
 
     class Meta:
         managed = False
         db_table = 'planetary_systems'
+
+
+class Territory(models.Model):
+    """A nation's or faction's space, for the map's territories layer (empty until the
+    owner adds rows; the layer's switch appears only when there is one).
+
+    sectors: sector names, space-separated ("K16 K17 L16"), filled as squares.
+    points:  a polygon instead, "X,Y; X,Y; ..." in the readout's galactocentric kly.
+    members: names of places on the map it owns, comma-separated; their dots take its colour.
+    """
+
+    name = models.TextField()
+    color = models.TextField(default="#c7a6ff")
+    source = models.TextField(blank=True, null=True)
+    note = models.TextField(blank=True, null=True)
+    sectors = models.TextField(blank=True, null=True)
+    points = models.TextField(blank=True, null=True)
+    members = models.TextField(blank=True, null=True)
+    fictional = models.IntegerField(default=1)
+    hidden = models.IntegerField(default=0)
+    sort = models.IntegerField(default=0)
+
+    class Meta:
+        managed = False
+        db_table = 'territories'
 
 
 class FictionPlace(models.Model):

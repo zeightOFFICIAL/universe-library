@@ -20,6 +20,7 @@ from starsystems.galaxy import (
     planetary_systems,
     spacecraft,
     stellar_objects,
+    territories,
 )
 from starsystems.image_sources import IMAGE_SOURCES
 from mysite.ServerScripts import (
@@ -33,8 +34,20 @@ from mysite.ServerScripts import (
 # page needs of a system is its name, its page and its accent colour; where it sits
 # in the galaxy comes from the galaxy_placement table, keyed by the same href.
 PREDEFINED_SYSTEM_LINKS = [
-    {"name": "Solar", "href": "Solar", "color": "#FBAB7E", "ready": True},
-    {"name": "Alpha Centauri", "href": "AlphaCentauri", "color": "#FF0000", "ready": True},
+    {
+        "name": "Solar",
+        "href": "Solar",
+        "color": "#FBAB7E",
+        "ready": True,
+        "about": "The Sun and everything held by it: eight planets, their moons, the asteroid and Kuiper belts, and the Oort cloud reaching a light-year out. Home, 26,700 ly from the centre of the galaxy.",
+    },
+    {
+        "name": "Alpha Centauri",
+        "href": "AlphaCentauri",
+        "color": "#FF0000",
+        "ready": True,
+        "about": "The nearest star system: two Sun-like stars orbiting each other every 80 years, and the red dwarf Proxima Centauri, the closest star of all, with at least one planet in its habitable zone.",
+    },
 ]
 
 # Photographs for the info cards. A card shows one only when the file is on disk, so
@@ -83,6 +96,7 @@ def universe_page(request) -> HttpResponse:
         "celestialPole": CELESTIAL_POLE_GALACTIC,
         "backgroundGalaxies": BACKGROUND_GALAXY_IMAGES,
         "credits": IMAGE_CREDITS,
+        "territories": territories(),
         "systems": [
             dict(link, name=placement[link["href"]].get("label", link["name"]), placement=placement[link["href"]])
             for link in links

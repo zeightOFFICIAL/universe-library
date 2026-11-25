@@ -247,11 +247,13 @@ There are no drop shadows on black. Depth is made of translucency, blur, hairlin
 | Sky | the 3D scene; `#000` |
 | Map labels | no box, with a black text halo, links included; a link with a page has a bright, bold name |
 | Controls, readouts | `--ul-glass` + `--ul-blur-md` + an `--ul-outline` hairline, pill |
-| Panels | `--ul-glass-sheen` + `--ul-blur-lg` + an `--ul-outline` hairline, `md` radius |
-| Dialogs, the detail panel | `--ul-glass-strong` + `--ul-blur-lg`, `lg` radius |
+| Panels | `--ul-glass-sheen` + `--ul-blur-lg` + the travelling edge (below), `md` radius |
+| Dialogs, the detail panel | `--ul-glass-strong` + `--ul-blur-lg` + the travelling edge, `lg` radius |
+| Legend, layer tooltip | near-opaque glass (`rgba(22,26,46,.82)` to `rgba(8,10,20,.88)`) + the travelling edge; the legend has a violet, amber and blue gradient drifting behind its keys (28 s) |
 | Loader | a radial vignette, `#0b1020` → `#000` |
 
 - **Selection and hover** brighten: background to `--ul-state-hover`/`--ul-state-pressed`, hairline to the role colour, plus a `--ul-glow-md` in the role colour. They never darken.
+- **The travelling edge** (2026-11-26): every glass panel's border is a 1 px conic gradient, amber into violet with a cool blue between (`--ul-edge-stops`), turning once every 14 s (`--ul-edge-period`, `@property --ul-edge-angle`), over a soft glow in amber and violet (`--ul-edge-glow`). It is the one moving thing in the chrome; it stops under reduced motion. Draw it with a masked `::after` at `inset: 0` (see `GalaxyStyles.css`), so a panel that scrolls must scroll an inner element, not itself.
 - LiftKit's shadow set (`shadow-sm` to `2xl`) is for light surfaces. We don't use it; if a light surface is ever added, take its values from there.
 
 ## 8. Motion
@@ -273,7 +275,7 @@ There are no drop shadows on black. Depth is made of translucency, blur, hairlin
 - **Photographs are light on black.** They are composited additively and premultiplied onto black, so their dark sky disappears into ours. Never use an image with a white or transparent-checkerboard background on the map.
 - Sources: Wikimedia Commons only, public domain or CC0/CC BY/CC BY-SA, downloaded and never hotlinked, each with its credit shown on the card and recorded in `starsystems/image_sources.py`.
 - Galaxy photographs are median-filtered so their foreground stars don't compete with ours. Card photos are 960 px wide.
-- An open place's photograph fills the screen left of the glass panel (cover; Fit as an option), at 0.86 so the sky shows through, dissolving into the sky towards the panel - never a framed rectangle. It appears only for the place you clicked, and the view is locked while it is up.
+- An open place is **drawn where it is** - a star by its temperature, a pulsar, a black hole, a cloud, a cluster, a small cube for things we built - and the bordered glass panel on the right points at it with a **leader**: a 1.2 px line in the place's colour with a soft glow, from the panel's edge at the name, to an elbow, to a small ring with four ticks on the object. The line draws itself in over 0.8 s. Stars and machines are drawn larger than life and say so; clouds and clusters are at their real size. It appears only for the place you clicked, and the view is locked while it is up. No photographs.
 - **Fiction may use images from games, films and books** (the owner's choice), always with the reference shown under them. They show like any photo, with a dashed violet edge, the fiction convention, and "Reference image:" in the credit.
 - An artist's impression is labelled as one (the backdrop, the black holes' glyphs).
 - The technical recipe (ffmpeg settings, sizes, rate limits) is in `AGENTS.md` §7.8.
@@ -284,7 +286,8 @@ There are no drop shadows on black. Depth is made of translucency, blur, hairlin
 - **Focus is always visible:** `--ul-focus-ring` on controls; the map canvas gets an inset version.
 - Hit targets are at least 40 × 40 px (the zoom buttons are 48 × 42); on touch, 44 px.
 - Never use colour alone: fiction is dashed **and** italic **and** violet, and every marker type differs in shape.
-- Every icon button has an `aria-label`; tooltips are not shown on hover (the owner's choice) but stay in the markup for screen readers.
+- Every icon button has an `aria-label`. No hover pop-ups, with one exception: a layer switch shows its tooltip under the row - name, what it shows, its part of the legend, its state - and the legend slides down rather than being covered.
+- The legend is one line per key: swatch, name in ink, a few words in dim ink at .94 em. Keep the words short enough to fit 268 px.
 - Respect `prefers-reduced-motion` (§8).
 
 ## 11. The 3D scene's look (intent)

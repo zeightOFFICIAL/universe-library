@@ -197,6 +197,17 @@
     --ul-glow-sm: 0 0 10px -2px; /* + a colour */
     --ul-glow-md: 0 0 18px -2px; /* + a colour */
 
+    /*
+     * The edge (owner, 2026-11-26): every glass panel carries a hairline of light
+     * that travels round it, amber into violet with a cool blue between, over a soft
+     * glow in the same two colours. Drawn by .ul-edge-like rules in the page styles
+     * (a masked ::after: conic-gradient(from var(--ul-edge-angle), var(--ul-edge-stops))),
+     * turned by animating --ul-edge-angle there; still under reduced motion.
+     */
+    --ul-edge-stops: rgba(255, 217, 160, .85), rgba(199, 166, 255, .75) 22%, rgba(158, 203, 255, .3) 40%, rgba(199, 166, 255, .7) 58%, rgba(255, 217, 160, .85) 78%, rgba(255, 217, 160, .35) 90%, rgba(255, 217, 160, .85);
+    --ul-edge-glow: 0 0 24px -12px rgba(199, 166, 255, .55), 0 0 34px -18px rgba(255, 217, 160, .45);
+    --ul-edge-period: 14s;
+
     /* ---------- motion ---------- */
 
     --ul-duration-fast: .2s; /* hover, press */
@@ -204,4 +215,17 @@
     --ul-duration-slow: .6s; /* fades of whole layers */
     --ul-ease: ease;
     --ul-ease-out: cubic-bezier(.2, .7, .2, 1);
+}
+
+/* the travelling edge: an angle the browser can animate (see --ul-edge-stops) */
+@property --ul-edge-angle {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+}
+
+@keyframes UlEdgeTurn {
+    to {
+        --ul-edge-angle: 360deg
+    }
 }

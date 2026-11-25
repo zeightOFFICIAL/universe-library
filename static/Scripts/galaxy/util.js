@@ -75,8 +75,14 @@ export class Layer {
     add(p, color, size, alpha, dust = 0) {
         if (this.count >= this.capacity) return;
         const i = this.count++;
-        this.positions.set([p.x, p.y, p.z], i * 3);
-        this.colors.set([color.r, color.g, color.b], i * 3);
+        // written element by element: .set([...]) allocated two arrays per point, millions per load
+        const j = i * 3;
+        this.positions[j] = p.x;
+        this.positions[j + 1] = p.y;
+        this.positions[j + 2] = p.z;
+        this.colors[j] = color.r;
+        this.colors[j + 1] = color.g;
+        this.colors[j + 2] = color.b;
         this.sizes[i] = size;
         this.alphas[i] = Math.min(alpha * this.alphaScale, 1);
         this.dust[i] = dust;

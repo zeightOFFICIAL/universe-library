@@ -40,7 +40,7 @@ SUN_HEIGHT_ABOVE_PLANE_LY = 65
 # luminosities in Suns. Empty columns are NULL and are left out, so the page can tell
 # "not set" from zero.
 
-from starsystems.models import DeepSky, FictionPlace, GalaxyPlacement, PlanetarySystem, Spacecraft, StellarObject
+from starsystems.models import DeepSky, FictionPlace, GalaxyPlacement, PlanetarySystem, Spacecraft, StellarObject, Territory
 
 # database column -> the key the page has always used
 _KEYS = {"radius_km": "radiusKm"}
@@ -53,10 +53,38 @@ def _rows(model, order="id", drop=("id",)):
     ]
 
 
+def parse_stars(text):
+    """"5790:1.22, 5260:0.86" -> [{"t": 5790, "r": 1.22}, ...]; "pulsar" stays a word.
+
+    The stars drawn when the map flies to a system: temperature in kelvin (it sets
+    the colour) and radius in Suns (it sets the drawn size, compressed).
+    """
+    if not text:
+        return None
+    if text.strip() == "pulsar":
+        return "pulsar"
+    stars = []
+    for part in text.split(","):
+        t, _, r = part.strip().partition(":")
+        try:
+            stars.append({"t": float(t), "r": float(r or 1)})
+        except ValueError:
+            continue
+    return stars or None
+
+
+def _with_stars(row):
+    stars = parse_stars(row.pop("stars", None))
+    if stars:
+        row["stars"] = stars
+    return row
+
+
 def galaxy_placement():
     """Placements keyed by href. fictional and hidden appear only when set."""
     placements = {}
     for row in _rows(GalaxyPlacement, order="sort", drop=("sort",)):
+        _with_stars(row)
         href = row.pop("href")
         for flag in ("fictional", "hidden"):
             if row.get(flag):
@@ -72,7 +100,35 @@ def deep_sky():
 
 
 def planetary_systems():
-    return _rows(PlanetarySystem)
+    return [_with_stars(row) for row in _rows(PlanetarySystem)]
+
+
+def territories():
+    """Nations and factions for the territories layer; hidden rows are left out.
+
+    sectors become a list of names, points a list of [X, Y] pairs in galactocentric
+    kly (the readout's axes), members a list of place names.
+    """
+    found = []
+    for row in _rows(Territory, order="sort", drop=("id", "sort")):
+        if row.pop("hidden", 0):
+            continue
+        row["fictional"] = bool(row.get("fictional"))
+        if "sectors" in row:
+            row["sectors"] = row["sectors"].replace(",", " ").split()
+        if "points" in row:
+            pairs = []
+            for pair in row["points"].split(";"):
+                try:
+                    x, y = (float(v) for v in pair.split(","))
+                    pairs.append([x, y])
+                except ValueError:
+                    continue
+            row["points"] = pairs
+        if "members" in row:
+            row["members"] = [m.strip() for m in row["members"].split(",") if m.strip()]
+        found.append(row)
+    return found
 
 
 def fictional_places():

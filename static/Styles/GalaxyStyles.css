@@ -1036,26 +1036,66 @@ div.CatalogueJump {
     width: 14px
 }
 
-/* ---------- legend: under the layers, the main keys first, all on hover ---------- */
+/* ---------- legend: under the layers, one line per key ---------- */
 
+/*
+ * Denser and darker than the other glass (owner, 2026-11-26): one line per key,
+ * a third shorter than the two-line rows, over a near-opaque fill so the keys read
+ * against any part of the galaxy, with an accent gradient drifting slowly behind.
+ * It slides down by --tip-push while a layer's tooltip is open above it.
+ */
 .GalaxyLegend {
     -webkit-backdrop-filter: blur(13px) saturate(150%);
     backdrop-filter: blur(13px) saturate(150%);
-    background: linear-gradient(160deg, rgba(40, 48, 78, .34), rgba(12, 15, 26, .54));
-    border: 1px solid var(--galaxy-line);
+    background: linear-gradient(160deg, rgba(22, 26, 46, .82), rgba(8, 10, 20, .88));
+    border: 1px solid rgba(255, 255, 255, .05);
     border-radius: var(--galaxy-radius-small);
-    box-shadow: 0 18px 50px -18px rgba(0, 0, 0, .8);
-    max-height: calc(100% - var(--galaxy-gap) * 2 - 140px);
-    overflow: hidden auto;
-    padding: 8px 12px 10px;
+    box-shadow: 0 18px 50px -18px rgba(0, 0, 0, .8), var(--ul-edge-glow);
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100% - var(--galaxy-gap) * 2 - 140px - var(--tip-push, 0px));
+    overflow: hidden;
+    padding: 8px 10px 9px 12px;
     position: absolute;
     /* its right edge lines up with the settings panel's */
     right: var(--galaxy-gap);
-    scrollbar-color: rgba(200, 210, 255, .25) transparent;
-    scrollbar-width: thin;
     top: calc(var(--galaxy-gap) + 62px);
-    width: 248px;
+    transform: translateY(var(--tip-push, 0px));
+    transition: transform .3s var(--ul-ease-out), max-height .3s var(--ul-ease-out);
+    width: 268px;
     z-index: 24
+}
+
+/* the accent: violet, amber and blue light drifting behind the keys */
+.GalaxyLegend::before {
+    animation: LegendDrift 28s ease-in-out infinite alternate;
+    background:
+        radial-gradient(60% 40% at 12% 8%, rgba(199, 166, 255, .24), transparent 70%),
+        radial-gradient(55% 38% at 92% 50%, rgba(255, 217, 160, .16), transparent 70%),
+        radial-gradient(60% 42% at 28% 96%, rgba(158, 203, 255, .17), transparent 70%);
+    background-size: 170% 170%;
+    content: "";
+    inset: 0;
+    pointer-events: none;
+    position: absolute
+}
+
+@keyframes LegendDrift {
+    0% {
+        background-position: 0% 0%
+    }
+
+    50% {
+        background-position: 100% 45%
+    }
+
+    100% {
+        background-position: 35% 100%
+    }
+}
+
+.GalaxyLegend > * {
+    position: relative
 }
 
 .LegendHead {
@@ -1064,9 +1104,10 @@ div.CatalogueJump {
     color: var(--galaxy-ink-faint);
     cursor: pointer;
     font-family: inherit;
-    font-size: .6rem;
+    font-size: .58rem;
     letter-spacing: .3em;
-    padding: 0 0 6px;
+    padding: 0 0 4px;
+    text-align: left;
     text-transform: uppercase
 }
 
@@ -1083,44 +1124,52 @@ div.CatalogueJump {
 
 .LegendList {
     display: grid;
-    gap: 5px;
+    gap: 0;
     list-style: none;
     margin: 0;
-    padding: 0
+    min-height: 0;
+    overflow: hidden auto;
+    padding: 0;
+    scrollbar-color: rgba(200, 210, 255, .25) transparent;
+    scrollbar-width: thin
 }
 
 .LegendList li {
-    align-items: flex-start;
+    align-items: baseline;
     color: var(--galaxy-ink-dim);
     display: flex;
-    font-size: .7rem;
-    gap: 8px
+    font-size: .66rem;
+    gap: 6px;
+    line-height: 1.55;
+    min-width: 0;
+    white-space: nowrap
 }
 
 .LegendList .LegendDots {
-    height: 1.2em;
-    min-width: 22px
-}
-
-.LegendText {
-    display: flex;
-    flex-direction: column;
-    line-height: 1.25
+    align-self: center;
+    height: 1em;
+    min-width: 18px
 }
 
 .LegendName {
-    color: var(--galaxy-ink)
+    color: var(--galaxy-ink);
+    flex: none
 }
 
 .LegendNote {
-    color: var(--galaxy-ink-faint);
-    font-size: .92em
+    color: var(--galaxy-ink-dim);
+    font-size: .94em;
+    min-width: 0;
+    opacity: .85;
+    overflow: hidden;
+    text-overflow: ellipsis
 }
 
 .LegendList li.LegendGroup {
     color: var(--galaxy-ink-faint);
-    font-size: .56rem;
+    font-size: .54rem;
     letter-spacing: .24em;
+    line-height: 1.4;
     padding-top: 6px;
     text-transform: uppercase
 }
@@ -2339,7 +2388,7 @@ button.GalaxyMember {
     right: calc(var(--galaxy-gap) * 2);
     top: 50%;
     transform: translateY(-50%);
-    width: min(400px, 36%);
+    width: min(500px, 40%);
     z-index: 40
 }
 
@@ -2405,7 +2454,7 @@ button.GalaxyMember {
 }
 
 .DetailName {
-    font-size: 2rem;
+    font-size: 2.7rem;
     font-weight: 500;
     letter-spacing: .03em;
     line-height: 1.1;
@@ -2414,15 +2463,74 @@ button.GalaxyMember {
 }
 
 .DetailAbout {
-    color: rgba(230, 236, 255, .86);
-    font-size: .95rem;
-    line-height: 1.6;
+    color: rgba(230, 236, 255, .88);
+    font-size: 1.02rem;
+    line-height: 1.62;
     margin: 0 0 8px;
     text-shadow: 0 1px 10px rgba(0, 0, 0, .6)
 }
 
 .DetailText .InfoFacts {
-    font-size: .84rem
+    font-size: .9rem
+}
+
+/* the photograph, when there is one: the panel's width, its credit over the foot */
+.DetailFigure {
+    background: rgba(0, 0, 0, .35);
+    border: 1px solid rgba(255, 255, 255, .1);
+    border-radius: 14px;
+    margin: 0 0 6px;
+    overflow: hidden;
+    position: relative
+}
+
+.DetailFigure[hidden] {
+    display: none
+}
+
+.DetailFigure.Fiction {
+    border: 1px dashed rgba(199, 166, 255, .55)
+}
+
+.DetailImage {
+    aspect-ratio: 16 / 10;
+    display: block;
+    height: auto;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity .5s;
+    width: 100%
+}
+
+.DetailFigure.Loaded .DetailImage {
+    opacity: 1
+}
+
+.DetailCredit {
+    background: linear-gradient(transparent, rgba(0, 0, 0, .75));
+    bottom: 0;
+    color: var(--galaxy-ink-faint);
+    font-size: .64rem;
+    left: 0;
+    letter-spacing: .03em;
+    line-height: 1.4;
+    padding: 18px 10px 6px;
+    position: absolute;
+    right: 0;
+    text-align: right
+}
+
+.DetailCredit a {
+    color: rgba(230, 236, 255, .72);
+    /* the site-wide a {} rule sets a vmin size */
+    font-size: inherit;
+    text-decoration: none
+}
+
+.DetailCredit a:hover,
+.DetailCredit a:focus-visible {
+    color: #fff;
+    text-decoration: underline
 }
 
 .InfoPhotoCredit {
@@ -2450,90 +2558,9 @@ button.GalaxyMember {
     text-decoration: underline
 }
 
-/*
- * The photograph of an open place (owner, 2026-11-25): it fills everything left of
- * the panel, cropped to cover (or whole, with Photos: Fit), slightly see-through so
- * the sky shows in it, and it melts into the sky at the panel's side.
- */
-.DetailPhoto {
-    bottom: 0;
-    left: 0;
-    margin: 0;
-    opacity: 0;
-    pointer-events: none;
-    position: absolute;
-    right: calc(min(400px, 36%) + var(--galaxy-gap) * 2);
-    top: 0;
-    transition: opacity .7s ease;
-    z-index: 30
-}
-
-.DetailPhoto[hidden] {
-    display: none
-}
-
-.DetailPhoto.Loaded {
-    opacity: .86
-}
-
-.DetailPhoto img {
-    display: block;
-    height: 100%;
-    -webkit-mask-image: linear-gradient(to right, #000 68%, transparent 96%), linear-gradient(to bottom, transparent 0, #000 8%, #000 92%, transparent 100%);
-    mask-image: linear-gradient(to right, #000 68%, transparent 96%), linear-gradient(to bottom, transparent 0, #000 8%, #000 92%, transparent 100%);
-    -webkit-mask-composite: source-in;
-    mask-composite: intersect;
-    object-fit: cover;
-    width: 100%
-}
-
-/* the whole picture, uncropped: the image is sized to the picture, so its soft edge is the picture's */
-.DetailPhoto.Fit:not([hidden]) {
-    align-items: center;
-    display: flex;
-    justify-content: center
-}
-
-/* sized in view.js (fitPhoto) to the largest that fits, so the soft edge is the picture's own */
-.DetailPhoto.Fit img {
-    height: auto;
-    -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent), linear-gradient(to bottom, transparent, #000 7%, #000 93%, transparent);
-    mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent), linear-gradient(to bottom, transparent, #000 7%, #000 93%, transparent);
-    -webkit-mask-composite: source-in;
-    mask-composite: intersect;
-    object-fit: contain
-}
-
-/* fiction's reference images keep the violet dashed edge that says "story" */
-.DetailPhoto.Fiction::after {
-    border-right: 1px dashed color-mix(in srgb, var(--ul-map-fiction, #c7a6ff) 55%, transparent);
-    bottom: 8%;
-    content: "";
-    position: absolute;
-    right: 0;
-    top: 8%
-}
-
-@media (max-width: 760px) {
-    .DetailPhoto {
-        bottom: 45%;
-        right: 0
-    }
-
-    .DetailPhoto img {
-        -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
-        mask-image: linear-gradient(to bottom, #000 70%, transparent 100%)
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .DetailPhoto {
-        transition: none
-    }
-}
 
 /* the rest of the interface steps away while the panel is open */
-.GalaxyView.DetailOpen > :not(canvas):not(.GalaxyDetail):not(.DetailPhoto):not(.GalaxyLoader):not(dialog) {
+.GalaxyView.DetailOpen > :not(canvas):not(.GalaxyDetail):not(.DetailLeader):not(.GalaxyLoader):not(dialog) {
     opacity: 0 !important;
     pointer-events: none !important;
     visibility: hidden
@@ -2557,7 +2584,11 @@ button.GalaxyMember {
     }
 
     .DetailName {
-        font-size: 1.5rem
+        font-size: 1.8rem
+    }
+
+    .DetailImage {
+        aspect-ratio: 21 / 9
     }
 }
 
@@ -2567,8 +2598,267 @@ button.GalaxyMember {
     }
 }
 
-/* no hover pop-ups on the layer buttons (owner, 2026-11-24): the text stays for screen readers */
+/*
+ * The tooltip text lives in each button for screen readers (aria-describedby); what
+ * a hover shows is a copy in #GALAXY_LAYER_TIP, under the row (owner, 2026-11-26).
+ */
 .LayerTip {
     display: none !important
+}
+
+/* ---------- a layer's tooltip: under the row, the legend slides down for it ---------- */
+
+.GalaxyLayerTip {
+    -webkit-backdrop-filter: blur(13px) saturate(150%);
+    backdrop-filter: blur(13px) saturate(150%);
+    background: linear-gradient(160deg, rgba(24, 28, 50, .86), rgba(8, 10, 20, .92));
+    border: 1px solid rgba(255, 255, 255, .05);
+    border-radius: var(--galaxy-radius-small);
+    box-shadow: 0 16px 40px -14px rgba(0, 0, 0, .9), var(--ul-edge-glow);
+    color: var(--galaxy-ink-dim);
+    display: flex;
+    flex-direction: column;
+    font-size: .72rem;
+    gap: 7px;
+    letter-spacing: .02em;
+    line-height: 1.45;
+    opacity: 0;
+    padding: 11px 13px 12px;
+    pointer-events: none;
+    position: absolute;
+    right: var(--galaxy-gap);
+    top: calc(var(--galaxy-gap) + 62px);
+    transform: translateY(-6px);
+    transition: opacity .2s, transform .2s, visibility 0s .2s;
+    visibility: hidden;
+    width: 268px;
+    z-index: 26
+}
+
+.GalaxyLayerTip[hidden] {
+    display: none
+}
+
+.GalaxyLayerTip.Visible {
+    opacity: 1;
+    transform: none;
+    transition: opacity .2s, transform .2s;
+    visibility: visible
+}
+
+.GalaxyLayerTip strong {
+    color: var(--galaxy-ink);
+    font-size: .82rem;
+    font-weight: 500;
+    letter-spacing: .06em
+}
+
+.GalaxyLayerTip p {
+    margin: 0
+}
+
+.GalaxyLayerTip .TipLegend {
+    border-top: 1px solid var(--galaxy-line);
+    padding-top: 6px
+}
+
+/* ---------- the travelling edge on every glass panel (Tokens.css, --ul-edge-*) ---------- */
+
+.SidePanel {
+    border-color: rgba(255, 255, 255, .05);
+    box-shadow: 0 18px 50px -18px rgba(0, 0, 0, .8), inset 0 1px 0 rgba(255, 255, 255, .09), var(--ul-edge-glow);
+    position: relative
+}
+
+.GalaxyLayers,
+.GalaxySettingsPanel {
+    border-color: rgba(255, 255, 255, .05);
+    box-shadow: 0 18px 50px -18px rgba(0, 0, 0, .8), inset 0 1px 0 rgba(255, 255, 255, .08), var(--ul-edge-glow)
+}
+
+.SidePanel::after,
+.GalaxyLayers::after,
+.GalaxySettingsPanel::after,
+.GalaxyLegend::after,
+.GalaxyLayerTip::after,
+.GalaxyDetail::after {
+    animation: UlEdgeTurn var(--ul-edge-period) linear infinite;
+    background: conic-gradient(from var(--ul-edge-angle), var(--ul-edge-stops));
+    border-radius: inherit;
+    content: "";
+    inset: 0;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    padding: 1px;
+    pointer-events: none;
+    position: absolute;
+    z-index: 2
+}
+
+/* the open place's panel: the words scroll inside, so the edge stays put */
+.GalaxyDetail {
+    border-color: rgba(255, 255, 255, .06);
+    box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .85), inset 0 1px 0 rgba(255, 255, 255, .14), var(--ul-edge-glow);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden
+}
+
+.GalaxyDetail .DetailText {
+    min-height: 0;
+    overflow: hidden auto;
+    scrollbar-color: rgba(200, 210, 255, .25) transparent;
+    scrollbar-width: thin
+}
+
+.DetailPage {
+    align-self: flex-start;
+    background: color-mix(in srgb, var(--info-color, #9ecbff) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--info-color, #9ecbff) 55%, transparent);
+    border-radius: 999px;
+    color: #fff;
+    font-size: .8rem;
+    letter-spacing: .04em;
+    margin-top: 10px;
+    padding: 9px 18px;
+    text-decoration: none;
+    transition: background .2s, border-color .2s
+}
+
+.DetailPage:hover,
+.DetailPage:focus-visible {
+    background: color-mix(in srgb, var(--info-color, #9ecbff) 32%, transparent);
+    border-color: var(--info-color, #9ecbff);
+    outline: none
+}
+
+.DetailPage[hidden] {
+    display: none
+}
+
+/* ---------- the leader: from the panel's edge to the place in the sky ---------- */
+
+.DetailLeader {
+    height: 100%;
+    left: 0;
+    opacity: 0;
+    overflow: visible;
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    transition: opacity .4s;
+    width: 100%;
+    z-index: 35
+}
+
+.GalaxyView.DetailOpen .DetailLeader {
+    opacity: 1
+}
+
+.LeaderLine {
+    fill: none;
+    stroke: url(#GALAXY_LEADER_FADE);
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    stroke-linecap: round;
+    stroke-width: 1.3
+}
+
+/* bright where it leaves the border, gone before it reaches the object */
+.LeaderStop0 {
+    stop-color: var(--info-color, #9ecbff);
+    stop-opacity: .95
+}
+
+.LeaderStop1 {
+    stop-color: var(--info-color, #9ecbff);
+    stop-opacity: .45
+}
+
+.LeaderStop2 {
+    stop-color: var(--info-color, #9ecbff);
+    stop-opacity: 0
+}
+
+.DetailLeader.Drawn .LeaderLine {
+    animation: LeaderDraw .8s .2s var(--ul-ease-out) forwards
+}
+
+@keyframes LeaderDraw {
+    to {
+        stroke-dashoffset: 0
+    }
+}
+
+
+/* ---------- labels of the data layers ---------- */
+
+.GalaxyMarker.HistoryLabel .GalaxyMarkerName {
+    color: var(--ul-amber-200);
+    letter-spacing: .16em
+}
+
+.GalaxyMarker.HistoryLabel .GalaxyMarkerSub {
+    color: rgba(255, 236, 206, .78)
+}
+
+.GalaxyMarker.RadioLabel .GalaxyMarkerName {
+    color: var(--ul-blue-300)
+}
+
+.GalaxyMarker.PlanetLabel .GalaxyMarkerName {
+    color: #73ffc7
+}
+
+.GalaxyMarker.TerritoryLabel .GalaxyMarkerName {
+    color: var(--marker-color, #c7a6ff);
+    font-size: .9em;
+    letter-spacing: .32em
+}
+
+@media (max-width: 760px) {
+    /* ten switches do not fit across a phone: the row takes the width and scrolls sideways */
+    .GalaxyLayers {
+        left: var(--galaxy-gap);
+        overflow: auto hidden;
+        scrollbar-width: none
+    }
+
+    .GalaxyLayers::-webkit-scrollbar {
+        display: none
+    }
+
+    /* a scrolling row would carry its edge away with the icons; the glow stays */
+    .GalaxyLayers::after {
+        display: none
+    }
+
+    .GalaxyLayerTip {
+        top: calc(var(--galaxy-gap) + 54px);
+        width: min(268px, calc(100vw - 20px))
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .SidePanel::after,
+    .GalaxyLayers::after,
+    .GalaxySettingsPanel::after,
+    .GalaxyLegend::after,
+    .GalaxyLayerTip::after,
+    .GalaxyDetail::after,
+    .GalaxyLegend::before {
+        animation: none
+    }
+
+    .GalaxyLegend,
+    .GalaxyLayerTip {
+        transition: none
+    }
+
+    .DetailLeader.Drawn .LeaderLine {
+        animation: none;
+        stroke-dashoffset: 0
+    }
 }
 

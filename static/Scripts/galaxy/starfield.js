@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { EXTREME, GALAXY_TINT, BACKDROP, STAR_ALPHA, HAZE_ALPHA, INTER_ARM_TINT, ARM_OUTER_EDGE, ARM_INNER_EDGE, THICK_DISK_TINT, CIRRUS_VIOLET, CIRRUS_BLUE, HALO_TINT, WHITE, STAR_TINTS, DEEP_SKY_STYLE } from "./config.js";
-import { rand, gauss, smoothstep, Layer } from "./util.js";
+import { ARMS, ORION_SPUR, EXTREME, GALAXY_TINT, BACKDROP, STAR_ALPHA, HAZE_ALPHA, INTER_ARM_TINT, ARM_OUTER_EDGE, ARM_INNER_EDGE, THICK_DISK_TINT, CIRRUS_VIOLET, CIRRUS_BLUE, HALO_TINT, WHITE, STAR_TINTS, DEEP_SKY_STYLE } from "./config.js";
+import { rand, gauss, smoothstep, Layer, mulberry32, armPhase, armPoint } from "./util.js";
 import { BACKDROP_MATRIX } from "./backdrop.js";
 
 /* ---------- star field sampled from the backdrop ---------- */
@@ -179,6 +179,82 @@ export function dustMapFrom(sampler, radius = 7) {
     return ribbons;
 }
 
+/*
+ * Dust filaments at the arms' edges (owner, 2026-11-26). In photographs of face-on
+ * spirals the dust is not only a lane along each arm: thin dark feathers leave the
+ * inner edge and cross the arm at a steep angle, a few hundred light-years wide and
+ * a few thousand long. The painting is too soft to carry them, so they are written
+ * into the same dust map the lanes come from - never drawn as geometry (see AGENTS.md:
+ * sprite dust always read as stains). From there they darken the backdrop and every
+ * star behind them like any other lane, at no cost per frame.
+ *
+ * Each arm gets a thin lane just inside its ridge and feathers off it every 0.6-1.6
+ * kly, leaning outward at 35-60 degrees to the arm, only where the painting is lit.
+ * Their own seeded generator: the star field is unchanged.
+ */
+export function addFilaments(dust, sampler) {
+    const n = sampler.n;
+    const random = mulberry32(3112026);
+    const inverse = new THREE.Matrix4().copy(BACKDROP_MATRIX).invert();
+    const v = new THREE.Vector3();
+    const toPixel = (x, z) => {
+        v.set(x, 0, z).applyMatrix4(inverse);
+        return [(v.x / BACKDROP.size + 0.5) * n, (0.5 - v.y / BACKDROP.size) * n];
+    };
+    // a soft-edged stroke from a to b in the plane, strength s, width w in pixels
+    const stroke = (ax, az, bx, bz, s, w) => {
+        const [x0, y0] = toPixel(ax, az);
+        const [x1, y1] = toPixel(bx, bz);
+        const length = Math.hypot(x1 - x0, y1 - y0);
+        const steps = Math.max(2, Math.ceil(length * 2));
+        const reach = Math.ceil(w * 2);
+        for (let k = 0; k <= steps; k++) {
+            const t = k / steps;
+            const px = x0 + (x1 - x0) * t;
+            const py = y0 + (y1 - y0) * t;
+            // tapered at both ends
+            const taper = Math.sin(Math.PI * t);
+            for (let dy = -reach; dy <= reach; dy++) {
+                for (let dx = -reach; dx <= reach; dx++) {
+                    const ix = Math.round(px) + dx;
+                    const iy = Math.round(py) + dy;
+                    if (ix < 0 || iy < 0 || ix >= n || iy >= n) continue;
+                    const d2 = (ix - px) ** 2 + (iy - py) ** 2;
+                    const lit = smoothstep(0.05, 0.2, sampler.lum(ix, iy));
+                    const value = s * taper * Math.exp(-d2 / (w * w)) * lit;
+                    const i = iy * n + ix;
+                    if (value > dust[i]) dust[i] = value;
+                }
+            }
+        }
+    };
+    const arms = [...ARMS.map((a) => ({ crossing: a.crossing, rMin: 9, rMax: a.rMax ?? 48 })), { crossing: ORION_SPUR.crossing, rMin: ORION_SPUR.rMin, rMax: ORION_SPUR.rMax }];
+    for (const arm of arms) {
+        const phase = armPhase(arm.crossing);
+        // the lane: short segments just inside the ridge, broken here and there
+        for (let r = arm.rMin; r < arm.rMax; r += 0.9) {
+            if (random() < 0.3) continue;
+            const a = armPoint(phase, r);
+            const b = armPoint(phase, r + 1.1);
+            const inA = a.clone().normalize().multiplyScalar(-0.55);
+            const inB = b.clone().normalize().multiplyScalar(-0.55);
+            stroke(a.x + inA.x, a.z + inA.z, b.x + inB.x, b.z + inB.z, 0.45 + random() * 0.3, 0.9);
+        }
+        // the feathers: from the inner edge, out across the arm at a steep lean
+        for (let r = arm.rMin + 1; r < arm.rMax; r += 0.6 + random() * 1.0) {
+            const base = armPoint(phase, r);
+            const outward = base.clone().normalize();
+            const along = armPoint(phase, r + 0.2).sub(base).normalize();
+            const lean = THREE.MathUtils.degToRad(35 + random() * 25);
+            const dir = along.multiplyScalar(Math.cos(lean)).addScaledVector(outward, Math.sin(lean)).normalize();
+            const start = base.clone().addScaledVector(outward, -0.6 - random() * 0.3);
+            const length = 1.2 + random() * 2.4;
+            const end = start.clone().addScaledVector(dir, length);
+            stroke(start.x, start.z, end.x, end.z, 0.5 + random() * 0.4, 0.55 + random() * 0.35);
+        }
+    }
+}
+
 export function imageSampler(image, n) {
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = n;
@@ -259,9 +335,21 @@ export function pickTint() {
 }
 
 export function buildGalaxyFromImage(image) {
+    // the load's sub-steps, as "galaxy:" performance measures (see view.buildStarField)
+    let mark = performance.now();
+    const step = (name) => {
+        const now = performance.now();
+        performance.measure(`galaxy:  ${name}`, { start: mark, end: now });
+        mark = now;
+    };
     const sampler = imageSampler(image, BACKDROP.sampleSize);
+    step("sampler");
     const dustMap = dustMapFrom(sampler);
+    step("dust map");
+    addFilaments(dustMap, sampler);
+    step("filaments");
     const scattered = buildScatteredDeepSky(sampler);
+    step("filler");
     const p = new THREE.Vector3();
     const stars = new Layer(BACKDROP.stars + BACKDROP.thickDisk + BACKDROP.halo, STAR_ALPHA);
     const gas = new Layer(BACKDROP.gas + BACKDROP.cirrus + BACKDROP.interArm, HAZE_ALPHA);
@@ -270,9 +358,14 @@ export function buildGalaxyFromImage(image) {
     const color = new THREE.Color();
 
     const centre = (sampler.n - 1) / 2;
+    // one colour read per star, into the same object: no allocation in the hot loop
+    const c = { r: 0, g: 0, b: 0 };
+    const pixels = sampler.pixels;
     for (let i = 0; i < BACKDROP.stars; i++) {
         const index = sampler.pick();
-        const c = pixelColor(sampler, index);
+        c.r = pixels[index * 4] / 255;
+        c.g = pixels[index * 4 + 1] / 255;
+        c.b = pixels[index * 4 + 2] / 255;
         const peak = Math.max(c.r, c.g, c.b);
         if (peak < 0.04) continue;
         const r = pixelToPlane(index, sampler.n, p);
@@ -358,6 +451,7 @@ export function buildGalaxyFromImage(image) {
         stars.add(p, color, size, alpha, dustMap[index]);
     }
 
+    step("thin disk");
     for (let i = 0; i < BACKDROP.gas; i++) {
         const index = sampler.pick();
         const c = pixelColor(sampler, index);
@@ -439,6 +533,7 @@ export function buildGalaxyFromImage(image) {
      * faint, they carry almost no structure, and they are what gives the galaxy
      * volume from every angle instead of looking like a decal.
      */
+    step("haze");
     for (let i = 0; i < BACKDROP.thickDisk; i++) {
         const index = sampler.pick();
         const c = pixelColor(sampler, index);
@@ -488,7 +583,8 @@ export function buildGalaxyFromImage(image) {
             c[i + 2] *= GALAXY_TINT.b;
         }
     }
-    return { stars, gas, knots, scattered, dustTexture: dustTexture(dustMap, sampler.n) };
+    step("thick disk, halo, knots");
+    return { stars, gas, knots, scattered, sampler, dustTexture: dustTexture(dustMap, sampler.n) };
 }
 
 /*
