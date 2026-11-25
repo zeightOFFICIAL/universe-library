@@ -191,9 +191,9 @@
 
     /* ---------- depth: glass and glow, never drop shadows on black ---------- */
 
-    --ul-blur-sm: blur(10px) saturate(140%); /* labels */
-    --ul-blur-md: blur(14px); /* controls, readouts */
-    --ul-blur-lg: blur(22px) saturate(150%); /* panels */
+    --ul-blur-sm: blur(8px) saturate(140%); /* labels */
+    --ul-blur-md: blur(10px); /* controls, readouts */
+    --ul-blur-lg: blur(16px) saturate(150%); /* panels */
     --ul-glow-sm: 0 0 10px -2px; /* + a colour */
     --ul-glow-md: 0 0 18px -2px; /* + a colour */
 

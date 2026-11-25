@@ -247,6 +247,12 @@ export class Marker {
             this.el.style.setProperty("--fade", this.fade.toFixed(2));
             this.drawnFade = this.fade;
         }
+        // the name has a fade of its own: the dot stays while the name waits for the camera
+        const text = this.textFade ?? 1;
+        if (visible && Math.abs(text - (this.drawnText ?? -1)) > 0.02) {
+            this.el.style.setProperty("--text-fade", text.toFixed(2));
+            this.drawnText = text;
+        }
         if (this.iconOnly !== this.drawnIconOnly) {
             this.el.classList.toggle("IconOnly", this.iconOnly);
             this.drawnIconOnly = this.iconOnly;

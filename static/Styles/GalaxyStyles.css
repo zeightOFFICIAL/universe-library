@@ -111,7 +111,10 @@
 .GalaxyMarkerText {
     display: flex;
     flex-direction: column;
-    line-height: 1.2
+    line-height: 1.2;
+    /* the name fades on its own: the dot stays while the name waits for the camera */
+    opacity: var(--text-fade, 1);
+    transition: opacity .3s
 }
 
 .GalaxyMarkerName {
@@ -131,14 +134,18 @@
     cursor: pointer
 }
 
+/*
+ * Every system label is plain text beside its dot - no frame, no glass (owner,
+ * 2026-11-25). A system with a page is told apart by its brighter name only.
+ */
 .GalaxyMarker.Link .GalaxyMarkerText {
-    -webkit-backdrop-filter: blur(10px) saturate(140%);
-    backdrop-filter: blur(10px) saturate(140%);
-    background: var(--galaxy-glass);
-    border: 1px solid var(--galaxy-line-strong);
-    border-radius: var(--galaxy-radius-small);
-    padding: 6px 12px;
-    transition: border-color .25s, box-shadow .25s, background .25s
+    padding: 2px 4px;
+    text-shadow: 0 0 4px #000, 0 0 10px #000
+}
+
+a.GalaxyMarker.Link .GalaxyMarkerName {
+    color: #fff;
+    font-weight: 600
 }
 
 .GalaxyMarker.Link:hover,
@@ -147,11 +154,10 @@
     outline: none
 }
 
-.GalaxyMarker.Link:hover .GalaxyMarkerText,
 .GalaxyMarker.Link:focus-visible .GalaxyMarkerText {
-    background: var(--galaxy-glass-strong);
-    border-color: var(--marker-color, var(--galaxy-accent));
-    box-shadow: 0 0 18px -2px var(--marker-color, var(--galaxy-accent))
+    outline: 1px solid var(--marker-color, var(--galaxy-accent));
+    outline-offset: 2px;
+    border-radius: 4px
 }
 
 /*
@@ -387,8 +393,8 @@
 }
 
 .SidePanel {
-    -webkit-backdrop-filter: blur(22px) saturate(150%);
-    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
     background: linear-gradient(160deg, rgba(40, 48, 78, .42), rgba(12, 15, 26, .58));
     border: 1px solid var(--galaxy-line);
     border-radius: var(--galaxy-radius);
@@ -838,8 +844,8 @@ div.CatalogueJump {
 /* ---------- layers: a row of icons, top right, with settings at the end ---------- */
 
 .GalaxyLayers {
-    -webkit-backdrop-filter: blur(18px) saturate(150%);
-    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(13px) saturate(150%);
+    backdrop-filter: blur(13px) saturate(150%);
     align-items: center;
     background: linear-gradient(160deg, rgba(40, 48, 78, .38), rgba(12, 15, 26, .56));
     border: 1px solid var(--galaxy-line);
@@ -860,8 +866,8 @@ div.CatalogueJump {
 
 /* settings: a panel of its own in the corner, apart from the layers */
 .GalaxySettingsPanel {
-    -webkit-backdrop-filter: blur(18px) saturate(150%);
-    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(13px) saturate(150%);
+    backdrop-filter: blur(13px) saturate(150%);
     background: linear-gradient(160deg, rgba(40, 48, 78, .38), rgba(12, 15, 26, .56));
     border: 1px solid var(--galaxy-line);
     border-radius: 999px;
@@ -926,8 +932,8 @@ div.CatalogueJump {
 
 /* the tooltip: name, what the layer covers, its legend, and its state */
 .LayerTip {
-    -webkit-backdrop-filter: blur(18px) saturate(150%);
-    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(13px) saturate(150%);
+    backdrop-filter: blur(13px) saturate(150%);
     background: rgba(14, 18, 30, .86);
     border: 1px solid var(--galaxy-line-strong);
     border-radius: var(--galaxy-radius-small);
@@ -1033,18 +1039,22 @@ div.CatalogueJump {
 /* ---------- legend: under the layers, the main keys first, all on hover ---------- */
 
 .GalaxyLegend {
-    -webkit-backdrop-filter: blur(18px) saturate(150%);
-    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(13px) saturate(150%);
+    backdrop-filter: blur(13px) saturate(150%);
     background: linear-gradient(160deg, rgba(40, 48, 78, .34), rgba(12, 15, 26, .54));
     border: 1px solid var(--galaxy-line);
     border-radius: var(--galaxy-radius-small);
     box-shadow: 0 18px 50px -18px rgba(0, 0, 0, .8);
+    max-height: calc(100% - var(--galaxy-gap) * 2 - 140px);
+    overflow: hidden auto;
     padding: 8px 12px 10px;
     position: absolute;
     /* its right edge lines up with the settings panel's */
     right: var(--galaxy-gap);
+    scrollbar-color: rgba(200, 210, 255, .25) transparent;
+    scrollbar-width: thin;
     top: calc(var(--galaxy-gap) + 62px);
-    width: 214px;
+    width: 248px;
     z-index: 24
 }
 
@@ -1060,13 +1070,10 @@ div.CatalogueJump {
     text-transform: uppercase
 }
 
-.LegendHead::after {
-    content: "  +";
-    letter-spacing: 0
-}
-
-.GalaxyLegend.Open .LegendHead::after {
-    content: "  –"
+/* always open on a wide screen, so the heading is only a heading there */
+.LegendHead {
+    cursor: default;
+    pointer-events: none
 }
 
 .LegendHead:focus-visible {
@@ -1083,20 +1090,57 @@ div.CatalogueJump {
 }
 
 .LegendList li {
-    align-items: center;
+    align-items: flex-start;
     color: var(--galaxy-ink-dim);
     display: flex;
     font-size: .7rem;
     gap: 8px
 }
 
-/* only the main keys until the legend is opened (a click; hovering does nothing) */
-.LegendList li:not(.Primary) {
-    display: none
+.LegendList .LegendDots {
+    height: 1.2em;
+    min-width: 22px
 }
 
-.GalaxyLegend.Open .LegendList li {
-    display: flex
+.LegendText {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25
+}
+
+.LegendName {
+    color: var(--galaxy-ink)
+}
+
+.LegendNote {
+    color: var(--galaxy-ink-faint);
+    font-size: .92em
+}
+
+.LegendList li.LegendGroup {
+    color: var(--galaxy-ink-faint);
+    font-size: .56rem;
+    letter-spacing: .24em;
+    padding-top: 6px;
+    text-transform: uppercase
+}
+
+.LegendList li.LegendGroup:first-child {
+    padding-top: 0
+}
+
+.LegendDot.Square {
+    background: color-mix(in srgb, var(--legend-color) 12%, transparent);
+    border: 1px solid var(--legend-color);
+    border-radius: 1px;
+    box-shadow: none;
+    height: 9px;
+    width: 9px
+}
+
+.LegendDot.Diamond.Fiction {
+    background: transparent;
+    border: 1.5px dashed var(--legend-color)
 }
 
 .LegendDot.Hollow {
@@ -1164,12 +1208,6 @@ div.GalaxyMarker.Object .GalaxyMarkerText {
     box-shadow: 0 0 10px -2px var(--marker-color)
 }
 
-.GalaxyMarker.Fiction .GalaxyMarkerText {
-    background: rgba(40, 24, 64, .45);
-    border-color: color-mix(in srgb, var(--marker-color) 55%, transparent);
-    border-style: dashed
-}
-
 .GalaxyMarker.Fiction .GalaxyMarkerName {
     color: #e6d8ff;
     font-style: italic;
@@ -1198,8 +1236,8 @@ div.GalaxyMarker.Object .GalaxyMarkerText {
 }
 
 .SettingsPanel {
-    -webkit-backdrop-filter: blur(22px) saturate(150%);
-    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
     background: linear-gradient(160deg, rgba(40, 48, 78, .7), rgba(12, 15, 26, .9));
     border: 1px solid var(--galaxy-line-strong);
     border-radius: var(--galaxy-radius);
@@ -1438,8 +1476,8 @@ div.GalaxyMarker.Object .GalaxyMarkerText {
 }
 
 .GalaxyReadout {
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
     background: var(--galaxy-glass);
     border: 1px solid var(--galaxy-line);
     border-radius: 999px;
@@ -1469,8 +1507,8 @@ div.GalaxyMarker.Object .GalaxyMarkerText {
 }
 
 .GalaxyControls {
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
     background: var(--galaxy-glass);
     border: 1px solid var(--galaxy-line);
     border-radius: 999px;
@@ -1614,8 +1652,8 @@ div.GalaxyMarker.Object .GalaxyMarkerText {
 }
 
 .GalaxyCoords {
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
     background: var(--galaxy-glass);
     border: 1px solid var(--galaxy-line);
     border-radius: 999px;
@@ -1679,19 +1717,42 @@ div.GalaxyMarker.Object .GalaxyMarkerText {
     filter: drop-shadow(0 0 2px var(--galaxy-warm))
 }
 
+.AngleText {
+    align-items: flex-end;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.05;
+    min-width: 2.8em
+}
+
 .AngleValue {
     font-size: .74rem;
     font-variant-numeric: tabular-nums;
-    letter-spacing: .04em;
-    min-width: 2.6em;
-    text-align: right
+    letter-spacing: .04em
+}
+
+.AngleSide {
+    color: var(--galaxy-ink-faint);
+    font-size: .52rem;
+    letter-spacing: .14em;
+    text-transform: uppercase
+}
+
+/* from the underside: the disk turns violet and dashed, and the dial says "below" */
+.AngleDial.Below .AngleDisk {
+    stroke: var(--ul-map-fiction, #c7a6ff);
+    stroke-dasharray: 2 1.6
+}
+
+.AngleDial.Below .AngleSide {
+    color: var(--ul-map-fiction, #c7a6ff)
 }
 
 /* ---------- hiding the interface ---------- */
 
 .UiToggle {
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
     align-items: center;
     background: var(--galaxy-glass);
     border: 1px solid var(--galaxy-line);
@@ -1928,7 +1989,18 @@ button.GalaxyMember {
     }
 
     .GalaxyLegend .LegendHead {
-        padding: 0
+        cursor: pointer;
+        padding: 0;
+        pointer-events: auto
+    }
+
+    .GalaxyLegend .LegendHead::after {
+        content: "  +";
+        letter-spacing: 0
+    }
+
+    .GalaxyLegend.Open .LegendHead::after {
+        content: "  –"
     }
 
     .GalaxyLegend:not(.Open) .LegendList {
@@ -1936,7 +2008,7 @@ button.GalaxyMember {
     }
 
     .GalaxyLegend.Open {
-        width: 214px
+        width: 240px
     }
 
     .GalaxyLegend.Open .LegendHead {
@@ -1973,7 +2045,7 @@ button.GalaxyMember {
         transition: opacity .6s
     }
 
-    .AngleDial .AngleValue {
+    .AngleDial .AngleText {
         display: none
     }
 
@@ -2039,8 +2111,8 @@ button.GalaxyMember {
  * zoom controls, out of the way of the dock and the legend.
  */
 .GalaxyInfo {
-    -webkit-backdrop-filter: blur(20px) saturate(150%);
-    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(15px) saturate(150%);
+    backdrop-filter: blur(15px) saturate(150%);
     background: linear-gradient(160deg, rgba(40, 48, 78, .62), rgba(12, 15, 26, .86));
     border: 1px solid var(--galaxy-line-strong);
     border-radius: var(--galaxy-radius);
@@ -2248,13 +2320,13 @@ button.GalaxyMember {
 /* ---------- arriving somewhere: a glass panel on the right, the sky all round it ---------- */
 
 /*
- * The photograph is in the sky now (photos.js), so the panel is text only: frosted
+ * The photograph fills the left (#GALAXY_PHOTO, .DetailPhoto), so the panel is text only: frosted
  * glass at the right edge, the stars and the place itself visible through and
  * around it. The rest of the interface steps away until Back.
  */
 .GalaxyDetail {
-    -webkit-backdrop-filter: blur(18px) saturate(160%);
-    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(13px) saturate(160%);
+    backdrop-filter: blur(13px) saturate(160%);
     animation: DetailIn .45s ease;
     background: linear-gradient(165deg, rgba(60, 70, 110, .26), rgba(14, 16, 30, .42));
     border: 1px solid rgba(255, 255, 255, .14);
@@ -2378,8 +2450,90 @@ button.GalaxyMember {
     text-decoration: underline
 }
 
+/*
+ * The photograph of an open place (owner, 2026-11-25): it fills everything left of
+ * the panel, cropped to cover (or whole, with Photos: Fit), slightly see-through so
+ * the sky shows in it, and it melts into the sky at the panel's side.
+ */
+.DetailPhoto {
+    bottom: 0;
+    left: 0;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    right: calc(min(400px, 36%) + var(--galaxy-gap) * 2);
+    top: 0;
+    transition: opacity .7s ease;
+    z-index: 30
+}
+
+.DetailPhoto[hidden] {
+    display: none
+}
+
+.DetailPhoto.Loaded {
+    opacity: .86
+}
+
+.DetailPhoto img {
+    display: block;
+    height: 100%;
+    -webkit-mask-image: linear-gradient(to right, #000 68%, transparent 96%), linear-gradient(to bottom, transparent 0, #000 8%, #000 92%, transparent 100%);
+    mask-image: linear-gradient(to right, #000 68%, transparent 96%), linear-gradient(to bottom, transparent 0, #000 8%, #000 92%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+    object-fit: cover;
+    width: 100%
+}
+
+/* the whole picture, uncropped: the image is sized to the picture, so its soft edge is the picture's */
+.DetailPhoto.Fit:not([hidden]) {
+    align-items: center;
+    display: flex;
+    justify-content: center
+}
+
+/* sized in view.js (fitPhoto) to the largest that fits, so the soft edge is the picture's own */
+.DetailPhoto.Fit img {
+    height: auto;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent), linear-gradient(to bottom, transparent, #000 7%, #000 93%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent), linear-gradient(to bottom, transparent, #000 7%, #000 93%, transparent);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+    object-fit: contain
+}
+
+/* fiction's reference images keep the violet dashed edge that says "story" */
+.DetailPhoto.Fiction::after {
+    border-right: 1px dashed color-mix(in srgb, var(--ul-map-fiction, #c7a6ff) 55%, transparent);
+    bottom: 8%;
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 8%
+}
+
+@media (max-width: 760px) {
+    .DetailPhoto {
+        bottom: 45%;
+        right: 0
+    }
+
+    .DetailPhoto img {
+        -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+        mask-image: linear-gradient(to bottom, #000 70%, transparent 100%)
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .DetailPhoto {
+        transition: none
+    }
+}
+
 /* the rest of the interface steps away while the panel is open */
-.GalaxyView.DetailOpen > :not(canvas):not(.GalaxyDetail):not(.GalaxyLoader):not(dialog) {
+.GalaxyView.DetailOpen > :not(canvas):not(.GalaxyDetail):not(.DetailPhoto):not(.GalaxyLoader):not(dialog) {
     opacity: 0 !important;
     pointer-events: none !important;
     visibility: hidden
@@ -2418,30 +2572,3 @@ button.GalaxyMember {
     display: none !important
 }
 
-/* ---------- fiction: a framed reference picture in the card and the panel ---------- */
-
-.InfoFigure {
-    aspect-ratio: 16 / 9;
-    background: #000;
-    border: 1px dashed color-mix(in srgb, var(--ul-map-fiction, #c7a6ff) 55%, transparent);
-    border-radius: var(--ul-radius-sm, 11px);
-    margin: 0 0 10px;
-    overflow: hidden
-}
-
-.InfoFigure[hidden] {
-    display: none
-}
-
-.InfoFigure img {
-    display: block;
-    height: 100%;
-    object-fit: cover;
-    width: 100%
-}
-
-.GalaxyInfo .InfoFigure {
-    border-radius: var(--galaxy-radius) var(--galaxy-radius) 0 0;
-    border-width: 0 0 1px;
-    margin: 0
-}

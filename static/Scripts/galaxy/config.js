@@ -257,6 +257,8 @@ export const GALAXY_MIN_DISTANCE = 0.8;
 export const SUN_VIEW = { distance: 0.95, polar: 1.0 };
 // nebula and cluster names come in from this far away (camera to object, scene units)
 export const DEEP_SKY_LABEL_DISTANCE = 80;
+// a system's or an object's name comes in once the camera is this close to it (its dot is always drawn)
+export const LABEL_TEXT_DISTANCE = 9;
 
 export const OVERVIEW = { target: new THREE.Vector3(0, 0, 0), distance: 85, polar: 0.9, azimuth: 0.45 };
 /*

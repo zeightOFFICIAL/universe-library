@@ -102,6 +102,8 @@ export const VERTEX_SHADER = /* glsl */ `
     uniform float uLaneHeight;
     uniform float uArmDust;
     uniform float uLaneFloor;
+    uniform float uTwinkle;
+    uniform float uTime;
     varying vec3 vColor;
     varying float vAlpha;
     varying float vExtinction;
@@ -171,6 +173,16 @@ export const VERTEX_SHADER = /* glsl */ `
         }
         float size = mix(aSize, aSize * uScale / dist, uAttenuate);
         float alpha = aAlpha;
+        /*
+         * Twinkling: two slow sines per star, at rates and phases from a hash of its
+         * position, multiplied so the waver never repeats in step. Only about half the
+         * stars take part, most of those faintly. Off when uTwinkle is 0.
+         */
+        if (uTwinkle > 0.0) {
+            float h = fract(sin(dot(position, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+            float w = sin(uTime * (0.7 + 2.1 * h) + h * 40.0) * sin(uTime * (0.23 + 0.45 * h) + h * 11.0);
+            alpha *= 1.0 + uTwinkle * smoothstep(0.45, 1.0, h) * w;
+        }
         // keep sub-pixel points as dim 1px points instead of losing them
         if (size < 1.0) {
             alpha *= size;
@@ -301,6 +313,8 @@ export function pointsMaterial({ maxSize, minSize = 1, nearFade = 0.02, sharpnes
             uArmDust: { value: 0 },
             uLaneFloor: { value: DUST.laneFloor },
             uRing: { value: ring ? 1 : 0 },
+            uTwinkle: { value: 0 },
+            uTime: { value: 0 },
             // soft sprites take the lane per fragment instead of per vertex
             uSoftLane: { value: 0 },
             uUpY: { value: 1 },

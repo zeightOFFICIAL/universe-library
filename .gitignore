@@ -6,3 +6,6 @@
 compiled/
 .idea/
 .venv/
+
+# agent tooling (local only)
+.claude/

@@ -22,14 +22,24 @@ import { rand, gauss, mulberry32, directionFromSun, truePosition, Layer } from "
  *
  * Its own seeded generator, so adding a landmark never reshuffles the star field.
  */
-// one dial for how loud the painted layer is against the star field
-const ART_BRIGHTNESS = 0.78;
 /*
- * The hard points - cluster member stars and each object's centre dot - at half the
- * strength they had (owner, 2026-11-24: the bright dots read too strong). The soft
- * envelopes and wisps keep ART_BRIGHTNESS alone.
+ * One dial for how loud the painted layer is against the star field. Lowered again
+ * on 2026-11-25 (0.78 to 0.56; owner: too much stands out, at every zoom), so the
+ * painted objects sit in the star field rather than on top of it.
  */
-const DOT_BRIGHTNESS = 0.5;
+const ART_BRIGHTNESS = 0.56;
+/*
+ * The hard points - cluster member stars and each object's centre dot - on top of
+ * that (owner, 2026-11-24: the bright dots read too strong; 0.5, then 0.42).
+ */
+const DOT_BRIGHTNESS = 0.42;
+/*
+ * And the spread between objects is narrowed, so no one thing shouts: the brightest
+ * member stars are only a little brighter than the rest (1 to 0.72), and the
+ * biggest nebula envelopes are held nearer the others (BIG_ENVELOPE).
+ */
+const BRIGHT_MEMBER = 0.72;
+const BIG_ENVELOPE = 0.8;
 
 const ARTISTIC = {
     nebula: {
@@ -107,7 +117,7 @@ export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: draw
         // a per-object stretch, so the wisps of one nebula lean one way
         const lean = new THREE.Vector3(normal(), normal() * 0.4, normal()).normalize();
 
-        envelopes.add(o.position, tint(0), size(art.envelope), between(art.envelopeAlpha) * quiet);
+        envelopes.add(o.position, tint(0), size(art.envelope), between(art.envelopeAlpha) * quiet * (o.kind === "nebula" ? BIG_ENVELOPE : 1));
         const wisps = Math.max(1, Math.round(art.wisps * amount));
         for (let i = 0; i < wisps; i++) {
             const along = normal() * art.spread * 0.8;
@@ -128,7 +138,7 @@ export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: draw
             p.set(normal(), normal(), normal()).normalize().multiplyScalar(r).add(o.position);
             color.set(art.memberTint || style.color).convertSRGBToLinear().lerp(white, 0.3 + 0.45 * random());
             const bright = !filler && random() < 0.15;
-            members.add(p, color, filler ? 2.2 + 2.6 * random() : (bright ? 3 + 1.5 * random() : 1.6 + 1.6 * random()), (bright ? 1 : 0.55 + 0.35 * random()) * (filler ? 0.6 : spots ? 0.7 : 1) * ART_BRIGHTNESS * DOT_BRIGHTNESS);
+            members.add(p, color, filler ? 2.2 + 2.6 * random() : (bright ? 3 + 1.5 * random() : 1.6 + 1.6 * random()), (bright ? BRIGHT_MEMBER : 0.5 + 0.22 * random()) * (filler ? 0.6 : 0.7) * ART_BRIGHTNESS * DOT_BRIGHTNESS);
             // the brightest members get a small glow of their own, like a photograph's
             if (bright) details.add(p, color, 0.09 * sizeScale, 0.16 * ART_BRIGHTNESS * DOT_BRIGHTNESS);
         }
@@ -140,9 +150,13 @@ export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: draw
     // detail has no floor: from across the galaxy it folds into the envelope
     const detailMaterial = pointsMaterial({ maxSize: cap * 0.8, minSize: 0, nearFade: 0.01, sharpness: 2.6, soft: true, cloud: 0.85 });
     const ringMaterial = pointsMaterial({ maxSize: cap * 0.7, minSize: 5, nearFade: 0.01, ring: true });
-    // member stars only resolve up close; from afar they fold into the core point
-    // spots sit between the two: the named look, a little smaller and sharper, since there are thousands
-    const memberMaterial = pointsMaterial(filler ? { maxSize: 6, minSize: 0, nearFade: 0.002, sharpness: 14 } : spots ? { maxSize: 8, minSize: 0, nearFade: 0.002, sharpness: 10 } : { maxSize: 13, minSize: 0, nearFade: 0.002, sharpness: 7 });
+    /*
+     * Member stars only resolve up close; from afar they fold into the core point.
+     * Named clusters and the ones across the disk share one look since 2026-11-25
+     * (8 px, sharpness 10, x 0.7): the named ones at 13 px were the brightest thing
+     * near the Sun - three quarters of its near-white pixels at distance 9.
+     */
+    const memberMaterial = pointsMaterial(filler ? { maxSize: 6, minSize: 0, nearFade: 0.002, sharpness: 14 } : { maxSize: 8, minSize: 0, nearFade: 0.002, sharpness: 10 });
 
     const group = new THREE.Group();
     const points = new THREE.Points(cores.geometry(), material);
@@ -170,6 +184,9 @@ const OBJECT_LOOK = {
     star: { color: "#ffe9a8", size: 0.35, alpha: 0.8 },
 };
 
+// the named stars, black holes and neutron stars sit in the star field, not on it (owner, 2026-11-25)
+const STELLAR_BRIGHTNESS = 0.5;
+
 export function buildStellarObjects(objects) {
     const rings = new Layer(objects.length);
     const glows = new Layer(objects.length * 2);
@@ -181,11 +198,12 @@ export function buildStellarObjects(objects) {
         const color = new THREE.Color(tint).convertSRGBToLinear();
         const bright = o.luminosity ? 0.7 + 0.15 * Math.log10(o.luminosity) : 1;
         if (look.ring) {
-            rings.add(o.position, color, look.size, look.alpha);
-            glows.add(o.position, color, look.size * 1.6, 0.12);
+            rings.add(o.position, color, look.size, look.alpha * STELLAR_BRIGHTNESS);
+            glows.add(o.position, color, look.size * 1.6, 0.12 * STELLAR_BRIGHTNESS);
         } else {
-            glows.add(o.position, color, look.size * bright, look.alpha * 0.5);
-            glows.add(o.position, new THREE.Color(1, 1, 1), look.size * 0.18 * bright, look.alpha);
+            glows.add(o.position, color, look.size * bright, look.alpha * 0.5 * STELLAR_BRIGHTNESS);
+            // the white heart only a little whiter than its glow, so it reads as a star, not a lamp
+            glows.add(o.position, new THREE.Color(1, 1, 1).lerp(color, 0.4), look.size * 0.18 * bright, look.alpha * 0.6 * STELLAR_BRIGHTNESS);
         }
     }
     const ringMaterial = pointsMaterial({ maxSize: 90, minSize: 3, nearFade: 0.002, ring: true });

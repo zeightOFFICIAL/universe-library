@@ -84,15 +84,15 @@
                     </div>
                 </section>
             </aside>
+            <figure class="DetailPhoto" id="GALAXY_PHOTO" hidden><img alt="" decoding="async"></figure>
             <section class="GalaxyDetail" id="GALAXY_DETAIL" aria-label="About this place" hidden>
                 <div class="DetailText">
                     <button type="button" class="DetailBack"><span aria-hidden="true">&larr;</span> Back to the map</button>
-                    <figure class="InfoFigure" hidden><img alt="" decoding="async"></figure>
                     <p class="InfoKicker"></p>
                     <h2 class="DetailName"></h2>
                     <p class="DetailAbout"></p>
                     <dl class="InfoFacts"></dl>
-                    <p class="InfoPhotoCredit" hidden>Photo in the sky: <a target="_blank" rel="noopener"></a></p>
+                    <p class="InfoPhotoCredit" hidden>Photo: <a target="_blank" rel="noopener"></a></p>
                 </div>
             </section>
             <nav class="GalaxyLayers" aria-label="Layers">
@@ -128,7 +128,7 @@
                 </button>
             </nav>
             <aside class="GalaxyLegend" id="GALAXY_LEGEND" aria-label="Legend">
-                <button type="button" class="LegendHead" aria-expanded="false" aria-controls="GALAXY_LEGEND_LIST">Legend</button>
+                <button type="button" class="LegendHead" aria-expanded="true" aria-controls="GALAXY_LEGEND_LIST">Legend</button>
                 <ul class="LegendList" id="GALAXY_LEGEND_LIST"></ul>
             </aside>
             <div class="GalaxySettingsPanel">
@@ -167,7 +167,7 @@
             <div class="GalaxyControls">
                 <div class="AngleDial" id="GALAXY_ANGLE" role="img" aria-label="Viewing angle">
                     <svg viewBox="-12 -12 24 24" aria-hidden="true"><ellipse class="AngleDisk" rx="9" ry="9"/><line class="AnglePlane" x1="-11" x2="11" y1="0" y2="0"/><circle class="AngleCore" r="1.7"/></svg>
-                    <span class="AngleValue"></span>
+                    <span class="AngleText"><span class="AngleValue"></span><span class="AngleSide">above</span></span>
                 </div>
                 <button type="button" data-action="sun" class="HomeButton" aria-label="Back to the Sun">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7.5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg>

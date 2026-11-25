@@ -245,7 +245,7 @@ There are no drop shadows on black. Depth is made of translucency, blur, hairlin
 | Layer | Treatment |
 |---|---|
 | Sky | the 3D scene; `#000` |
-| Map labels | no box, with a black text halo; links get `--ul-glass` + `--ul-blur-sm` + an `--ul-outline-strong` hairline |
+| Map labels | no box, with a black text halo, links included; a link with a page has a bright, bold name |
 | Controls, readouts | `--ul-glass` + `--ul-blur-md` + an `--ul-outline` hairline, pill |
 | Panels | `--ul-glass-sheen` + `--ul-blur-lg` + an `--ul-outline` hairline, `md` radius |
 | Dialogs, the detail panel | `--ul-glass-strong` + `--ul-blur-lg`, `lg` radius |
@@ -273,8 +273,8 @@ There are no drop shadows on black. Depth is made of translucency, blur, hairlin
 - **Photographs are light on black.** They are composited additively and premultiplied onto black, so their dark sky disappears into ours. Never use an image with a white or transparent-checkerboard background on the map.
 - Sources: Wikimedia Commons only, public domain or CC0/CC BY/CC BY-SA, downloaded and never hotlinked, each with its credit shown on the card and recorded in `starsystems/image_sources.py`.
 - Galaxy photographs are median-filtered so their foreground stars don't compete with ours. Card photos are 960 px wide.
-- Sky photos hang in the scene with dissolved edges, never as framed rectangles, and only for the place you have flown to (a click or a jump, never on the way past). The view is held while one is up - no turning, small nudges only - so it is always seen square on.
-- **Fiction may use images from games, films and books** (the owner's choice), always with the reference shown under them. They are never hung in the sky - they are not light on black - but framed in the card with a dashed violet border, the fiction convention.
+- An open place's photograph fills the screen left of the glass panel (cover; Fit as an option), at 0.86 so the sky shows through, dissolving into the sky towards the panel - never a framed rectangle. It appears only for the place you clicked, and the view is locked while it is up.
+- **Fiction may use images from games, films and books** (the owner's choice), always with the reference shown under them. They show like any photo, with a dashed violet edge, the fiction convention, and "Reference image:" in the credit.
 - An artist's impression is labelled as one (the backdrop, the black holes' glyphs).
 - The technical recipe (ffmpeg settings, sizes, rate limits) is in `AGENTS.md` §7.8.
 
