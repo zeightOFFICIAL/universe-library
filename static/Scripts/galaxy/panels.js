@@ -101,7 +101,7 @@ export class Catalogue {
             jump.className = "CatalogueJump";
             if (entry.fly) {
                 jump.type = "button";
-                jump.setAttribute("aria-label", `Show ${entry.name} on the map`);
+                jump.setAttribute("aria-label", `Fly to ${entry.name} and see it close up`);
                 jump.addEventListener("click", () => entry.fly());
             }
             jump.innerHTML = '<span class="CatalogueDot"></span><span class="CatalogueText"><span class="CatalogueName"></span><span class="CatalogueSub"></span></span><span class="CatalogueSeen" aria-hidden="true"></span>';
@@ -117,14 +117,30 @@ export class Catalogue {
                 jump.querySelector(".CatalogueText").appendChild(distanceLine);
             }
             row.appendChild(jump);
+            /*
+             * Two buttons on the right of every row (owner, 2026-11-26): close-up,
+             * which is also what a click anywhere on the row does, and - when the
+             * place has one - its page.
+             */
+            if (entry.fly) {
+                const close = document.createElement("button");
+                close.type = "button";
+                close.className = "CatalogueOpen CatalogueCloseUp";
+                close.setAttribute("aria-label", `Fly to ${entry.name} and see it close up`);
+                close.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2L14 14M7 4.8v4.4M4.8 7h4.4"/></svg>';
+                close.addEventListener("click", () => entry.fly());
+                row.appendChild(close);
+            }
             if (entry.href) {
                 const open = document.createElement("a");
                 open.className = "CatalogueOpen";
                 open.href = entry.href;
-                open.setAttribute("aria-label", `Open ${entry.name}`);
+                open.setAttribute("aria-label", `Open the ${entry.name} page`);
                 open.innerHTML = '<span aria-hidden="true">&rarr;</span>';
                 row.appendChild(open);
             }
+            // the buttons sit in the row's top corner; the name keeps clear of them
+            row.classList.add(`Actions${Boolean(entry.fly) + Boolean(entry.href)}`);
             this.list.appendChild(row);
             return { entry, row, distanceLine, seen: false, search: `${entry.name} ${entry.sub || ""} ${entry.search || ""}`.toLowerCase() };
         });

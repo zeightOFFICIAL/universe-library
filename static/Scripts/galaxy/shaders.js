@@ -103,6 +103,7 @@ export const VERTEX_SHADER = /* glsl */ `
     uniform float uArmDust;
     uniform float uLaneFloor;
     uniform float uTwinkle;
+    uniform float uOutliers;
     uniform float uTime;
     varying vec3 vColor;
     varying float vAlpha;
@@ -182,18 +183,38 @@ export const VERTEX_SHADER = /* glsl */ `
          * glints: a short flare every few seconds, brighter and a little bigger,
          * which the bloom catches. Off when uTwinkle is 0.
          */
+        /*
+         * Twice as strong (owner, 2026-11-26), and with bright outliers: one star in
+         * about 180 (h above 0.9945) is several times brighter and a little bigger than
+         * its neighbours and shimmers more. The outliers fade back to ordinary stars
+         * with distance (8 to 40 kly from the camera), so the wide view never glitters.
+         * The shimmer is exponential, so doubling it never drives a star below zero.
+         */
         float twinkle = 1.0;
-        if (uTwinkle > 0.0) {
+        if (uTwinkle > 0.0 || uOutliers > 0.0) {
             float h = fract(sin(dot(position, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
             float h2 = fract(h * 91.7);
-            float w = 0.6 * sin(uTime * (0.9 + 2.6 * h) + h * 40.0) + 0.4 * sin(uTime * (2.3 + 3.1 * h2) + h2 * 23.0);
-            twinkle = 1.0 + uTwinkle * 0.55 * w;
-            if (h2 > 0.92) {
-                float glint = pow(max(sin(uTime * (0.45 + 0.9 * h) + h * 60.0), 0.0), 14.0);
-                twinkle += uTwinkle * 3.2 * glint;
-                size *= 1.0 + 0.9 * uTwinkle * glint;
+            /*
+             * The outliers are the shimmer, not just brightness (owner, 2026-11-26,
+             * second pass): one star in about 180 flickers hard and fast - from a
+             * fifth of its light to four times it - on top of a modest lift, so it
+             * catches the eye without turning into a beacon. From afar they keep
+             * half their strength (20 to 90 kly from the camera).
+             */
+            float outlier = h > 0.9945 ? uOutliers * (1.0 - 0.5 * smoothstep(20.0, 90.0, dist)) : 0.0;
+            twinkle = 1.0 + 1.2 * outlier;
+            size *= 1.0 + 0.45 * outlier;
+            if (uTwinkle > 0.0) {
+                // outliers run on faster sines as well as deeper ones
+                float speed = 1.0 + 1.6 * outlier;
+                float w = 0.6 * sin(uTime * speed * (0.9 + 2.6 * h) + h * 40.0) + 0.4 * sin(uTime * speed * (2.3 + 3.1 * h2) + h2 * 23.0);
+                twinkle *= exp(uTwinkle * (0.8 + 0.75 * outlier) * w);
+                if (h2 > 0.9) {
+                    float glint = pow(max(sin(uTime * (0.45 + 0.9 * h) + h * 60.0), 0.0), 12.0);
+                    twinkle += uTwinkle * 6.4 * glint;
+                    size *= 1.0 + 1.4 * uTwinkle * glint;
+                }
             }
-            twinkle = max(twinkle, 0.15);
         }
         // keep sub-pixel points as dim 1px points instead of losing them
         if (size < 1.0) {
@@ -326,6 +347,8 @@ export function pointsMaterial({ maxSize, minSize = 1, nearFade = 0.02, sharpnes
             uLaneFloor: { value: DUST.laneFloor },
             uRing: { value: ring ? 1 : 0 },
             uTwinkle: { value: 0 },
+            // bright outliers among the stars (the view sets it to 1 for the star field)
+            uOutliers: { value: 0 },
             uTime: { value: 0 },
             // soft sprites take the lane per fragment instead of per vertex
             uSoftLane: { value: 0 },

@@ -207,6 +207,16 @@
     --ul-edge-stops: rgba(255, 217, 160, .85), rgba(199, 166, 255, .75) 22%, rgba(158, 203, 255, .3) 40%, rgba(199, 166, 255, .7) 58%, rgba(255, 217, 160, .85) 78%, rgba(255, 217, 160, .35) 90%, rgba(255, 217, 160, .85);
     --ul-edge-glow: 0 0 24px -12px rgba(199, 166, 255, .55), 0 0 34px -18px rgba(255, 217, 160, .45);
     --ul-edge-period: 14s;
+    /* 1.5 px: at 1 px the ring's curve broke into steps at the corners (owner, 2026-11-26) */
+    --ul-edge-width: 1.5px;
+
+    /*
+     * The panel surface (owner, 2026-11-26): near-opaque, so words read against any part
+     * of the galaxy. Every panel takes it - the dock, the layers, settings, the legend,
+     * the tooltips, the open place - with the travelling edge as its only border. No
+     * backdrop blur behind it: see "one surface for every panel" in GalaxyStyles.css.
+     */
+    --ul-panel-fill: linear-gradient(160deg, rgba(24, 28, 50, .9), rgba(8, 10, 20, .94));
 
     /* ---------- motion ---------- */
 

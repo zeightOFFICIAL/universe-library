@@ -159,7 +159,12 @@ for (const key of ["stars", "thickDisk", "halo"]) BACKDROP[key] = Math.round(BAC
 for (const key of ["gas", "cirrus", "interArm"]) BACKDROP[key] = Math.round(BACKDROP[key] * HAZE_DENSITY);
 export const STAR_ALPHA = 1 / STAR_DENSITY;
 export const HAZE_ALPHA = 1 / HAZE_DENSITY;
-export const MAX_PIXEL_RATIO = LITE ? 1.5 : EXTREME ? 3 : 2;
+/*
+ * Full is capped at 1.5 (owner, 2026-11-26: it held an Arc laptop at full load). On a
+ * 2x screen that is 44% fewer pixels for the post-processing and the soft layers, and
+ * points are drawn at a size in pixels anyway, so the stars barely change.
+ */
+export const MAX_PIXEL_RATIO = LITE ? 1.25 : EXTREME ? 3 : 1.5;
 /*
  * Extreme is the best picture this page can make, at any cost (owner, 2026-11-24):
  *   - supersampled: it renders at twice the screen's own pixel ratio (up to 3), so a
@@ -259,6 +264,8 @@ export const SUN_VIEW = { distance: 0.95, polar: 1.0 };
 export const DEEP_SKY_LABEL_DISTANCE = 80;
 // a system's or an object's name comes in once the camera is this close to it (its dot is always drawn)
 export const LABEL_TEXT_DISTANCE = 9;
+// the territories layer (territories.js) is off for now (owner, 2026-11-26); its code and table stay
+export const SHOW_TERRITORIES = false;
 
 export const OVERVIEW = { target: new THREE.Vector3(0, 0, 0), distance: 85, polar: 0.9, azimuth: 0.45 };
 /*

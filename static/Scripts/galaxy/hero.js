@@ -57,9 +57,17 @@ const VERTEX = /* glsl */ `
     }
 `;
 
+/*
+ * A hash with no sin() in it (Dave Hoskins' hash12). The sin-based one lost precision
+ * for the large inputs the upper octaves feed it on some GPUs (an Arc laptop among
+ * them), and the noise came apart into hard-edged squares across the nebulae
+ * (owner's screenshot, 2026-11-26).
+ */
 const NOISE = /* glsl */ `
     float hash(vec2 p) {
-        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+        vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+        p3 += dot(p3, p3.yzx + 33.33);
+        return fract((p3.x + p3.y) * p3.z);
     }
     float noise(vec2 p) {
         vec2 i = floor(p);
@@ -144,14 +152,21 @@ const BLACKHOLE_FRAGMENT = /* glsl */ `
     uniform float uTime;
     uniform float uDisc;
     uniform float uOpacity;
+    // the disk's tilt as seen now (Hero.update): its axis's angle on screen, how open
+    // the disk is (0 edge-on, 1 face-on), and which face is towards us
+    uniform float uAngle;
+    uniform float uSquash;
+    uniform float uFlip;
     varying vec2 vUv;
     ${NOISE}
     void main() {
-        vec2 p = vUv;
+        float ca = cos(uAngle);
+        float sa = sin(uAngle);
+        vec2 p = vec2(vUv.x * ca - vUv.y * sa, (vUv.x * sa + vUv.y * ca) * uFlip);
         float s = uDisc;
         float r = length(p);
         // the accretion disk, seen at a slant
-        vec2 e = vec2(p.x, p.y / 0.26);
+        vec2 e = vec2(p.x, p.y / uSquash);
         float re = length(e);
         float inner = 1.9 * s;
         float outer = 4.6 * s;
@@ -228,6 +243,30 @@ const NEBULA_FRAGMENT = /* glsl */ `
     }
 `;
 
+/*
+ * A photograph of the place, for what is too complex to draw well (owner, 2026-11-26):
+ * nebulae, planetary nebulae and remnants with a picture on disk. Cropped to a square,
+ * its sky lifted to true black, and faded out to a soft round edge, so it sits in the
+ * galaxy rather than on it. Added light, like everything else in the scene.
+ */
+const PHOTO_FRAGMENT = /* glsl */ `
+    uniform sampler2D uMap;
+    uniform float uAspect;
+    uniform float uOpacity;
+    uniform float uReady;
+    varying vec2 vUv;
+    void main() {
+        vec2 crop = uAspect > 1.0 ? vec2(1.0 / uAspect, 1.0) : vec2(1.0, uAspect);
+        vec2 uv = 0.5 + vUv * 0.5 * crop;
+        vec3 col = texture2D(uMap, uv).rgb;
+        // the photo's own sky to black, so its square never shows
+        col = max(col - 0.045, 0.0) / 0.955;
+        float r = length(vUv);
+        float vignette = 1.0 - smoothstep(0.42, 0.98, r);
+        gl_FragColor = vec4(col * vignette * vignette * uOpacity * uReady, 1.0);
+    }
+`;
+
 const POINT_VERTEX = /* glsl */ `
     attribute float aSize;
     attribute float aPhase;
@@ -254,8 +293,16 @@ const POINT_FRAGMENT = /* glsl */ `
 `;
 
 const QUAD = new THREE.PlaneGeometry(2, 2);
+const PHOTO_LOADER = new THREE.TextureLoader();
+// the kinds drawn from a photograph when there is one (the rest are drawn)
+export const PHOTO_KINDS = new Set(["nebula", "planetary", "remnant"]);
+const VIEW = new THREE.Vector3();
+const UP = new THREE.Vector3();
 
 export class Hero {
+    // where the place photographs are served from (the view sets it from the page)
+    static imageBase = "";
+
     constructor() {
         this.group = new THREE.Group();
         this.group.visible = false;
@@ -347,6 +394,29 @@ export class Hero {
         this.group.position.copy(item.position);
         const seed = hero.seed ?? 0.37;
         const size = hero.size;
+        this.photo = false;
+        if (PHOTO_KINDS.has(hero.type) && (item.image || item.warm) && !item.noPhoto) {
+            this.photo = true;
+            const material = this.material(PHOTO_FRAGMENT, { uMap: { value: null }, uAspect: { value: 1 }, uReady: { value: 0 } });
+            this.billboard(material, size * 1.05);
+            if (item.warm) return this.finishShow();
+            PHOTO_LOADER.load(
+                `${Hero.imageBase}${item.image}`,
+                (texture) => {
+                    if (this.item !== item) return texture.dispose();
+                    texture.colorSpace = THREE.SRGBColorSpace;
+                    material.uniforms.uMap.value = texture;
+                    material.uniforms.uAspect.value = texture.image.width / texture.image.height;
+                    material.uniforms.uReady.value = 1;
+                    this.fade = 0;
+                    this.texture = texture;
+                },
+                undefined,
+                // no picture after all: draw it instead
+                () => this.item === item && this.show({ ...item, noPhoto: true })
+            );
+            return this.finishShow();
+        }
         if (hero.type === "star") {
             const stars = hero.stars?.length ? hero.stars : [{ t: hero.t ?? 5600, r: 1 }];
             // radii are compressed: a supergiant is drawn a little larger, a dwarf a little smaller
@@ -365,10 +435,13 @@ export class Hero {
         } else if (hero.type === "neutron") {
             this.billboard(this.material(NEUTRON_FRAGMENT, { uColor: { value: new THREE.Color(hero.color || "#7fe7ff") }, uDisc: { value: 0.045 } }), size * 10);
         } else if (hero.type === "blackhole") {
-            this.billboard(
-                this.material(BLACKHOLE_FRAGMENT, { uDisc: { value: 0.18 } }, THREE.CustomBlending),
+            const mesh = this.billboard(
+                this.material(BLACKHOLE_FRAGMENT, { uDisc: { value: 0.18 }, uAngle: { value: 0 }, uSquash: { value: 0.26 }, uFlip: { value: 1 } }, THREE.CustomBlending),
                 size / 0.18
             );
+            // the disk's axis: near the galaxy's own, leaning a little by the seed
+            const a = seed * Math.PI * 2;
+            mesh.userData.axis = new THREE.Vector3(0.35 * Math.sin(a), 1, 0.35 * Math.cos(a)).normalize();
             const m = this.materials[this.materials.length - 1];
             m.blendSrc = THREE.OneFactor;
             m.blendDst = THREE.OneMinusSrcAlphaFactor;
@@ -426,6 +499,10 @@ export class Hero {
             this.group.add(cube);
             this.star(color, size * 0.12, 0, seed);
         }
+        this.finishShow();
+    }
+
+    finishShow() {
         this.fade = 0;
         this.group.visible = true;
     }
@@ -437,12 +514,19 @@ export class Hero {
         }
         for (const m of this.materials) m.dispose();
         this.materials = [];
+        this.texture?.dispose();
+        this.texture = null;
+        this.photo = false;
         this.billboards = [];
         this.group.visible = false;
         this.item = null;
     }
 
-    // billboards face the camera; stars of one system stand side by side on screen
+    /*
+     * Billboards face the camera; stars of one system stand side by side on screen.
+     * A black hole's disk keeps its own axis in space, so turning round it (the right
+     * button, while it is open) shows the disk open up, close to a line and flip.
+     */
     update(camera, now, dt, pixelScale) {
         if (!this.group.visible) return;
         this.fade = Math.min(1, this.fade + dt / 0.7);
@@ -451,6 +535,16 @@ export class Hero {
         for (const mesh of this.billboards) {
             mesh.quaternion.copy(camera.quaternion);
             mesh.position.copy(this.right).multiplyScalar(mesh.userData.offset);
+            const axis = mesh.userData.axis;
+            if (axis) {
+                const u = mesh.material.uniforms;
+                const view = VIEW.copy(camera.position).sub(this.group.position).normalize();
+                const c = axis.dot(view);
+                UP.setFromMatrixColumn(camera.matrixWorld, 1);
+                u.uAngle.value = Math.atan2(axis.dot(this.right), axis.dot(UP));
+                u.uSquash.value = 0.1 + 0.8 * Math.pow(Math.abs(c), 1.3);
+                u.uFlip.value = c < 0 ? -1 : 1;
+            }
         }
         const time = (now / 1000) % 3600;
         for (const m of this.materials) {

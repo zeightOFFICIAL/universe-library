@@ -2,7 +2,8 @@ import * as THREE from "three";
 import { ORIGIN } from "./config.js";
 
 /*
- * Two map overlays in the plane of the disk, each on its own layer switch.
+ * Map overlays in the plane of the disk, each on its own layer switch: bearings,
+ * distance rings (further down) and sectors.
  *
  * Bearings: a dot on the pivot - the point the readout measures from, which sits
  * in the middle of the view - and four beams from it in the plane. The first runs
@@ -36,8 +37,8 @@ function lineMaterial(color) {
 export function buildBearings() {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(8 * 3), 3));
-    // the core beam stays bright to the end; the other three fade out
-    const alphas = [1, 0.9, 1, 0, 1, 0, 1, 0];
+    // every beam fades out towards its end; the core beam holds on a little longer
+    const alphas = [0.9, 0.35, 0.8, 0, 0.8, 0, 0.8, 0];
     geometry.setAttribute("color", new THREE.Float32BufferAttribute(alphas.flatMap((a) => [1, 1, 1, a]), 4));
     const material = lineMaterial(0xffd9a0);
     const lines = new THREE.LineSegments(geometry, material);
@@ -73,6 +74,63 @@ export function updateBearings(bearings, pivot, length) {
     position.needsUpdate = true;
     return { ends, toCore };
 }
+
+/*
+ * Distance rings (owner, 2026-11-26): rings round the pivot, in the plane, at round
+ * distances picked for the zoom - a step of 1, 2 or 5 times a power of ten, about an
+ * eighth of the camera distance, and its first four multiples - so they always span
+ * the middle of the view. Quiet, like the bearings; the view names each one.
+ */
+export const DISTANCE_RING_COUNT = 4;
+const UNIT_CIRCLE = (() => {
+    const points = [];
+    for (let i = 0; i <= 160; i++) {
+        const a = (i / 160) * Math.PI * 2;
+        points.push(new THREE.Vector3(Math.cos(a), 0, Math.sin(a)));
+    }
+    return new THREE.BufferGeometry().setFromPoints(points);
+})();
+
+export function buildDistanceRings() {
+    const group = new THREE.Group();
+    const material = new THREE.LineBasicMaterial({ color: 0x9ecbff, transparent: true, opacity: 0, depthWrite: false, depthTest: false });
+    const rings = [];
+    for (let i = 0; i < DISTANCE_RING_COUNT; i++) {
+        const ring = new THREE.Line(UNIT_CIRCLE, material);
+        ring.frustumCulled = false;
+        ring.renderOrder = 9;
+        group.add(ring);
+        rings.push(ring);
+    }
+    return { group, material, rings, step: 0 };
+}
+
+// a round step for this zoom: 1, 2 or 5 times a power of ten, in scene units (kly)
+export function ringStep(cameraDistance) {
+    const want = cameraDistance * 0.13;
+    const power = Math.pow(10, Math.floor(Math.log10(want)));
+    for (const m of [1, 2, 5, 10]) if (power * m >= want * 0.75) return power * m;
+    return power * 10;
+}
+
+/*
+ * Moves the rings to the pivot and sizes them. Returns each ring's radius and a point
+ * on it in the direction given (the view passes the near side), where its name goes.
+ */
+export function updateDistanceRings(distanceRings, pivot, cameraDistance, toward) {
+    const step = ringStep(cameraDistance);
+    distanceRings.step = step;
+    const side = SIDE_RING.set(toward.x, 0, toward.z);
+    if (side.lengthSq() < 1e-8) side.set(1, 0, 0);
+    side.normalize();
+    return distanceRings.rings.map((ring, i) => {
+        const radius = step * (i + 1);
+        ring.position.copy(pivot);
+        ring.scale.setScalar(radius);
+        return { radius, point: pivot.clone().addScaledVector(side, radius) };
+    });
+}
+const SIDE_RING = new THREE.Vector3();
 
 export function buildSectors() {
     const points = [];

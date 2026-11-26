@@ -245,15 +245,15 @@ There are no drop shadows on black. Depth is made of translucency, blur, hairlin
 | Layer | Treatment |
 |---|---|
 | Sky | the 3D scene; `#000` |
-| Map labels | no box, with a black text halo, links included; a link with a page has a bright, bold name |
+| Map labels | no box, with a black text halo, links included; a link with a page has a bright, bold name. Always the small size |
+| Map dots | a 9 px box holding a 5 px glyph in the place's colour, a 1 px dark halo and a 5 px glow; the shape says the kind (dot, ringed dot, hollow, diamond, soft glow, specks, thin ring). Never bigger, never a big glow: many more places are coming |
 | Controls, readouts | `--ul-glass` + `--ul-blur-md` + an `--ul-outline` hairline, pill |
-| Panels | `--ul-glass-sheen` + `--ul-blur-lg` + the travelling edge (below), `md` radius |
-| Dialogs, the detail panel | `--ul-glass-strong` + `--ul-blur-lg` + the travelling edge, `lg` radius |
-| Legend, layer tooltip | near-opaque glass (`rgba(22,26,46,.82)` to `rgba(8,10,20,.88)`) + the travelling edge; the legend has a violet, amber and blue gradient drifting behind its keys (28 s) |
+| Every panel: the dock's panels, the layer row, settings (button and dialog), the legend, the layer tooltip, the open place | **one surface** (owner, 2026-11-26): `--ul-panel-fill` (near-opaque, `rgba(24,28,50,.9)` to `rgba(8,10,20,.94)`) + the travelling edge as its only border, **no backdrop blur** (it showed a sliver of blurred sky past the right and bottom edges of panels with fractional sizes, and cost a blur of the canvas per panel per frame); `md` radius, `lg` for dialogs and the open place. The legend adds a violet, amber and blue gradient drifting behind its keys (28 s) |
 | Loader | a radial vignette, `#0b1020` → `#000` |
 
 - **Selection and hover** brighten: background to `--ul-state-hover`/`--ul-state-pressed`, hairline to the role colour, plus a `--ul-glow-md` in the role colour. They never darken.
-- **The travelling edge** (2026-11-26): every glass panel's border is a 1 px conic gradient, amber into violet with a cool blue between (`--ul-edge-stops`), turning once every 14 s (`--ul-edge-period`, `@property --ul-edge-angle`), over a soft glow in amber and violet (`--ul-edge-glow`). It is the one moving thing in the chrome; it stops under reduced motion. Draw it with a masked `::after` at `inset: 0` (see `GalaxyStyles.css`), so a panel that scrolls must scroll an inner element, not itself.
+- **The travelling edge** (2026-11-26): every panel's border is a 1.5 px (`--ul-edge-width`) conic gradient, amber into violet with a cool blue between (`--ul-edge-stops`), turning once every 14 s (`--ul-edge-period`, `@property --ul-edge-angle`), over a soft glow in amber and violet (`--ul-edge-glow`). It is the one moving thing in the chrome; it stops under reduced motion. Draw it with a masked `::after` at `inset: 0` on a panel with **no border of its own** (see `GalaxyStyles.css`), so the ring and the panel share one outline: at 1 px over a separate 1 px border the ring sat inside the border box with the outer radius, and its corners stepped (owner, 2026-11-26). A panel that scrolls must scroll an inner element, not itself.
+- **Scrollbars** (2026-11-26): never the native grey. A slim rounded thumb (8 px track, 2 px inset) lit amber into violet into blue at half strength, full strength under the pointer, on no track (`::-webkit-scrollbar-*` in `GalaxyStyles.css`), in the panel's right margin rather than over the rows: the scroller reaches over the padding by the bar's width, with `scrollbar-gutter: stable`. Chromium ignores those pseudo-elements once `scrollbar-color` is set, so set `scrollbar-color` only for browsers without them (`@supports not selector(::-webkit-scrollbar)`), where it is a thin violet bar. A panel that is pushed or squeezed (the legend under a tooltip) clips and fades rather than growing a scrollbar.
 - LiftKit's shadow set (`shadow-sm` to `2xl`) is for light surfaces. We don't use it; if a light surface is ever added, take its values from there.
 
 ## 8. Motion

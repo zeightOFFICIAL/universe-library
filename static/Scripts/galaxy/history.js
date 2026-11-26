@@ -20,24 +20,25 @@ import { truePosition } from "./util.js";
  */
 export const NOW = 2026;
 
-// light-years out, then what was happening on Earth when the light now arriving set off
+// light-years out, then what was happening on Earth when the light now arriving set
+// off, worded to follow "it set off when ..." on the ring's label
 export const HISTORY_RINGS = [
-    [10, "LIGO hears two black holes merge"],
-    [57, "Apollo 11 lands on the Moon"],
-    [81, "The Second World War ends"],
-    [123, "The Wright brothers' first flight"],
-    [167, "Darwin's On the Origin of Species"],
-    [257, "Watt's steam engine"],
-    [339, "Newton's Principia"],
-    [417, "Galileo turns a telescope to the sky"],
-    [534, "Columbus crosses the Atlantic"],
-    [1005, "Norse settlers reach Newfoundland"],
-    [2000, "Rome under the emperor Tiberius"],
-    [4590, "The Great Pyramid of Giza is built"],
-    [11600, "Göbekli Tepe, the oldest known temple"],
-    [26700, "The height of the last Ice Age"],
-    [50000, "Modern humans reach Australia"],
-    [100000, "Our species lives in Africa and the Levant"],
+    [10, "LIGO first heard two black holes merge"],
+    [57, "Apollo 11 landed on the Moon"],
+    [81, "the Second World War ended"],
+    [123, "the Wright brothers first flew"],
+    [167, "Darwin published On the Origin of Species"],
+    [257, "Watt's steam engine was new"],
+    [339, "Newton published the Principia"],
+    [417, "Galileo turned a telescope to the sky"],
+    [534, "Columbus crossed the Atlantic"],
+    [1005, "Norse settlers reached Newfoundland"],
+    [2000, "Tiberius ruled Rome"],
+    [4590, "the Great Pyramid of Giza was being built"],
+    [11600, "Göbekli Tepe, the oldest known temple, was raised"],
+    [26700, "the last Ice Age was at its height"],
+    [50000, "modern humans reached Australia"],
+    [100000, "our species lived only in Africa and the Levant"],
 ];
 
 export function yearOf(ly) {

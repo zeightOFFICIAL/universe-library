@@ -14,13 +14,41 @@
                 }
             }
         </script>
+        <!--
+            Every galaxy module asked for at once (2026-11-26). Without these the browser
+            found them one import at a time - main, then view, then config... - so each
+            level cost a round trip, which on a phone over Wi-Fi added seconds. Keep the
+            list in step with static/Scripts/galaxy/.
+        -->
+        <link rel="modulepreload" href="{% static 'Vendor/three/three.module.js' %}">
+        <link rel="modulepreload" href="{% static 'Vendor/three/addons/controls/OrbitControls.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/main.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/setup.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/view.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/config.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/util.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/units.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/shaders.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/dust.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/backdrop.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/starfield.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/structures.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/landmarks.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/local.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/post.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/markers.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/panels.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/overlays.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/hero.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/history.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/territories.js' %}">
+        <link rel="modulepreload" href="{% static 'Scripts/galaxy/regions.js' %}">
     </head>
     <body>
         <div id="GALAXY_VIEW" class="GalaxyView"
              data-backdrop="{% static 'Images/GalaxyBackdrop.jpg' %}"
              data-galaxies="{% static 'Images/Galaxies/' %}"
-             data-info-images="{% static 'Images/DeepSky/' %}"
-             data-exoplanets="{% static 'Data/exoplanets.json' %}">
+             data-info-images="{% static 'Images/DeepSky/' %}">
             <canvas id="GALAXY_CANVAS" tabindex="0" role="application" aria-roledescription="galaxy map"
                     aria-label="Map of the Milky Way. Arrow keys move, Shift and arrow keys turn and tilt, plus and minus zoom, Home shows the whole galaxy."></canvas>
             <div class="GalaxyLoader" id="GALAXY_LOADER">
@@ -107,7 +135,7 @@
                 </button>
                 <button type="button" class="LayerToggle" data-layer="deepsky" aria-pressed="true" aria-label="Nebulae and clusters" aria-describedby="TIP_DEEPSKY">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3.5l1.4 4.6L16 9.5l-4.6 1.4L10 15.5l-1.4-4.6L4 9.5l4.6-1.4z" fill="currentColor" stroke="none"/><circle cx="17.5" cy="16.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="14" cy="19.5" r="1" fill="currentColor" stroke="none"/><circle cx="19.5" cy="12.5" r=".9" fill="currentColor" stroke="none"/></svg>
-                    <span class="LayerTip" id="TIP_DEEPSKY" role="tooltip"><strong>Nebulae &amp; clusters</strong><span class="TipText">Names of real nebulae, star clusters and the remains of dead stars, from the Pleiades to the Crab. Positions are true; the look is painted, with clusters spread wider than life. Each name appears as the camera comes near it.</span><span class="TipState"></span></span>
+                    <span class="LayerTip" id="TIP_DEEPSKY" role="tooltip"><strong>Nebulae &amp; clusters</strong><span class="TipText">Names of real nebulae, star clusters and the remains of dead stars, from the Pleiades to the Crab. Positions are true; the look is painted, with clusters spread wider than life. Every one keeps a dot in its colour; its name comes in as the camera nears it. Click one to fly there.</span><span class="TipState"></span></span>
                 </button>
                 <button type="button" class="LayerToggle" data-layer="systems" aria-pressed="true" aria-label="Star systems" aria-describedby="TIP_SYSTEMS">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><ellipse cx="12" cy="12" rx="9" ry="4.2" transform="rotate(-20 12 12)"/><circle cx="20" cy="9" r="1.3" fill="currentColor" stroke="none"/></svg>
@@ -117,14 +145,6 @@
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5l4.5 7.5-4.5 7.5-4.5-7.5z"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M3.5 12h2M18.5 12h2"/></svg>
                     <span class="LayerTip" id="TIP_OBJECTS" role="tooltip"><strong>Objects</strong><span class="TipText">Things that are not star systems: black holes, neutron stars, remarkable stars like Betelgeuse, and our spacecraft. Click one to fly there and see it drawn.</span><span class="TipState"></span></span>
                 </button>
-                <button type="button" class="LayerToggle" data-layer="catalogue" aria-pressed="true" aria-label="Planet catalogue" aria-describedby="TIP_CATALOGUE">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><ellipse cx="12" cy="12" rx="9.5" ry="3.1" transform="rotate(-18 12 12)"/><circle cx="19" cy="5.5" r="1" fill="currentColor" stroke="none"/></svg>
-                    <span class="LayerTip" id="TIP_CATALOGUE" role="tooltip"><strong>Planet catalogue</strong><span class="TipText">Every star known to have planets, from the NASA Exoplanet Archive (November 2026): about 4,800 stars with 6,400 planets. Positions to a tenth of a degree and distances to the light-year - enough for a map of the galaxy, not a star chart. Nearly all are within a few thousand light-years: Kepler's one patch of sky holds half, microlensing reaches towards the bulge. Colour: teal transit, gold wobble (radial velocity), pink microlensing, blue imaging.</span><span class="TipState"></span></span>
-                </button>
-                <button type="button" class="LayerToggle" data-layer="planets" data-default="off" aria-pressed="false" aria-label="Planet surveys" aria-describedby="TIP_PLANETS">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M6.5 11.2L20 5.5M6.5 12.8L20 18.5" /><path d="M20 5.5v13" stroke-dasharray="1.6 2"/></svg>
-                    <span class="LayerTip" id="TIP_PLANETS" role="tooltip"><strong>Planet surveys</strong><span class="TipText">A sketch of how far each way of finding planets reaches: radial velocity a couple of hundred light-years, TESS about a thousand, Kepler one narrow cone to five thousand, microlensing towards the bulge. Drawn from each survey's direction and reach, so no dot is a real planet; the Planet catalogue layer has the real ones. Off at load.</span><span class="TipState"></span></span>
-                </button>
                 <span class="LayerDivider" aria-hidden="true"></span>
                 <button type="button" class="LayerToggle" data-layer="sectors" data-default="off" aria-pressed="false" aria-label="Sectors" aria-describedby="TIP_SECTORS">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM12 4v16M4 12h16"/><path d="M8 4v16M16 4v16M4 8h16M4 16h16" opacity=".45"/></svg>
@@ -132,22 +152,22 @@
                 </button>
                 <button type="button" class="LayerToggle" data-layer="bearings" data-default="off" aria-pressed="false" aria-label="Bearings" aria-describedby="TIP_BEARINGS">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M12 9V2.5M12 15v6.5M9 12H2.5M15 12h6.5"/><path d="M12 2.5l-1.6 2.4h3.2z" fill="currentColor"/></svg>
-                    <span class="LayerTip" id="TIP_BEARINGS" role="tooltip"><strong>Bearings</strong><span class="TipText">The point in the middle of the view - the one the distances below are measured from - with four beams in the plane: one to the galactic centre, then 90&deg;, 180&deg; and 270&deg; from it, turning the way the galaxy does.</span><span class="TipState"></span></span>
+                    <span class="LayerTip" id="TIP_BEARINGS" role="tooltip"><strong>Bearings</strong><span class="TipText">A small dot on the point in the middle of the view - the one the distances below are measured from - and four faint beams in the plane: one to the galactic centre, then 90&deg;, 180&deg; and 270&deg; from it, turning the way the galaxy does.</span><span class="TipState"></span></span>
                 </button>
-                <button type="button" class="LayerToggle" data-layer="earth" aria-pressed="true" aria-label="From Earth" aria-describedby="TIP_EARTH">
+                <button type="button" class="LayerToggle" data-layer="rings" data-default="off" aria-pressed="false" aria-label="Distance rings" aria-describedby="TIP_RINGS">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="9" stroke-dasharray="2 2.2"/></svg>
+                    <span class="LayerTip" id="TIP_RINGS" role="tooltip"><strong>Distance rings</strong><span class="TipText">Rings round the point in the middle of the view, at round distances that suit the zoom - 1, 2 and 5 light-years, up to tens of thousands - each named with its distance. They follow the view, so anything can be measured at a glance.</span><span class="TipState"></span></span>
+                </button>
+                <button type="button" class="LayerToggle" data-layer="earth" data-default="off" aria-pressed="false" aria-label="From Earth" aria-describedby="TIP_EARTH">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="19" r="1.8" fill="currentColor" stroke="none"/><path d="M5 13.5a5.5 5.5 0 0 1 5.5 5.5M5 8.5a10.5 10.5 0 0 1 10.5 10.5M5 3.5a15.5 15.5 0 0 1 15.5 15.5"/></svg>
-                    <span class="LayerTip" id="TIP_EARTH" role="tooltip"><strong>From Earth</strong><span class="TipText">How far our history reaches. Each ring is as far as light travels between an event on Earth and now: light reaching us from 57 ly away set off while Apollo 11 was on the Moon, and the galactic centre's in the last Ice Age. And our own signals going out: the radio bubble of our broadcasts since 1936, and the Arecibo message, sent to M13 in 1974.</span><span class="TipState"></span></span>
+                    <span class="LayerTip" id="TIP_EARTH" role="tooltip"><strong>From Earth</strong><span class="TipText">Looking far is looking back in time. Each ring marks a distance, and the light reaching us now from anything on that ring left it the year the ring names: from 57 light-years away it set off in 1969, while Apollo 11 was on the Moon; from the galactic centre, in the last Ice Age. Going the other way: the bubble our radio and TV broadcasts have filled since 1936, and the Arecibo message, sent to M13 in 1974. Off at load.</span><span class="TipState"></span></span>
                 </button>
                 <span class="LayerDivider" aria-hidden="true"></span>
                 <button type="button" class="LayerToggle" data-layer="fiction" aria-pressed="true" aria-label="Fiction" aria-describedby="TIP_FICTION">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5c-2-1.6-5-2-8-1.5v13c3-.5 6-.1 8 1.5 2-1.6 5-2 8-1.5V5c-3-.5-6-.1-8 1.5z"/><path d="M12 6.5V20"/><path d="M16.5 9.2l.5 1.2 1.2.2-.9.8.3 1.2-1.1-.6-1.1.6.3-1.2-.9-.8 1.2-.2z" fill="currentColor" stroke="none"/></svg>
                     <span class="LayerTip" id="TIP_FICTION" role="tooltip"><strong>Fiction</strong><span class="TipText">Adds places from stories to the star systems and objects layers - never shown on its own. Star systems and places from stories set in the Milky Way - Mass Effect, Star Trek, Halo, Dune, Alien, Foundation, Warhammer 40,000 and more - drawn dashed and violet. Where a story names a real star the place sits there; otherwise it is placed from the story's own galaxy map, or by eye.</span><span class="TipState"></span></span>
                 </button>
-                <span class="LayerDivider" aria-hidden="true"></span>
-                <button type="button" class="LayerToggle" data-layer="territories" aria-pressed="true" aria-label="Territories" aria-describedby="TIP_TERRITORIES">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V3.5M6 4.5h11l-2.6 4L17 12.5H6"/></svg>
-                    <span class="LayerTip" id="TIP_TERRITORIES" role="tooltip"><strong>Territories</strong><span class="TipText">Nations and factions: the space each holds, filled in its colour with a border round it, and the places it holds in its colour.</span><span class="TipState"></span></span>
-                </button>
+                <!-- Territories (territories.js, the territories table) are switched off for now (owner, 2026-11-26); the code is kept. To bring the layer back, restore its switch here (git history, 0.8.2.9d) and set SHOW_TERRITORIES in config.js. -->
             </nav>
             <div class="GalaxyLayerTip" id="GALAXY_LAYER_TIP" aria-hidden="true" hidden></div>
             <aside class="GalaxyLegend" id="GALAXY_LEGEND" aria-label="Legend">
@@ -157,7 +177,7 @@
             <div class="GalaxySettingsPanel">
                 <button type="button" class="LayerToggle SettingsOpen" id="GALAXY_SETTINGS_OPEN" aria-haspopup="dialog" aria-expanded="false" aria-label="Settings" aria-describedby="TIP_SETTINGS">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/></svg>
-                    <span class="LayerTip" id="TIP_SETTINGS" role="tooltip"><strong>Settings</strong><span class="TipText">Units, label size, which systems to show, camera moves, twinkling and detail. Remembered on this device.</span></span>
+                    <span class="LayerTip" id="TIP_SETTINGS" role="tooltip"><strong>Settings</strong><span class="TipText">Units, which systems to show, camera moves, twinkling and detail. Remembered on this device.</span></span>
                 </button>
             </div>
             <dialog class="GalaxySettings" id="GALAXY_SETTINGS" aria-labelledby="GALAXY_SETTINGS_TITLE">
@@ -186,7 +206,26 @@
                 <div class="GalaxyCoords" id="GALAXY_COORDS" aria-label="Coordinates in thousands of light-years from the galactic core, and the sector"></div>
             </div>
             <div class="GalaxyScaleNote" id="GALAXY_SCALE_NOTE">Local view · true scale · rings at 10, 100 and 1,000 ly</div>
-            <div class="GalaxyHint">Drag to move · right-drag to tilt · scroll to zoom</div>
+            <!-- the controls legend: the mouse and keys on a desktop, the gestures on a touch screen -->
+            <aside class="GalaxyHint GalaxyKeys" aria-label="Controls">
+                <dl>
+                    <div data-input="mouse"><dt><kbd>Drag</kbd></dt><dd>move</dd></div>
+                    <div data-input="mouse"><dt><kbd>Right-drag</kbd></dt><dd>turn and tilt</dd></div>
+                    <div data-input="mouse"><dt><kbd>Scroll</kbd></dt><dd>zoom</dd></div>
+                    <div data-input="keys"><dt><kbd>W</kbd><kbd>S</kbd></dt><dd>fly forward, back</dd></div>
+                    <div data-input="keys"><dt><kbd>A</kbd><kbd>D</kbd></dt><dd>left, right</dd></div>
+                    <div data-input="keys"><dt><kbd>Q</kbd><kbd>E</kbd></dt><dd>down, up</dd></div>
+                    <div data-input="keys"><dt><kbd>Shift</kbd></dt><dd>faster</dd></div>
+                    <div data-input="keys"><dt><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&larr;</kbd><kbd>&rarr;</kbd></dt><dd>pan; with Shift, turn</dd></div>
+                    <div data-input="keys"><dt><kbd>+</kbd><kbd>&minus;</kbd></dt><dd>zoom</dd></div>
+                    <div data-input="keys"><dt><kbd>Home</kbd></dt><dd>whole galaxy</dd></div>
+                    <div data-input="keys"><dt><kbd>H</kbd></dt><dd>hide the interface</dd></div>
+                    <div data-input="keys"><dt><kbd>Esc</kbd></dt><dd>back from a place</dd></div>
+                    <div data-input="touch"><dt><kbd>Drag</kbd></dt><dd>move</dd></div>
+                    <div data-input="touch"><dt><kbd>Two fingers</kbd></dt><dd>turn, tilt and zoom</dd></div>
+                    <div><dt><span class="KeysIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg></span></dt><dd>pick a new centre</dd></div>
+                </dl>
+            </aside>
             <div class="GalaxyControls">
                 <div class="AngleDial" id="GALAXY_ANGLE" role="img" aria-label="Viewing angle">
                     <svg viewBox="-12 -12 24 24" aria-hidden="true"><ellipse class="AngleDisk" rx="9" ry="9"/><line class="AnglePlane" x1="-11" x2="11" y1="0" y2="0"/><circle class="AngleCore" r="1.7"/></svg>
@@ -194,6 +233,9 @@
                 </div>
                 <button type="button" data-action="sun" class="HomeButton" aria-label="Back to the Sun">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7.5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg>
+                </button>
+                <button type="button" data-action="pick" class="PickButton" aria-pressed="false" aria-label="Pick a new centre: then click a point on the map">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>
                 </button>
                 <button type="button" data-action="zoom-out" aria-label="Zoom out">&minus;</button>
                 <button type="button" data-action="zoom-in" aria-label="Zoom in">+</button>

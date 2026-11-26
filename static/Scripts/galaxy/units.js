@@ -141,16 +141,14 @@ export function onUnitsChange(listener) {
  * size, whether systems without a page yet are drawn, and whether the camera flies
  * or cuts between places.
  */
+/*
+ * Motion follows the device unless chosen here (owner, 2026-11-26): a device set to
+ * reduce motion - Windows' "Animation effects" off, say - used to lose the flights and
+ * the twinkling with no way to have them back, which on another computer read as
+ * "flying and shimmering do not work". "Auto" still honours it; "Fly" and "On" win.
+ */
+const DEVICE_REDUCES_MOTION = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 export const DISPLAY_OPTIONS = {
-    labelSize: {
-        label: "Label size",
-        hint: "Names on the map",
-        choices: [
-            { value: "small", label: "Small", example: "more fits" },
-            { value: "medium", label: "Medium", example: "default" },
-            { value: "large", label: "Large", example: "easier to read" },
-        ],
-    },
     emptySystems: {
         label: "Systems without a page yet",
         hint: "Polaris, Sirius, Mira and others",
@@ -163,6 +161,7 @@ export const DISPLAY_OPTIONS = {
         label: "Camera moves",
         hint: "Between places",
         choices: [
+            { value: "auto", label: "Auto", example: DEVICE_REDUCES_MOTION ? "cuts: this device asks for less motion" : "flies, unless the device asks for less motion" },
             { value: "fly", label: "Fly", example: "a smooth flight" },
             { value: "cut", label: "Cut", example: "jump straight there" },
         ],
@@ -171,6 +170,7 @@ export const DISPLAY_OPTIONS = {
         label: "Twinkling",
         hint: "Stars shimmer, and now and then one glints",
         choices: [
+            { value: "auto", label: "Auto", example: DEVICE_REDUCES_MOTION ? "still: this device asks for less motion" : "on, unless the device asks for less motion" },
             { value: "on", label: "On", example: "a living sky" },
             { value: "off", label: "Off", example: "still stars" },
         ],
@@ -185,10 +185,18 @@ export const DISPLAY_OPTIONS = {
     },
 };
 
-export const LABEL_SCALE = { small: 0.86, medium: 1, large: 1.2 };
+// labels are always the small size (owner, 2026-11-26: the size setting is gone)
+export const LABEL_SIZE = 0.86;
+
+// whether flights fly and stars twinkle now, from the setting and the device
+export function motionAllowed(setting, reduce) {
+    if (setting === "fly" || setting === "on") return true;
+    if (setting === "cut" || setting === "off") return false;
+    return !reduce;
+}
 
 const DISPLAY_KEY = "galaxyDisplay";
-const DISPLAY_DEFAULTS = { labelSize: "medium", emptySystems: "show", motion: "fly", twinkle: "on", turn: "off" };
+const DISPLAY_DEFAULTS = { emptySystems: "show", motion: "auto", twinkle: "auto", turn: "off" };
 
 function loadDisplay() {
     const display = { ...DISPLAY_DEFAULTS };
