@@ -123,11 +123,22 @@ export const COMPOSITE_FRAGMENT = /* glsl */ `
      * streak through it. No texture reads: a few distances per pixel, and nothing at
      * all while the amount is zero. Off in lite.
      */
+    /*
+     * A ghost is mostly its rim (2026-11-28: a solid disc read as a brown sticker in
+     * empty sky): a faint fill that fades towards the middle, and a thin rim whose
+     * red, green and blue sit at slightly different radii, the way a real lens
+     * splits it.
+     */
     vec3 ghost(vec2 uv, vec2 at, float radius, vec3 tint) {
         float d = length((uv - at) * vec2(uAspect, 1.0));
-        float disc = 1.0 - smoothstep(radius * 0.7, radius, d);
-        float rim = exp(-pow((d - radius * 0.92) / (radius * 0.06), 2.0));
-        return tint * (disc * 0.55 + rim * 0.45);
+        float fill = smoothstep(radius * 0.2, radius * 0.95, d) * (1.0 - smoothstep(radius * 0.9, radius, d));
+        float w = radius * 0.07;
+        vec3 rim = vec3(
+            exp(-pow((d - radius * 0.95) / w, 2.0)),
+            exp(-pow((d - radius * 0.92) / w, 2.0)),
+            exp(-pow((d - radius * 0.89) / w, 2.0))
+        );
+        return tint * (fill * 0.14 + rim * 0.5);
     }
     vec3 lensFlare(vec2 uv) {
         vec2 axis = 0.5 - uFlarePos;
@@ -155,18 +166,29 @@ export const COMPOSITE_FRAGMENT = /* glsl */ `
         c *= uExposure;
 
         /*
-         * The shoulder. 1 - exp(-x) has slope one at black, so the faint end - the
-         * arms, the haze, the dark between them - comes through as authored, and it
-         * only bends where the 8-bit canvas used to clip. Applied per channel it
-         * also bleaches towards white as it saturates, which is right for a core;
-         * applied to luminance alone it keeps the hue, which is right for a blue
-         * arm or a pink knot. The mix leans on the first and keeps some of the
-         * second, so the bulge goes to a warm white rather than to paper.
+         * The shoulder (reworked 2026-11-28). The curve acts on luminance, so a blue
+         * arm or a pink knot keeps its hue, and it has slope one at black, so the
+         * faint end - arms, haze, the dark between them - comes through as authored.
+         * It used to be 1 - exp(-x) per channel, which reaches white by about 3 and
+         * turned the whole bulge into one flat cream plateau (5% of the frame in the
+         * core close-up). 1 - 1 / (1 + L + L^2/2) matches it in the mids and keeps
+         * climbing to about 16, so the bulge has a gradient. A channel pushed past
+         * one spills into the others, and only the brightest light whitens
+         * (smoothstep 1.5 to 16), so the bulge goes gold with a small white heart.
+         * Keeping the hue everywhere turned the bulge's halo rose (the painting's warm
+         * gold under the house violet), which the old curve had bleached to cream; so
+         * the highlights lean back towards a gentler per-channel curve, and a bright
+         * warm pink drifts to gold, as an old bulge is. Measured against the old
+         * curve in the core close-up: mid-tones the same, near-white pixels about half.
          */
-        vec3 perChannel = 1.0 - exp(-c);
         float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
-        vec3 hueKept = c * ((1.0 - exp(-lum)) / max(lum, 0.0001));
-        c = mix(perChannel, min(hueKept, vec3(1.0)), 0.3);
+        float mapped = 1.0 - 1.0 / (1.0 + lum + 0.5 * lum * lum);
+        vec3 toned = c * (mapped / max(lum, 0.0001));
+        toned += max(max(max(toned.r, toned.g), toned.b) - 1.0, 0.0) * 0.5;
+        toned = mix(toned, vec3(mapped), smoothstep(1.5, 16.0, lum) * 0.8);
+        float high = smoothstep(0.35, 0.95, mapped);
+        c = mix(min(toned, vec3(1.0)), 1.0 - exp(-c * 0.7), 0.15 + 0.45 * high);
+        c.b -= 0.3 * high * clamp((c.r - c.g) * 2.5, 0.0, 1.0) * c.b;
 
         float grey = dot(c, vec3(0.2126, 0.7152, 0.0722));
         c = mix(vec3(grey), c, uSaturation);

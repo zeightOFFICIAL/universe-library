@@ -5,6 +5,10 @@ import { BACKDROP_MATRIX } from "./backdrop.js";
 
 /* ---------- star field sampled from the backdrop ---------- */
 
+// the old inner disk and the young outer arms (see "Populations by radius" below)
+const INNER_DISK = new THREE.Color(1.0, 0.84, 0.6);
+const OUTER_DISK = new THREE.Color(0.58, 0.74, 1.0);
+
 /*
  * Cheap 2D value noise. The artwork's arms are smooth and continuous; real arms are
  * flocculent - branched, broken, feathered - so this is used to carve the sampled
@@ -430,6 +434,14 @@ export async function buildGalaxyFromImage(image, onProgress = () => {}) {
         // a second cue for telling arm from gap up close: the sparse stars between
         // the arms are the old, redder population, the arms keep the blue-violet
         if (peak < 0.42) color.lerp(INTER_ARM_TINT, (0.42 - peak) * 1.6 * smoothstep(3.5, 11, r));
+        /*
+         * Populations by radius (2026-11-28): a real spiral is yellow-white in its
+         * inner disk, where the stars are old, and bluer in its outer arms, where they
+         * are young. Without it every arm was one lavender. No random draws, so the
+         * field is placed exactly as before.
+         */
+        color.lerp(INNER_DISK, 0.38 * smoothstep(4, 7, r) * (1 - smoothstep(11, 22, r)));
+        color.lerp(OUTER_DISK, 0.34 * smoothstep(20, 38, r));
 
         /*
          * Arms are not symmetric across their width. Gas piles up on the inner edge,
@@ -484,6 +496,9 @@ export async function buildGalaxyFromImage(image, onProgress = () => {}) {
         if (r < 3.5) continue;
         p.y += gauss() * (0.45 + 0.016 * r + 1.6 * Math.exp(-r / 3));
         color.setRGB(c.r, c.g, c.b).lerp(STAR_TINTS[0].color, (0.3 + rand() * 0.2) * smoothstep(4, 12, r));
+        // the same populations as the stars, half as strong
+        color.lerp(INNER_DISK, 0.19 * smoothstep(4, 7, r) * (1 - smoothstep(11, 22, r)));
+        color.lerp(OUTER_DISK, 0.17 * smoothstep(20, 38, r));
         gas.add(p, color, 26 + rand() * 40, 0.008 + rand() * 0.012, dustMap[index]);
     }
 
@@ -600,6 +615,7 @@ export async function buildGalaxyFromImage(image, onProgress = () => {}) {
         color.setRGB(Math.min(c.r * 1.2, 1), c.g * 0.85, c.b * 0.95);
         knots.add(p, color, 1.8 + rand() * 3.0, (0.16 + rand() * 0.26) * (0.3 + 0.7 * smoothstep(6, 15, r)), dustMap[index]);
     }
+    chainKnots(knots);
 
     // the house violet, over everything sampled from the painting (see GALAXY_TINT)
     for (const layer of [stars, gas, knots]) {
@@ -612,6 +628,40 @@ export async function buildGalaxyFromImage(image, onProgress = () => {}) {
     }
     step("thick disk, halo, knots");
     return { stars, gas, knots, scattered, sampler, dustTexture: dustTexture(dustMap, sampler.n) };
+}
+
+/*
+ * Star-forming regions come in strings along an arm, not one by one (2026-11-28: up
+ * close the evenly spread knots, all one size, read as pink confetti). The knots are
+ * picked as before, then regrouped: every group of five keeps its first as the head,
+ * and the other four line up behind it along the disk's rotation, 0.12-0.5 kly apart,
+ * with a little scatter. Sizes spread wider - a big head, small followers. The count
+ * and the total light are unchanged, and it runs on its own seeded generator, so
+ * nothing drawn after it moves.
+ */
+function chainKnots(knots) {
+    const random = mulberry32(2811026);
+    const pos = knots.positions;
+    for (let head = 0; head < knots.count; head += 5) {
+        const h = head * 3;
+        const radial = Math.hypot(pos[h], pos[h + 2]) || 1;
+        // along the rotation: perpendicular to the radius, in the plane
+        const tx = -pos[h + 2] / radial;
+        const tz = pos[h] / radial;
+        const sense = random() < 0.5 ? -1 : 1;
+        let along = 0;
+        knots.sizes[head] *= 1.25 + random() * 0.45;
+        for (let k = head + 1; k < Math.min(head + 5, knots.count); k++) {
+            const j = k * 3;
+            along += 0.12 + random() * 0.38;
+            const drift = (random() - 0.5) * 0.3;
+            pos[j] = pos[h] + tx * along * sense + (pos[h] / radial) * drift;
+            pos[j + 1] = pos[h + 1] + (random() - 0.5) * 0.08;
+            pos[j + 2] = pos[h + 2] + tz * along * sense + (pos[h + 2] / radial) * drift;
+            knots.sizes[k] *= 0.5 + random() * 0.6;
+            knots.dust[k] = knots.dust[head];
+        }
+    }
 }
 
 /*

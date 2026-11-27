@@ -2453,7 +2453,14 @@ export class GalaxyView {
 
         const closeGain = 1 - smoothstep(10, 80, cameraDistance);
         this.materials.stars.uniforms.uGain.value = 1 + 5.6 * closeGain;
-        this.materials.knots.uniforms.uGain.value = 1 + 2.0 * closeGain;
+        /*
+         * Knots soften as you come in (2026-11-28): from afar a crisp bead, close in
+         * a softer, fainter glow - hard, bright dots up close were the pink confetti.
+         * A softer sprite spreads its light wider, so its opacity comes down with it.
+         */
+        this.materials.knots.uniforms.uGain.value = 1 + 1.2 * closeGain;
+        this.materials.knots.uniforms.uSharpness.value = THREE.MathUtils.lerp(9, 5, closeGain);
+        this.materials.knots.uniforms.uOpacity.value = this.edgeQuiet * (1 - 0.55 * closeGain);
         this.materials.scattered.uniforms.uGain.value = 1 + 1.0 * closeGain;
 
         /*

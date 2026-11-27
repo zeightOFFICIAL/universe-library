@@ -124,6 +124,16 @@ export const BACKDROP_FRAGMENT = /* glsl */ `
          * the arm dust and the edge-on lane - simply add their optical depths, which
          * is what two absorbers in series actually do.
          */
+        /*
+         * Populations by radius, as the stars have them (2026-11-28; starfield.js):
+         * the old inner disk yellow-white, the young outer arms bluer. From afar most
+         * of the light is this painting, so without it here the shift did not show.
+         * Brightness is kept: each pixel leans towards the colour at its own peak.
+         */
+        float kly = radius * ${BACKDROP.size.toFixed(1)};
+        float peak = max(c.r, max(c.g, c.b));
+        c = mix(c, vec3(1.0, 0.84, 0.6) * peak, 0.36 * smoothstep(4.0, 7.0, kly) * (1.0 - smoothstep(11.0, 22.0, kly)));
+        c = mix(c, vec3(0.58, 0.74, 1.0) * peak, 0.3 * smoothstep(20.0, 38.0, kly));
         c *= uTint;
         float tau = dust + lane;
         c *= exp(-tau * ${DUST_COLOR_GLSL});
