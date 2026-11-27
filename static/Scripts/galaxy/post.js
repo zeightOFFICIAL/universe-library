@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { LITE, EXTREME, SOFT_LAYER, SOFT_SCALE } from "./config.js";
+import { LITE, EXTREME, SOFT_LAYER, HERO_LAYER, SOFT_SCALE } from "./config.js";
 import { smoothstep } from "./util.js";
 
 /* ---------- HDR: float target, bloom, tone curve ---------- */
@@ -273,6 +273,11 @@ export class PostPipeline {
         // the post passes cover every pixel or add to what is there, so none clears
         renderer.autoClear = false;
         this.pass(this.merge, this.scene);
+        // the open place's drawing, over everything soft, still ahead of the bloom
+        camera.layers.set(HERO_LAYER);
+        renderer.setRenderTarget(this.scene);
+        renderer.render(scene, camera);
+        camera.layers.set(0);
         let source = this.scene;
         for (let i = 0; i < this.mips.length; i++) {
             this.down.uniforms.tSource.value = source.texture;

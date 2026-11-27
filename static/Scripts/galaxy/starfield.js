@@ -611,6 +611,7 @@ export function buildScatteredDeepSky(sampler) {
     const remnant = new THREE.Color(DEEP_SKY_STYLE.remnant.color).convertSRGBToLinear();
     const planetary = new THREE.Color(DEEP_SKY_STYLE.planetary.color).convertSRGBToLinear();
     let tries = 0;
+    let halo = 0;
     while (layer.count < BACKDROP.scatteredDeepSky && tries < BACKDROP.scatteredDeepSky * 60) {
         tries++;
         const roll = rand();
@@ -618,8 +619,18 @@ export function buildScatteredDeepSky(sampler) {
             // halo globulars: a round, thick distribution around the whole galaxy
             p.set(gauss(), gauss(), gauss()).normalize().multiplyScalar(4 + Math.abs(gauss()) * 16);
             color.copy(globular);
-            layer.add(p, color, 2.8 + rand() * 2.0, 0.4 + rand() * 0.22);
-            layer.objects.push({ position: p.clone(), kind: "globular" });
+            /*
+             * About 240 of them came out, against the Milky Way's 160 or so, all equally
+             * bright, so edge-on the halo read as polka dots (owner, 2026-11-27). Every
+             * third is now only a faint point with no painted cluster, and the rest
+             * vary in brightness. The same random numbers are drawn in the same order,
+             * so the star field sampled after this is unchanged.
+             */
+            const size = 2.8 + rand() * 2.0;
+            const shade = rand();
+            const painted = halo++ % 3 !== 2;
+            layer.add(p, color, painted ? size : size * 0.7, (0.4 + shade * 0.22) * (painted ? 0.35 + 0.65 * shade : 0.3));
+            if (painted) layer.objects.push({ position: p.clone(), kind: "globular" });
             continue;
         }
         const index = sampler.pick();

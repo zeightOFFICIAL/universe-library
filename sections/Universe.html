@@ -160,7 +160,7 @@
                 </button>
                 <button type="button" class="LayerToggle" data-layer="earth" data-default="off" aria-pressed="false" aria-label="From Earth" aria-describedby="TIP_EARTH">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="19" r="1.8" fill="currentColor" stroke="none"/><path d="M5 13.5a5.5 5.5 0 0 1 5.5 5.5M5 8.5a10.5 10.5 0 0 1 10.5 10.5M5 3.5a15.5 15.5 0 0 1 15.5 15.5"/></svg>
-                    <span class="LayerTip" id="TIP_EARTH" role="tooltip"><strong>From Earth</strong><span class="TipText">Looking far is looking back in time. Each ring marks a distance, and the light reaching us now from anything on that ring left it the year the ring names: from 57 light-years away it set off in 1969, while Apollo 11 was on the Moon; from the galactic centre, in the last Ice Age. Going the other way: the bubble our radio and TV broadcasts have filled since 1936, and the Arecibo message, sent to M13 in 1974. Off at load.</span><span class="TipState"></span></span>
+                    <span class="LayerTip" id="TIP_EARTH" role="tooltip"><strong>From Earth</strong><span class="TipText">Looking far is looking back in time. Anything on a ring we see as it was when its light left it: a star 57 light-years away as it was in 1969, while Apollo 11 was on the Moon; one 2,000 light-years away as it was when Tiberius ruled Rome; the galactic centre as it was in the last Ice Age. Going the other way: the bubble our radio and TV broadcasts have filled since 1936, and the Arecibo message, sent to M13 in 1974. Off at load.</span><span class="TipState"></span></span>
                 </button>
                 <span class="LayerDivider" aria-hidden="true"></span>
                 <button type="button" class="LayerToggle" data-layer="fiction" aria-pressed="true" aria-label="Fiction" aria-describedby="TIP_FICTION">
@@ -208,22 +208,23 @@
             <div class="GalaxyScaleNote" id="GALAXY_SCALE_NOTE">Local view · true scale · rings at 10, 100 and 1,000 ly</div>
             <!-- the controls legend: the mouse and keys on a desktop, the gestures on a touch screen -->
             <aside class="GalaxyHint GalaxyKeys" aria-label="Controls">
-                <dl>
+                <button type="button" class="KeysFold" aria-expanded="false" aria-controls="GALAXY_KEYS_LIST"><span class="KeysFoldOpen">Controls</span><span class="KeysFoldShut">Show controls</span><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 7.5 6 4.5l3 3"/></svg></button>
+                <dl id="GALAXY_KEYS_LIST">
                     <div data-input="mouse"><dt><kbd>Drag</kbd></dt><dd>move</dd></div>
                     <div data-input="mouse"><dt><kbd>Right-drag</kbd></dt><dd>turn and tilt</dd></div>
                     <div data-input="mouse"><dt><kbd>Scroll</kbd></dt><dd>zoom</dd></div>
-                    <div data-input="keys"><dt><kbd>W</kbd><kbd>S</kbd></dt><dd>fly forward, back</dd></div>
-                    <div data-input="keys"><dt><kbd>A</kbd><kbd>D</kbd></dt><dd>left, right</dd></div>
-                    <div data-input="keys"><dt><kbd>Q</kbd><kbd>E</kbd></dt><dd>down, up</dd></div>
+                    <div data-input="keys"><dt><kbd>W</kbd><kbd>S</kbd></dt><dd>move the centre on, back</dd></div>
+                    <div data-input="keys"><dt><kbd>A</kbd><kbd>D</kbd></dt><dd>move it left, right</dd></div>
                     <div data-input="keys"><dt><kbd>Shift</kbd></dt><dd>faster</dd></div>
-                    <div data-input="keys"><dt><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&larr;</kbd><kbd>&rarr;</kbd></dt><dd>pan; with Shift, turn</dd></div>
+                    <div data-input="keys"><dt><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&larr;</kbd><kbd>&rarr;</kbd></dt><dd>the same; with Shift, turn</dd></div>
                     <div data-input="keys"><dt><kbd>+</kbd><kbd>&minus;</kbd></dt><dd>zoom</dd></div>
                     <div data-input="keys"><dt><kbd>Home</kbd></dt><dd>whole galaxy</dd></div>
                     <div data-input="keys"><dt><kbd>H</kbd></dt><dd>hide the interface</dd></div>
                     <div data-input="keys"><dt><kbd>Esc</kbd></dt><dd>back from a place</dd></div>
                     <div data-input="touch"><dt><kbd>Drag</kbd></dt><dd>move</dd></div>
                     <div data-input="touch"><dt><kbd>Two fingers</kbd></dt><dd>turn, tilt and zoom</dd></div>
-                    <div><dt><span class="KeysIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg></span></dt><dd>pick a new centre</dd></div>
+                    <div><dt><span class="KeysIcon Core" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12.4c.8-.5.5-1.8-.5-1.9-1.5-.2-2.6 1.3-2.2 2.7.5 2 3 2.7 4.6 1.7 2.3-1.4 2.4-4.6.6-6.3-2.4-2.3-6.6-1.8-8.3 1-2 3.2-.4 7.5 3.1 8.6 2.9.9 6.2-.2 8.1-2.5"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/></svg></span></dt><dd>to the galactic core</dd></div>
+                    <div><dt><span class="KeysIcon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7.5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></span></dt><dd>to Sol</dd></div>
                 </dl>
             </aside>
             <div class="GalaxyControls">
@@ -231,11 +232,11 @@
                     <svg viewBox="-12 -12 24 24" aria-hidden="true"><ellipse class="AngleDisk" rx="9" ry="9"/><line class="AnglePlane" x1="-11" x2="11" y1="0" y2="0"/><circle class="AngleCore" r="1.7"/></svg>
                     <span class="AngleText"><span class="AngleValue"></span><span class="AngleSide">above</span></span>
                 </div>
-                <button type="button" data-action="sun" class="HomeButton" aria-label="Back to the Sun">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7.5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg>
+                <button type="button" data-action="core" class="HomeButton CoreButton" aria-label="Fly to the galactic core">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12.4c.8-.5.5-1.8-.5-1.9-1.5-.2-2.6 1.3-2.2 2.7.5 2 3 2.7 4.6 1.7 2.3-1.4 2.4-4.6.6-6.3-2.4-2.3-6.6-1.8-8.3 1-2 3.2-.4 7.5 3.1 8.6 2.9.9 6.2-.2 8.1-2.5"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/></svg>
                 </button>
-                <button type="button" data-action="pick" class="PickButton" aria-pressed="false" aria-label="Pick a new centre: then click a point on the map">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>
+                <button type="button" data-action="sun" class="HomeButton" aria-label="Fly to Sol, the Sun">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7.5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg>
                 </button>
                 <button type="button" data-action="zoom-out" aria-label="Zoom out">&minus;</button>
                 <button type="button" data-action="zoom-in" aria-label="Zoom in">+</button>

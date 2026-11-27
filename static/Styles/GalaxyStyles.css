@@ -169,24 +169,22 @@ a.GalaxyMarker.Link .GalaxyMarkerName {
 }
 
 .GalaxyMarker.Displaced .GalaxyMarkerText {
-    transform: translateY(var(--label-shift, 0))
+    transform: translate(var(--label-reach, 0), var(--label-shift, 0))
 }
 
+/* the stick: from the dot towards the name, wherever it went, fading as it goes */
 .GalaxyMarker.Displaced .GalaxyMarkerIcon::before {
-    background: linear-gradient(var(--marker-color, #fff), transparent);
+    background: linear-gradient(var(--marker-color, #fff), rgba(255, 255, 255, .15));
     content: "";
     height: var(--leader, 0);
     left: calc(50% - .5px);
-    opacity: .55;
+    opacity: .6;
+    pointer-events: none;
     position: absolute;
     top: 50%;
+    transform: rotate(var(--leader-angle, 0deg));
+    transform-origin: 50% 0;
     width: 1px
-}
-
-.GalaxyMarker.Displaced.Above .GalaxyMarkerIcon::before {
-    background: linear-gradient(transparent, var(--marker-color, #fff));
-    bottom: 50%;
-    top: auto
 }
 
 .GalaxyMarker.Fictional .GalaxyMarkerText {
@@ -2667,14 +2665,23 @@ button.GalaxyMember {
 .GalaxyDetail::after,
 .SettingsPanel::after {
     animation: UlEdgeTurn var(--ul-edge-period) linear infinite;
-    background: conic-gradient(from var(--ul-edge-angle), var(--ul-edge-stops));
+    /*
+     * The ring is a real border (third pass, owner, 2026-11-26: the right and bottom
+     * edges and the bottom-right corner still looked thinner). Drawn as padding, it
+     * ended wherever the panel's fractional width and height happened to fall, so the
+     * right and bottom sides landed between pixels and came out fainter; a border is
+     * snapped to whole device pixels on every side by the browser. The gradient fills
+     * the border box and the mask keeps only the border.
+     */
+    background: conic-gradient(from var(--ul-edge-angle), var(--ul-edge-stops)) border-box;
+    border: var(--ul-edge-width) solid transparent;
     border-radius: inherit;
+    box-sizing: border-box;
     content: "";
     inset: 0;
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0) border-box;
     -webkit-mask-composite: xor;
-    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
-    padding: var(--ul-edge-width);
+    mask: linear-gradient(#000 0 0) padding-box exclude, linear-gradient(#000 0 0) border-box;
     pointer-events: none;
     position: absolute;
     z-index: 2
@@ -2872,7 +2879,10 @@ button.GalaxyMember {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
     background: var(--ul-panel-fill);
-    border: 0
+    border: 0;
+    /* even all round: no top highlight, no shadow dropped below - both made the
+       bottom and right read differently from the top and left */
+    box-shadow: 0 0 36px -12px rgba(0, 0, 0, .75), var(--ul-edge-glow)
 }
 
 /* centred without a half-pixel transform, so its edges land on whole pixels */
@@ -2971,20 +2981,31 @@ button.GalaxyMember {
  *   nebula           a soft glow;  open cluster  three specks;  globular  a dense dot
  *                    with a halo;  remnant or planetary  a thin ring round a point
  */
+/*
+ * Second pass (owner, 2026-11-27: many dots in one place still read as messy): a 7 px
+ * box (iconHalf 3.5) and 3-4 px glyphs, a fainter halo, and a dot that sits on a more
+ * important one with no name of its own steps back to a speck (.Crowded, see the
+ * declutter in view.js). Nothing is dropped; a clump just stops shouting.
+ */
 .GalaxyMarkerIcon {
     border: 0;
     box-shadow: none;
-    height: 9px;
-    width: 9px
+    height: 7px;
+    transition: opacity .25s;
+    width: 7px
 }
 
 .GalaxyMarkerIcon::after {
     background: var(--marker-color, #fff);
     border: 0;
     border-radius: 50%;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, .55), 0 0 5px -1px var(--marker-color, #fff);
-    inset: 2px;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, .45), 0 0 3px -1px var(--marker-color, #fff);
+    inset: 1.75px;
     transform: none
+}
+
+.GalaxyMarker.Crowded .GalaxyMarkerIcon {
+    opacity: .28
 }
 
 /* a system with a page: a ring round the dot */
@@ -2994,12 +3015,13 @@ a.GalaxyMarker.Link .GalaxyMarkerIcon {
 }
 
 a.GalaxyMarker.Link .GalaxyMarkerIcon::after {
-    inset: 2.5px
+    inset: 2px
 }
 
 .GalaxyMarker.MapOnly .GalaxyMarkerIcon::after {
     background: rgba(0, 0, 0, .35);
-    box-shadow: inset 0 0 0 1.2px var(--marker-color, #fff), 0 0 4px -1px var(--marker-color, #fff)
+    box-shadow: inset 0 0 0 1px var(--marker-color, #fff);
+    inset: 1.25px
 }
 
 .GalaxyMarker.Object .GalaxyMarkerIcon {
@@ -3010,8 +3032,8 @@ a.GalaxyMarker.Link .GalaxyMarkerIcon::after {
 .GalaxyMarker.Object .GalaxyMarkerIcon::after {
     border: 0;
     border-radius: 1px;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, .55), 0 0 5px -1px var(--marker-color, #fff);
-    inset: 2.4px;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, .45);
+    inset: 2px;
     transform: rotate(45deg)
 }
 
@@ -3024,7 +3046,8 @@ a.GalaxyMarker.Link .GalaxyMarkerIcon::after {
 .GalaxyMarker.Object.Fiction .GalaxyMarkerIcon::after {
     background: rgba(0, 0, 0, .35);
     border: 0;
-    box-shadow: inset 0 0 0 1.2px var(--marker-color, #c7a6ff), 0 0 4px -1px var(--marker-color, #c7a6ff)
+    box-shadow: inset 0 0 0 1px var(--marker-color, #c7a6ff);
+    inset: 1.25px
 }
 
 /* nebulae and clusters: the name sits right beside the glyph */
@@ -3056,9 +3079,9 @@ a.GalaxyMarker.Link .GalaxyMarkerIcon::after {
 /* an open cluster: three specks */
 .GalaxyMarker.Deep-open .GalaxyMarkerIcon::after {
     background:
-        radial-gradient(circle at 50% 22%, var(--marker-color) 0 1.1px, transparent 1.6px),
-        radial-gradient(circle at 22% 72%, var(--marker-color) 0 1.1px, transparent 1.6px),
-        radial-gradient(circle at 78% 72%, var(--marker-color) 0 1.1px, transparent 1.6px);
+        radial-gradient(circle at 50% 20%, var(--marker-color) 0 .9px, transparent 1.3px),
+        radial-gradient(circle at 20% 75%, var(--marker-color) 0 .9px, transparent 1.3px),
+        radial-gradient(circle at 80% 75%, var(--marker-color) 0 .9px, transparent 1.3px);
     border-radius: 0
 }
 
@@ -3070,9 +3093,9 @@ a.GalaxyMarker.Link .GalaxyMarkerIcon::after {
 /* a remnant or a planetary nebula: a thin shell round a point */
 .GalaxyMarker.Deep-remnant .GalaxyMarkerIcon::after,
 .GalaxyMarker.Deep-planetary .GalaxyMarkerIcon::after {
-    background: radial-gradient(circle, var(--marker-color) 0 1px, transparent 1.5px);
+    background: radial-gradient(circle, var(--marker-color) 0 .7px, transparent 1.1px);
     box-shadow: inset 0 0 0 1px var(--marker-color);
-    inset: 1px
+    inset: .5px
 }
 
 /* ---------- distance rings' names ---------- */
@@ -3255,6 +3278,74 @@ button.CatalogueOpen {
     z-index: 20
 }
 
+/* the fold (owner, 2026-11-27): a small heading with a chevron; remembered per browser */
+.KeysFold {
+    align-items: center;
+    background: none;
+    border: none;
+    color: var(--galaxy-ink-faint);
+    cursor: pointer;
+    display: flex;
+    font-family: inherit;
+    font-size: .58rem;
+    gap: 6px;
+    justify-content: space-between;
+    letter-spacing: .28em;
+    margin: -2px -3px 5px;
+    padding: 2px 3px;
+    text-transform: uppercase;
+    width: calc(100% + 6px)
+}
+
+.KeysFold:hover,
+.KeysFold:focus-visible {
+    color: var(--galaxy-ink);
+    outline: none
+}
+
+.KeysFold svg {
+    fill: none;
+    height: 11px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.5;
+    transition: transform .25s var(--ul-ease-out);
+    width: 11px
+}
+
+.KeysFoldShut {
+    display: none
+}
+
+/* folded (the default): the heading is the label that says the help is there */
+.GalaxyKeys.Folded .KeysFold {
+    color: var(--galaxy-ink-dim);
+    gap: 10px;
+    margin-bottom: -2px
+}
+
+.GalaxyKeys.Folded .KeysFoldOpen {
+    display: none
+}
+
+.GalaxyKeys.Folded .KeysFoldShut {
+    display: inline
+}
+
+.GalaxyKeys.Folded .KeysFold:hover,
+.GalaxyKeys.Folded .KeysFold:focus-visible {
+    color: var(--galaxy-ink)
+}
+
+.GalaxyKeys.Folded .KeysFold svg {
+    transform: rotate(180deg)
+}
+
+.GalaxyKeys.Folded dl {
+    display: none
+}
+
 .GalaxyKeys dl {
     column-gap: 16px;
     display: grid;
@@ -3297,8 +3388,7 @@ button.CatalogueOpen {
     text-align: center
 }
 
-.KeysIcon svg,
-.PickButton svg {
+.KeysIcon svg {
     fill: none;
     height: 14px;
     stroke: currentColor;
@@ -3328,31 +3418,80 @@ button.CatalogueOpen {
     grid-template-rows: none
 }
 
-/* the pick-a-centre button, and the map while it is armed */
-.GalaxyControls .PickButton {
-    align-items: center;
-    color: var(--galaxy-ink-dim);
-    display: flex;
-    justify-content: center
-}
-
-.GalaxyControls .PickButton svg {
-    height: 18px;
-    width: 18px
-}
-
-.GalaxyControls .PickButton[aria-pressed="true"] {
-    background: color-mix(in srgb, var(--ul-primary) 22%, transparent);
-    color: var(--ul-primary)
-}
-
-.GalaxyView.Picking canvas {
-    cursor: crosshair
-}
-
 @media (max-width: 760px) {
     .GalaxyKeys {
         bottom: auto;
         right: auto
     }
+}
+
+/* the core and Sol buttons: amber for the core, blue for the Sun */
+.GalaxyControls .CoreButton,
+.KeysIcon.Core {
+    color: var(--ul-secondary)
+}
+
+@media (max-width: 760px) {
+    /* the layer row scrolls, so its edge is a plain hairline (after the shared panel rule) */
+    .GalaxyLayers {
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12), var(--ul-edge-glow)
+    }
+}
+
+/* ---------- the search fields' clear button ---------- */
+
+.PanelSearchWrap {
+    display: flex;
+    position: relative
+}
+
+.PanelSearchWrap .PanelSearch {
+    flex: 1;
+    min-width: 0;
+    padding-right: 34px
+}
+
+/* the browser's own clear button (Chromium) gives way to ours */
+.PanelSearch::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none
+}
+
+.PanelSearchClear {
+    align-items: center;
+    background: rgba(255, 255, 255, .08);
+    border: 0;
+    border-radius: 50%;
+    color: var(--galaxy-ink-dim);
+    cursor: pointer;
+    display: flex;
+    height: 20px;
+    justify-content: center;
+    padding: 0;
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: background .2s, color .2s;
+    width: 20px
+}
+
+.PanelSearchClear[hidden] {
+    display: none
+}
+
+.PanelSearchClear:hover,
+.PanelSearchClear:focus-visible {
+    background: rgba(255, 255, 255, .16);
+    color: #fff;
+    outline: none
+}
+
+.PanelSearchClear svg {
+    fill: none;
+    height: 12px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 1.6;
+    width: 12px
 }

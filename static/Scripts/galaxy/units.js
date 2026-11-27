@@ -177,7 +177,7 @@ export const DISPLAY_OPTIONS = {
     },
     turn: {
         label: "Idle turn",
-        hint: "When nothing is touched for 20 s",
+        hint: "When nothing is touched for 5 s",
         choices: [
             { value: "off", label: "Off", example: "the view stays put" },
             { value: "slow", label: "Slow", example: "one turn in 10 minutes" },

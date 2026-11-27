@@ -366,6 +366,12 @@ export const PIVOT = {
  * the bloom. Measured, haze alone was 5-12ms of the frame at full resolution.
  */
 export const SOFT_LAYER = 1;
+/*
+ * The drawn object of an open place (hero.js) renders last, after the soft layers are
+ * added back, so the haze and the painting's glow never wash over it: a star's disc
+ * is solid, not seen through a veil (owner, 2026-11-27).
+ */
+export const HERO_LAYER = 2;
 export const SOFT_SCALE = EXTREME ? 1 : 0.5;
 
 export const SCRATCH_VECTOR = new THREE.Vector3();

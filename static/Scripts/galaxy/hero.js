@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { mulberry32 } from "./util.js";
+import { HERO_LAYER } from "./config.js";
 
 /*
  * The object itself, drawn where it is, for the place you have flown to (owner,
@@ -28,6 +29,48 @@ import { mulberry32 } from "./util.js";
  * Nothing here draws random numbers from the shared generator, so the star field
  * never shifts when a place is opened.
  */
+
+/*
+ * The drawn stars' colours (owner, 2026-11-27): a painter's ramp by temperature, not
+ * a blackbody's. A real 5,000 K star looks nearly white; here it is plainly amber, so
+ * a red supergiant, the Sun and a blue giant can be told apart at a glance. Ember red,
+ * amber, gold, cream, ice, blue, violet-blue, interpolated in log temperature.
+ */
+const ART_RAMP = [
+    [2400, [1.0, 0.26, 0.14]],
+    [3400, [1.0, 0.42, 0.18]],
+    [4500, [1.0, 0.6, 0.24]],
+    [5800, [1.0, 0.8, 0.4]],
+    [7400, [1.0, 0.94, 0.8]],
+    [10000, [0.7, 0.85, 1.0]],
+    [20000, [0.46, 0.64, 1.0]],
+    [40000, [0.56, 0.48, 1.0]],
+];
+export function artColor(t) {
+    const x = Math.log(THREE.MathUtils.clamp(t || 5800, ART_RAMP[0][0], ART_RAMP[ART_RAMP.length - 1][0]));
+    for (let i = 1; i < ART_RAMP.length; i++) {
+        const [t1, c1] = ART_RAMP[i];
+        if (x > Math.log(t1)) continue;
+        const [t0, c0] = ART_RAMP[i - 1];
+        const k = (x - Math.log(t0)) / (Math.log(t1) - Math.log(t0));
+        return new THREE.Color(c0[0] + (c1[0] - c0[0]) * k, c0[1] + (c1[1] - c0[1]) * k, c0[2] + (c1[2] - c0[2]) * k);
+    }
+    return new THREE.Color(...ART_RAMP[ART_RAMP.length - 1][1]);
+}
+
+/*
+ * How much bigger a star is drawn for its real radius (in Suns). It used to be squeezed
+ * into 0.45-1.75 x, so a red supergiant looked like the Sun (owner, 2026-11-27: the
+ * big ones must be big - VY Canis Majoris should reach the edges of the view). Dwarfs
+ * still shrink gently; above the Sun it grows with the logarithm, a little faster than
+ * linearly in it: 10 Suns about 1.8 x, 100 about 2.8 x, 1,400 about 4.2 x, which at the
+ * close-up's distance fills most of the screen.
+ */
+export function starScale(r) {
+    const R = Math.max(r || 1, 0.001);
+    if (R <= 1) return Math.max(0.5, 1 + 0.25 * Math.log10(R));
+    return Math.min(1 + 0.8 * Math.pow(Math.log10(R), 1.2), 4.3);
+}
 
 // a blackbody's colour at temperature t (K), scaled so the brightest channel is 1
 export function starColor(t) {
@@ -105,16 +148,19 @@ const STAR_FRAGMENT = /* glsl */ `
             float limb = 0.35 + 0.65 * mu;
             vec2 q = vUv / uDisc / (0.4 + 0.6 * mu) * 5.0 + uSeed * 17.0;
             float cells = 0.6 * noise(q + uTime * 0.07) + 0.4 * noise(q * 2.4 - uTime * 0.11);
-            col = mix(uColor, vec3(1.0), 0.2 * mu) * limb * (0.78 + 0.44 * cells) * 1.05;
+            // a hot white heart, the star's own colour towards the limb
+            col = mix(uColor, vec3(1.0), 0.16 * mu * mu) * limb * (0.74 + 0.5 * cells) * 1.12;
         }
         float out_ = max(d - 1.0, 0.0);
-        // the corona and the glow of the light scattered in the eye
-        float glow = 0.42 * exp(-out_ * 3.2) + 0.08 * exp(-out_ * 0.7);
+        // the corona and the glow of the light scattered in the eye: stars glow (owner, 2026-11-27)
+        float glow = 0.95 * exp(-out_ * 2.4) + 0.26 * exp(-out_ * 0.55);
         float a = atan(vUv.y, vUv.x) + 0.35;
-        float spikes = pow(abs(cos(a * 2.0)), 600.0) * exp(-out_ * 0.75) * 0.22;
+        float spikes = pow(abs(cos(a * 2.0)), 600.0) * exp(-out_ * 0.6) * 0.4;
         col += uColor * (glow + spikes) * smoothstep(0.96, 1.04, d);
         col *= 1.0 - smoothstep(0.82, 1.0, r);
-        gl_FragColor = vec4(col * uOpacity, 1.0);
+        // the disc is solid: nothing behind it shows through (premultiplied, see material())
+        float solid = 1.0 - smoothstep(0.97, 1.0, d);
+        gl_FragColor = vec4(col * uOpacity, solid * uOpacity);
     }
 `;
 
@@ -144,7 +190,8 @@ const NEUTRON_FRAGMENT = /* glsl */ `
         col += mix(uColor, vec3(1.0), 0.3) * beam * (0.55 + 1.4 * flash);
         col += uColor * flash * exp(-out_ * 0.9) * 0.8;
         col *= 1.0 - smoothstep(0.85, 1.0, r);
-        gl_FragColor = vec4(col * uOpacity, 1.0);
+        float solid = max(1.0 - smoothstep(0.95, 1.0, d), min(beam * 0.7, 0.7));
+        gl_FragColor = vec4(col * uOpacity, solid * uOpacity);
     }
 `;
 
@@ -174,13 +221,15 @@ const BLACKHOLE_FRAGMENT = /* glsl */ `
         float swirl = noise(vec2(atan(e.y, e.x) * 4.0 - uTime * 0.9 + re / s * 1.7, re / s * 3.0));
         // the side coming towards us is brighter (Doppler beaming)
         float beaming = 1.0 + 0.75 * p.x / max(re, 0.0001);
-        vec3 hot = vec3(1.0, 0.92, 0.78);
-        vec3 warm = vec3(1.0, 0.5, 0.16);
+        // painted, not measured: a gold-white inner disk, a deep orange rim
+        vec3 hot = vec3(1.0, 0.86, 0.62);
+        vec3 warm = vec3(1.0, 0.36, 0.1);
         vec3 disk = mix(warm, hot, 1.0 - smoothstep(inner, outer, re)) * band * beaming * (0.55 + 0.75 * swirl) * 2.4;
         // the far side of the disk, bent by gravity over the top and under the bottom
         float lensR = 1.45 * s;
         float lens = exp(-pow((r - lensR) / (0.16 * s), 2.0)) * (0.35 + 0.65 * smoothstep(-0.2, 0.9, p.y / max(r, 0.0001)));
-        vec3 lensed = mix(warm, hot, 0.6) * lens * (0.7 + 0.5 * swirl) * 1.8;
+        // the lensed arc leans violet, so it reads apart from the disk in front
+        vec3 lensed = mix(mix(warm, hot, 0.6), vec3(0.78, 0.52, 1.0), 0.35) * lens * (0.7 + 0.5 * swirl) * 1.9;
         // the photon ring: light that has gone round the hole
         float ring = exp(-pow((r - 1.08 * s) / (0.035 * s), 2.0)) * 2.2;
         float shadow = 1.0 - smoothstep(s * 0.97, s * 1.03, r);
@@ -192,7 +241,8 @@ const BLACKHOLE_FRAGMENT = /* glsl */ `
         vec3 col = back + front + warm * glow;
         col *= 1.0 - smoothstep(0.85, 1.0, r);
         // premultiplied: light added, and the shadow takes away what is behind it
-        float cover = shadow * (1.0 - min(length(front), 1.0));
+        // the shadow and the disk both hide what is behind them; the lensed light is added
+        float cover = max(shadow, min(band * 1.4, 1.0) * 0.95) * (1.0 - smoothstep(0.85, 1.0, r));
         gl_FragColor = vec4(col * uOpacity, cover * uOpacity);
     }
 `;
@@ -239,7 +289,9 @@ const NEBULA_FRAGMENT = /* glsl */ `
             col = mix(uColorA, uColorB, smoothstep(0.2, 0.8, n)) * body * 1.4;
         }
         col *= 1.0 - smoothstep(0.86, 1.0, r);
-        gl_FragColor = vec4(col * uOpacity, 1.0);
+        // bright gas hides the stars behind it; faint wisps stay see-through
+        float solid = smoothstep(0.05, 0.6, max(col.r, max(col.g, col.b)));
+        gl_FragColor = vec4(col * uOpacity, solid * uOpacity);
     }
 `;
 
@@ -263,7 +315,10 @@ const PHOTO_FRAGMENT = /* glsl */ `
         col = max(col - 0.045, 0.0) / 0.955;
         float r = length(vUv);
         float vignette = 1.0 - smoothstep(0.42, 0.98, r);
-        gl_FragColor = vec4(col * vignette * vignette * uOpacity * uReady, 1.0);
+        float fade = vignette * vignette * uOpacity * uReady;
+        // the lit gas is solid; the photo's dark sky lets the galaxy through
+        float solid = smoothstep(0.03, 0.35, max(col.r, max(col.g, col.b)));
+        gl_FragColor = vec4(col * fade, solid * fade);
     }
 `;
 
@@ -288,7 +343,7 @@ const POINT_FRAGMENT = /* glsl */ `
         float r2 = dot(gl_PointCoord - 0.5, gl_PointCoord - 0.5) * 4.0;
         if (r2 >= 1.0) discard;
         float a = exp(-r2 * 6.0) * (1.0 - r2);
-        gl_FragColor = vec4(vColor * a * uOpacity * 1.8, 1.0);
+        gl_FragColor = vec4(vColor * a * uOpacity * 1.8, min(a * 1.6, 1.0) * uOpacity);
     }
 `;
 
@@ -314,7 +369,14 @@ export class Hero {
         this.right = new THREE.Vector3();
     }
 
-    material(fragmentShader, uniforms, blending = THREE.AdditiveBlending) {
+    /*
+     * Premultiplied alpha for every drawing (owner, 2026-11-26: the drawn objects
+     * were see-through). A shader returns its light in rgb and how much of what is
+     * behind it it hides in alpha: a star's disc, a black hole's shadow and disk, the
+     * bright parts of a cloud hide the sky; glows and coronas, with alpha 0, are
+     * still added light.
+     */
+    material(fragmentShader, uniforms) {
         const m = new THREE.ShaderMaterial({
             vertexShader: VERTEX,
             fragmentShader,
@@ -322,7 +384,9 @@ export class Hero {
             transparent: true,
             depthWrite: false,
             depthTest: false,
-            blending,
+            blending: THREE.CustomBlending,
+            blendSrc: THREE.OneFactor,
+            blendDst: THREE.OneMinusSrcAlphaFactor,
         });
         this.materials.push(m);
         return m;
@@ -373,7 +437,9 @@ export class Hero {
             transparent: true,
             depthWrite: false,
             depthTest: false,
-            blending: THREE.AdditiveBlending,
+            blending: THREE.CustomBlending,
+            blendSrc: THREE.OneFactor,
+            blendDst: THREE.OneMinusSrcAlphaFactor,
         });
         this.materials.push(material);
         const cloud = new THREE.Points(geometry, material);
@@ -398,7 +464,7 @@ export class Hero {
         if (PHOTO_KINDS.has(hero.type) && (item.image || item.warm) && !item.noPhoto) {
             this.photo = true;
             const material = this.material(PHOTO_FRAGMENT, { uMap: { value: null }, uAspect: { value: 1 }, uReady: { value: 0 } });
-            this.billboard(material, size * 1.05);
+            this.billboard(material, size * 1.2);
             if (item.warm) return this.finishShow();
             PHOTO_LOADER.load(
                 `${Hero.imageBase}${item.image}`,
@@ -419,8 +485,8 @@ export class Hero {
         }
         if (hero.type === "star") {
             const stars = hero.stars?.length ? hero.stars : [{ t: hero.t ?? 5600, r: 1 }];
-            // radii are compressed: a supergiant is drawn a little larger, a dwarf a little smaller
-            const discs = stars.map((s) => size * THREE.MathUtils.clamp(1 + 0.24 * Math.log10(Math.max(s.r, 0.001)), 0.45, 1.75));
+            // drawn bigger for a bigger star: a supergiant fills the view (starScale)
+            const discs = stars.map((s) => size * starScale(s.r));
             let x = 0;
             const offsets = discs.map((d, i) => {
                 if (i === 0) return 0;
@@ -429,14 +495,14 @@ export class Hero {
             });
             const shift = offsets[offsets.length - 1] / 2;
             stars.forEach((s, i) => {
-                const color = hero.color ? new THREE.Color(hero.color).lerp(starColor(s.t), 0.5) : starColor(s.t);
+                const color = hero.color ? new THREE.Color(hero.color).lerp(artColor(s.t), 0.5) : artColor(s.t);
                 this.star(color, discs[i], offsets[i] - shift, seed + i * 0.31);
             });
         } else if (hero.type === "neutron") {
             this.billboard(this.material(NEUTRON_FRAGMENT, { uColor: { value: new THREE.Color(hero.color || "#7fe7ff") }, uDisc: { value: 0.045 } }), size * 10);
         } else if (hero.type === "blackhole") {
             const mesh = this.billboard(
-                this.material(BLACKHOLE_FRAGMENT, { uDisc: { value: 0.18 }, uAngle: { value: 0 }, uSquash: { value: 0.26 }, uFlip: { value: 1 } }, THREE.CustomBlending),
+                this.material(BLACKHOLE_FRAGMENT, { uDisc: { value: 0.18 }, uAngle: { value: 0 }, uSquash: { value: 0.26 }, uFlip: { value: 1 } }),
                 size / 0.18
             );
             // the disk's axis: near the galaxy's own, leaning a little by the seed
@@ -476,13 +542,13 @@ export class Hero {
                     const s = Math.sqrt(1 - v * v);
                     p.set(Math.cos(a) * s, v, Math.sin(a) * s).multiplyScalar(Math.min(radius, size * 1.4));
                     const giant = random() < 0.06;
-                    c.setRGB(1.0, giant ? 0.72 : 0.86, giant ? 0.45 : 0.66);
-                    if (random() < 0.02) c.setRGB(0.7, 0.82, 1.0);
+                    c.setRGB(1.0, giant ? 0.55 : 0.8, giant ? 0.25 : 0.5);
+                    if (random() < 0.03) c.setRGB(0.55, 0.72, 1.0);
                     return { brightness: giant ? 0.6 + 0.4 * random() : 0.12 + 0.2 * random() };
                 }
                 p.set((random() - 0.5) * 2, (random() - 0.5) * 1.2, (random() - 0.5) * 2).multiplyScalar(size * Math.pow(random(), 0.6));
-                const hot = random() < 0.7;
-                c.setRGB(hot ? 0.72 : 1.0, hot ? 0.84 : 0.86, hot ? 1.0 : 0.6);
+                const hot = random() < 0.75;
+                c.setRGB(hot ? 0.55 : 1.0, hot ? 0.74 : 0.62, hot ? 1.0 : 0.3);
                 return { brightness: Math.pow(random(), 2.2) };
             }, size);
         } else {
@@ -505,6 +571,8 @@ export class Hero {
     finishShow() {
         this.fade = 0;
         this.group.visible = true;
+        // drawn in its own pass, after the soft layers (config.HERO_LAYER)
+        this.group.traverse((node) => node.layers.set(HERO_LAYER));
     }
 
     hide() {

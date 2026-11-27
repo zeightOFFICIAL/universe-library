@@ -11,7 +11,7 @@ import { buildDeepSky, buildGalaxies, buildStellarObjects } from "./landmarks.js
 import { DUST, dustColumn, diskTransmission } from "./dust.js";
 import { buildLocal } from "./local.js";
 import { PostPipeline } from "./post.js";
-import { LABEL_SPOTS, Marker } from "./markers.js";
+import { LABEL_SPOTS, LABEL_REACH, Marker } from "./markers.js";
 import { Catalogue, ensureOneOpen } from "./panels.js";
 import { buildBearings, updateBearings, buildSectors, updateSectors, sectorName, buildDistanceRings, updateDistanceRings } from "./overlays.js";
 import { Hero, PHOTO_KINDS } from "./hero.js";
@@ -99,17 +99,14 @@ export class GalaxyView {
         this.hint = this.root.querySelector(".GalaxyHint");
         // the controls legend shows the touch gestures on a touch screen, the mouse and keys elsewhere
         if (this.hint && window.matchMedia("(pointer: coarse)").matches) this.hint.classList.add("Touch");
+        this.bindKeysFold();
         // anything that moves the view keeps it at the full frame rate (see frame())
         this.controls.addEventListener("change", () => {
             this.lastMove = performance.now();
         });
         this.controls.addEventListener("start", () => {
             // a flight to a place, cut short: the place's drawing goes with it
-            if (this.flight?.open && !this.detailItem) {
-                this.hero.hide();
-                // a close-up abandoned on the way: there is nothing to come back from
-                this.returnView = null;
-            }
+            if (this.flight?.open && !this.detailItem) this.hero.hide();
             this.flight = null;
             this.lastInteraction = performance.now();
             // the hint has done its job once the map has been touched
@@ -158,10 +155,40 @@ export class GalaxyView {
          * theirs: the right and middle buttons and the wheel go on to the map, so
          * turning and zooming work wherever the cursor happens to be.
          */
+        /*
+         * And a drag that starts on a dot or a name is a drag (owner, 2026-11-27: the
+         * dots got in the way of panning). Every press on a label goes on to the map
+         * at once; only a press that ends where it began - under 6 px of travel - is a
+         * click on the label. The browser's own click on it is swallowed, and the
+         * label is clicked again by hand. A key press on a focused label sends a click
+         * with detail 0, which is let through, so the keyboard works as before.
+         */
+        let press = null;
+        // set while the label is clicked by hand, so that click is let through
+        let ours = false;
         this.labels.addEventListener("pointerdown", (event) => {
-            if (event.button === 0 || !event.target.closest(".GalaxyMarker")) return;
+            const marker = event.target.closest(".GalaxyMarker");
+            if (!marker) return;
             event.preventDefault();
+            if (event.button === 0) press = { id: event.pointerId, x: event.clientX, y: event.clientY, target: event.target };
             this.canvas.dispatchEvent(new PointerEvent("pointerdown", event));
+        }, true);
+        window.addEventListener("pointerup", (event) => {
+            if (!press || event.pointerId !== press.id) return;
+            const { x, y, target } = press;
+            press = null;
+            if (Math.hypot(event.clientX - x, event.clientY - y) < 6 && target.isConnected) {
+                ours = true;
+                target.click();
+                ours = false;
+            }
+        }, true);
+        window.addEventListener("pointercancel", () => (press = null), true);
+        this.labels.addEventListener("click", (event) => {
+            if (!ours && event.detail > 0 && event.target.closest(".GalaxyMarker")) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
         }, true);
         this.labels.addEventListener("contextmenu", (event) => event.preventDefault());
         this.labels.addEventListener("wheel", (event) => {
@@ -491,7 +518,7 @@ export class GalaxyView {
          * than life, at a size set by how close the camera comes; clouds and clusters
          * at their real size. The panel says which.
          */
-        const starHero = (close, stars, color) => ({ type: "star", size: close * 0.075, stars: stars === "pulsar" ? null : stars, color });
+        const starHero = (close, stars, color) => ({ type: "star", size: close * 0.09, stars: stars === "pulsar" ? null : stars, color });
         const starFacts = (stars) => {
             if (!Array.isArray(stars) || !stars.length) return [];
             return [[stars.length > 1 ? `${stars.length} stars` : "Star", stars.map((s) => formatTemperature(s.t)).join(", ")]];
@@ -658,7 +685,7 @@ export class GalaxyView {
                 close,
                 layers: ["systems"],
                 about: s.note,
-                hero: pulsar ? { type: "neutron", size: close * 0.02 } : starHero(close, s.stars),
+                hero: pulsar ? { type: "neutron", size: close * 0.024 } : starHero(close, s.stars),
                 facts: () => [["Distance", formatLy(s.d)], ...(pulsar ? [["Star", "A pulsar"]] : starFacts(s.stars)), DRAWN],
             });
             const fly = () => this.visit(item);
@@ -721,7 +748,7 @@ export class GalaxyView {
                 fiction: true,
                 layers: ["fiction", isObject ? "objects" : "systems"],
                 about: f.note,
-                hero: isObject ? { type: "cube", size: close * 0.08, color: "#c7a6ff" } : starHero(close, null, "#c7a6ff"),
+                hero: isObject ? { type: "cube", size: close * 0.096, color: "#c7a6ff" } : starHero(close, null, "#c7a6ff"),
                 // a reference picture from the story, always with its source
                 ...photo(f),
                 facts: () => [
@@ -742,7 +769,7 @@ export class GalaxyView {
             const ly = c.au / 63241;
             const position = truePosition(c.l, c.b, ly);
             const close = (ly / 1000) * 2;
-            const item = info({ name: c.name, kicker: "Spacecraft", color: "#e6eaf2", position, close, layers: ["objects"], about: c.about || c.note, ...photo(c), hero: { type: "cube", size: close * 0.08 }, facts: () => [["From the Sun", formatLy(ly)], ["Light takes", `${(ly * 365.25 * 24).toFixed(1)} hours`], DRAWN] });
+            const item = info({ name: c.name, kicker: "Spacecraft", color: "#e6eaf2", position, close, layers: ["objects"], about: c.about || c.note, ...photo(c), hero: { type: "cube", size: close * 0.096 }, facts: () => [["From the Sun", formatLy(ly)], ["Light takes", `${(ly * 365.25 * 24).toFixed(1)} hours`], DRAWN] });
             const fly = () => this.visit(item);
             const marker = add({
                 position,
@@ -801,9 +828,9 @@ export class GalaxyView {
                 ...photo(o),
                 hero:
                     o.kind === "blackhole"
-                        ? { type: "blackhole", size: close * 0.11, seed: (o.l * 3.1 + o.b) % 1 }
+                        ? { type: "blackhole", size: close * 0.13, seed: (o.l * 3.1 + o.b) % 1 }
                         : o.kind === "neutron"
-                          ? { type: "neutron", size: close * 0.02 }
+                          ? { type: "neutron", size: close * 0.024 }
                           : starHero(close, [{ t: o.temperature || 5600, r: o.radius || 1 }]),
                 facts: () => {
                     const rows = [["Distance", formatLy(o.d)]];
@@ -861,7 +888,7 @@ export class GalaxyView {
                 about: o.about,
                 alias: o.alias,
                 ...photo(o),
-                hero: { type: o.kind, size: o.kind === "open" || o.kind === "globular" ? radius : radius * 1.25, seed: (o.l * 7.13 + o.b * 3.7) % 1 },
+                hero: { type: o.kind, size: o.kind === "open" || o.kind === "globular" ? radius * 1.15 : radius * 1.4, seed: (o.l * 7.13 + o.b * 3.7) % 1 },
                 facts: () => [
                     ["Distance", formatLy(o.d)],
                     ...(o.size ? [["Across", `about ${formatDistance(o.size)}`]] : []),
@@ -947,8 +974,9 @@ export class GalaxyView {
             const r = ly / 1000;
             add({
                 position: SUN.clone().add(new THREE.Vector3(Math.sin(angle) * r, 0, Math.cos(angle) * r)),
-                name: `Light from ${yearOf(ly)}`,
-                sub: `${formatLy(ly)} away · it set off when ${event}`,
+                // what we see out there is how it was: as it was when ... (owner, 2026-11-26, third pass)
+                name: `Seen as in ${yearOf(ly)}`,
+                sub: `${formatLy(ly)} away · as it was when ${event}`,
                 level: "any",
                 layer: "earth",
                 kind: "region",
@@ -985,7 +1013,7 @@ export class GalaxyView {
                 close,
                 layers: ["earth"],
                 about: "1,679 radio pulses sent from the Arecibo telescope in Puerto Rico on 16 November 1974, aimed at the globular cluster M13. Arranged as 73 rows of 23, they draw the numbers one to ten, DNA, a person, the Solar System and the telescope itself. It was a demonstration more than a real attempt: by the time it gets there, M13 will have moved.",
-                hero: { type: "cube", size: close * 0.08, color: "#ff8fb0" },
+                hero: { type: "cube", size: close * 0.096, color: "#ff8fb0" },
                 facts: () => [
                     ["Sent", "16 November 1974"],
                     ["Out now", formatLy(ARECIBO_LY)],
@@ -1018,38 +1046,7 @@ export class GalaxyView {
         this.applyTerritoryColors();
     }
 
-    /*
-     * Pick a centre (owner, 2026-11-26, a button rather than a double-click): the
-     * button arms it, the cursor turns to a crosshair, and the next left click on the
-     * map makes that point the pivot - the centre the view turns round and measures
-     * from - without changing the zoom or the angle. Esc or the button again cancels.
-     * The click is caught before the controls see it, so it never starts a pan.
-     */
-    setPicking(on) {
-        this.picking = on;
-        this.root.classList.toggle("Picking", on);
-        const button = this.root.querySelector('[data-action="pick"]');
-        button?.setAttribute("aria-pressed", String(on));
-    }
-
-    bindPicking() {
-        this.root.addEventListener("pointerdown", (event) => {
-            if (!this.picking || event.target !== this.canvas || event.button !== 0) return;
-            event.stopPropagation();
-            event.preventDefault();
-            const rect = this.canvas.getBoundingClientRect();
-            this.pointer = { x: ((event.clientX - rect.left) / rect.width) * 2 - 1, y: -((event.clientY - rect.top) / rect.height) * 2 + 1 };
-            // on the galaxy's plane; near the Sun, on the plane the Sun sits in (65 ly up)
-            const hit = this.pointerOnPlane(this.camera.position.distanceTo(SUN) < LOCAL_ENTER ? SUN.y : 0);
-            this.setPicking(false);
-            if (!hit) return;
-            const s = this.spherical();
-            this.flyTo({ target: hit.clone(), distance: s.radius, polar: s.phi, azimuth: s.theta }, 700);
-        }, true);
-    }
-
     bindControls() {
-        this.bindPicking();
         // the dock's jump chips and the zoom buttons share one vocabulary
         this.root.querySelectorAll("[data-action]").forEach((button) => {
             button.addEventListener("click", () => {
@@ -1069,7 +1066,6 @@ export class GalaxyView {
                  */
                 if (action === "edge") this.flyTo({ target: ORIGIN.clone(), distance: this.framed(96), polar: THREE.MathUtils.degToRad(89.5) });
                 if (action === "zoom-in") this.zoomBy(0.6);
-                if (action === "pick") this.setPicking(!this.picking);
                 if (action === "zoom-out") this.zoomBy(1 / 0.6);
             });
         });
@@ -1082,35 +1078,33 @@ export class GalaxyView {
      * the dock's switches and links keep their own keys.
      */
     /*
-     * WASD flying (owner, 2026-11-26): held keys move the camera and the pivot
-     * together, so the view travels without turning. W and S go forward and back
-     * along the line of sight, A and D sideways, Q and E down and up towards the
-     * galactic poles; Shift is three times faster. The speed is half the camera's
-     * distance per second, so it feels the same in the local view and across the
-     * galaxy. Not while a place is open, and never while typing. The pivot allowance
-     * in frame() still holds, so the flight eases back rather than leaving the galaxy.
+     * WASD and the arrows move the centre point across the galaxy (owner,
+     * 2026-11-26, second pass: not a free flight). Held, they slide the pivot and the
+     * camera together along the plane - W and Up away from the viewer, S and Down
+     * towards, A, D, Left and Right sideways - so the view travels without turning
+     * or climbing. Shift with WASD is three times faster; Shift with the arrows still
+     * turns and tilts (bindKeyboard). Half the camera's distance per second, so it
+     * feels the same at every zoom. Not while a place is open or a field has focus.
      */
-    flyByKeys(dt, now) {
+    panByKeys(dt, now) {
         if (!this.keys.size || this.detailItem) return;
         const k = this.keys;
-        const forward = (k.has("KeyW") ? 1 : 0) - (k.has("KeyS") ? 1 : 0);
-        const side = (k.has("KeyD") ? 1 : 0) - (k.has("KeyA") ? 1 : 0);
-        const up = (k.has("KeyE") ? 1 : 0) - (k.has("KeyQ") ? 1 : 0);
-        if (!forward && !side && !up) return;
+        const forward = (k.has("KeyW") || k.has("ArrowUp") ? 1 : 0) - (k.has("KeyS") || k.has("ArrowDown") ? 1 : 0);
+        const side = (k.has("KeyD") || k.has("ArrowRight") ? 1 : 0) - (k.has("KeyA") || k.has("ArrowLeft") ? 1 : 0);
+        if (!forward && !side) return;
         const radius = this.camera.position.distanceTo(this.controls.target);
         const speed = radius * 0.5 * (k.has("ShiftLeft") || k.has("ShiftRight") ? 3 : 1) * dt;
         const move = KEY_MOVE.set(0, 0, 0);
-        this.camera.getWorldDirection(KEY_AXIS);
-        move.addScaledVector(KEY_AXIS, forward);
-        KEY_AXIS.setFromMatrixColumn(this.camera.matrixWorld, 0);
+        this.camera.getWorldDirection(KEY_AXIS).setY(0);
+        // straight down on the disk the line of sight has no direction in the plane: use the screen's up
+        if (KEY_AXIS.lengthSq() < 1e-6) KEY_AXIS.setFromMatrixColumn(this.camera.matrixWorld, 1).setY(0);
+        move.addScaledVector(KEY_AXIS.normalize(), forward);
+        KEY_AXIS.setFromMatrixColumn(this.camera.matrixWorld, 0).setY(0).normalize();
         move.addScaledVector(KEY_AXIS, side);
-        move.y += up;
         if (move.lengthSq() < 1e-12) return;
         move.normalize().multiplyScalar(speed);
         this.controls.target.add(move);
         this.camera.position.add(move);
-        // a free flight lets go of any place the view was anchored to
-        this.destination = null;
         this.flight = null;
         this.lastMove = now;
         this.lastInteraction = now;
@@ -1119,11 +1113,10 @@ export class GalaxyView {
 
     bindKeyboard() {
         this.keys = this.keys || new Set();
-        const FLY_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyE", "ShiftLeft", "ShiftRight"]);
+        const PAN_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft", "ShiftRight"]);
+        const ARROWS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
         window.addEventListener("keyup", (event) => this.keys.delete(event.code));
         window.addEventListener("blur", () => this.keys.clear());
-        const forward = new THREE.Vector3();
-        const right = new THREE.Vector3();
         window.addEventListener("keydown", (event) => {
             if (event.ctrlKey || event.metaKey || event.altKey) return;
             const el = document.activeElement;
@@ -1131,15 +1124,12 @@ export class GalaxyView {
             if (typing) return;
             // the view is held while a place is open: only Esc (bindInfo) and Back let go
             if (this.detailItem) return;
-            // WASD, Q and E: held, and read by flyByKeys() every frame
-            if (FLY_KEYS.has(event.code)) {
+            // arrows belong to whatever has focus, unless that is the map or nothing
+            const mapKeys = !el || el === document.body || el === this.canvas;
+            // WASD, and the arrows without Shift: held, and read by panByKeys() every frame
+            if (PAN_KEYS.has(event.code) || (ARROWS.has(event.code) && !event.shiftKey && mapKeys)) {
                 this.keys.add(event.code);
                 if (!event.code.startsWith("Shift")) event.preventDefault();
-                return;
-            }
-            // Esc leaves the pick-a-centre mode
-            if (event.key === "Escape" && this.picking) {
-                this.setPicking(false);
                 return;
             }
             // arrows belong to whatever has focus, unless that is the map or nothing
@@ -1175,15 +1165,8 @@ export class GalaxyView {
                         move = sideways
                             ? { azimuth: s.theta - sign * 0.14 }
                             : { polar: THREE.MathUtils.clamp(s.phi + sign * 0.09, this.controls.minPolarAngle, this.controls.maxPolarAngle) };
-                    } else {
-                        // pan along the disk, in the directions the camera is facing
-                        this.camera.getWorldDirection(forward).setY(0).normalize();
-                        right.crossVectors(forward, this.camera.up).normalize();
-                        const step = s.radius * 0.1;
-                        if (sideways) target.addScaledVector(right, sign * step);
-                        else target.addScaledVector(forward, -sign * step);
-                        move = {};
                     }
+                    // without Shift the arrows pan, held, like WASD (panByKeys)
                     break;
                 }
                 default:
@@ -1404,7 +1387,7 @@ export class GalaxyView {
             ["Core and bar", "old stars, Sgr A* inside", "#ffd9a0", "Oval", "arms"],
             ["Other galaxy", "a photo at its real tilt", "#c9d6ff", "Oval", "arms"],
             ["From Earth", null],
-            ["Light-time ring", "light from it left in the year named", "#ffd9a0", "Dash", "earth"],
+            ["Light-time ring", "we see it as it was that year", "#ffd9a0", "Dash", "earth"],
             ["Radio bubble", "how far our broadcasts have got", "#9ecbff", "Line", "earth"],
             ["Arecibo message", "sent to M13 in 1974", "#ff8fb0", "Line", "earth"],
             ["Map aids", null],
@@ -1451,6 +1434,36 @@ export class GalaxyView {
         });
     }
 
+    /*
+     * The controls legend folds to its heading (owner, 2026-11-27), and starts folded:
+     * the heading reads "Show controls", so it is there for whoever looks for it.
+     * Opening it is remembered per browser (galaxyKeysOpen). The legend panel top
+     * right reaches down to it, so its room follows.
+     */
+    bindKeysFold() {
+        const keys = this.root.querySelector(".GalaxyKeys");
+        const fold = keys?.querySelector(".KeysFold");
+        if (!fold) return;
+        const set = (folded) => {
+            keys.classList.toggle("Folded", folded);
+            fold.setAttribute("aria-expanded", String(!folded));
+            this.root.style.setProperty("--keys-height", folded ? "40px" : "190px");
+        };
+        let folded = true;
+        try {
+            localStorage.removeItem("galaxyKeysFolded");
+            folded = localStorage.getItem("galaxyKeysOpen") !== "1";
+        } catch (e) {}
+        set(folded);
+        fold.addEventListener("click", () => {
+            folded = !keys.classList.contains("Folded");
+            set(folded);
+            try {
+                localStorage.setItem("galaxyKeysOpen", folded ? "0" : "1");
+            } catch (e) {}
+        });
+    }
+
     // turn on the layers a flight needs, so it never lands on empty space
     showLayers(keys = []) {
         for (const key of keys) {
@@ -1475,23 +1488,73 @@ export class GalaxyView {
      */
     visit(item) {
         if (!item) return;
-        // where Back returns to: the view before the first close-up of a run
-        if (!this.detailItem && !this.returnView) {
-            const s = this.spherical();
-            this.returnView = { target: this.controls.target.clone(), distance: s.radius, polar: s.phi, azimuth: s.theta };
-        }
         this.showLayers(item.layers);
-        const p = item.position;
-        const outward = Math.hypot(p.x, p.z) > 0.5 ? Math.atan2(p.x, p.z) : Math.random() * Math.PI * 2;
-        this.flyTo({
-            target: p.clone(),
-            // 1.75 x closer than the 1.4-1.9 x close it was (owner, 2026-11-26)
-            distance: (item.close * (1.4 + 0.5 * Math.random())) / 1.75,
-            polar: THREE.MathUtils.degToRad(64 + 14 * Math.random()),
-            azimuth: outward + (Math.random() - 0.5) * 1.3,
-        }, 1800, { open: item });
         // the object is drawn from the start, so it grows out of the sky on the way in
         this.hero.show(item);
+        const distance = item.close * 0.94;
+        const { polar, azimuth } = this.compose(item, distance);
+        this.flyTo({ target: item.position.clone(), distance, polar, azimuth }, 1800, { open: item });
+    }
+
+    /*
+     * The close-up is a still picture (owner, 2026-11-27: no turning round the drawn
+     * object - it is not good enough from every side), so each place gets a pose
+     * chosen for it, the same every time. A sweep of camera directions round the
+     * place is scored on what is behind it:
+     *   - the galaxy's heart sits to the left of the object (the panel is on the
+     *     right) and up on the horizon, so the bright band crosses the top of the
+     *     picture and the object stands against the darker sky below it;
+     *   - from far out in the halo, the whole galaxy lies below and to the left;
+     *   - at the core itself there is nothing to compose against, so it simply looks
+     *     in from outside, a little above the plane;
+     *   - a black hole is seen at about 70 degrees to its disk's axis, so the disk is
+     *     open enough to read and still tilted.
+     */
+    compose(item, distance) {
+        const p = item.position;
+        const radius = Math.hypot(p.x, p.z);
+        const halo = Math.abs(p.y) > 4 || radius > 40;
+        const want = halo ? [-0.3, -0.38] : [-0.42, 0.42];
+        const axis = this.hero.item === item ? this.hero.billboards.find((m) => m.userData.axis)?.userData.axis : null;
+        const tanV = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2);
+        const aspect = this.width && this.height ? this.width / this.height : 1.6;
+        const camera = new THREE.Vector3();
+        const forward = new THREE.Vector3();
+        const right = new THREE.Vector3();
+        const up = new THREE.Vector3();
+        const toCore = new THREE.Vector3();
+        const spherical = new THREE.Spherical();
+        let best = null;
+        for (let i = 0; i < 48; i++) {
+            const azimuth = (i / 48) * Math.PI * 2;
+            for (const degrees of [60, 66, 71, 76, 81]) {
+                const polar = THREE.MathUtils.degToRad(degrees);
+                spherical.set(distance, polar, azimuth);
+                camera.setFromSpherical(spherical).add(p);
+                forward.copy(p).sub(camera).normalize();
+                right.crossVectors(forward, THREE.Object3D.DEFAULT_UP).normalize();
+                up.crossVectors(right, forward);
+                let score = Math.pow((degrees - 70) / 30, 2);
+                if (radius > 2.5 || halo) {
+                    toCore.copy(ORIGIN).sub(camera);
+                    const z = toCore.dot(forward);
+                    if (z <= 0) {
+                        score += 4;
+                    } else {
+                        const nx = toCore.dot(right) / z / (tanV * aspect);
+                        const ny = toCore.dot(up) / z / tanV;
+                        score += Math.pow(nx - want[0], 2) + 1.4 * Math.pow(ny - want[1], 2);
+                    }
+                } else {
+                    // at the core: look in from outside
+                    const outward = Math.atan2(p.x, p.z);
+                    score += 0.5 * (1 - Math.cos(azimuth - outward));
+                }
+                if (axis) score += 3 * Math.pow(Math.abs(axis.dot(forward)) - 0.34, 2);
+                if (!best || score < best.score) best = { score, polar, azimuth };
+            }
+        }
+        return best;
     }
 
     /*
@@ -1743,11 +1806,7 @@ export class GalaxyView {
     flyTo({ target, distance, polar, azimuth }, duration = 1600, { anchor = true, open = null } = {}) {
         if (anchor) this.destination = target.clone();
         if (this.detailItem) this.closeDetail();
-        if (!open) {
-            this.hero.hide();
-            // any other flight ends the run of close-ups Back would return from
-            this.returnView = null;
-        }
+        if (!open) this.hero.hide();
         if (!this.motion()) duration = 0;
         const from = this.spherical();
         // the near limit depends on where the flight ends, not where it starts
@@ -1871,43 +1930,71 @@ export class GalaxyView {
             void this.leader.getBoundingClientRect();
             this.leader.classList.add("Drawn");
         }
-        /*
-         * Held in place, but it can be turned (owner, 2026-11-26): the right button -
-         * or one finger - orbits the place; nothing pans or zooms until Back or Esc.
-         */
-        this.controls.enablePan = false;
-        this.controls.enableZoom = false;
-        this.controls.touches.ONE = THREE.TOUCH.ROTATE;
-        // a photograph is flat: turning round it would only show that, so it is held still
-        this.controls.enabled = !this.hero.photo;
+        // a still picture (owner, 2026-11-27): nothing turns, pans or zooms until Back or Esc
+        this.controls.enabled = false;
         this.detail.querySelector(".DetailBack").focus({ preventScroll: true });
     }
 
     /*
-     * back: Back or Esc, which also flies the camera back to where it was before the
-     * close-up (owner, 2026-11-26). Left at the place, the pivot stayed out there - by
-     * a halo cluster, in the LMC - and held by the flight's anchor it made the next
-     * pans and zooms feel wrong. Going on to another place passes nothing: that flight
-     * takes over, and Back from there still returns to the view before the first one.
+     * back: Back or Esc. The camera stays where it is, and the place becomes the
+     * centre the view turns round and pans from (owner, 2026-11-26, second pass: a
+     * flight back to the earlier view was not wanted). The anchor is set on it, so
+     * the pivot allowance does not drag a far place's centre back to the disk.
      */
     closeDetail({ back = false } = {}) {
         if (!this.detailItem) return;
-        const view = back ? this.returnView : null;
-        if (back) this.returnView = null;
+        const item = this.detailItem;
         this.detailItem = null;
         this.detail.hidden = true;
         this.hero.hide();
         this.leader?.classList.remove("Drawn");
         this.root.classList.remove("DetailOpen");
         this.controls.enabled = true;
-        this.controls.enablePan = true;
-        this.controls.enableZoom = true;
-        this.controls.touches.ONE = THREE.TOUCH.PAN;
         this.canvas.focus({ preventScroll: true });
-        if (view) {
-            this.destination = null;
-            this.flyTo(view, 1400, { anchor: false });
+        if (back) this.settleOnPlane(item);
+    }
+
+    /*
+     * After a close-up, the centre goes back to the disk (owner, 2026-11-27): a place
+     * far above or below the plane - a halo globular, a high-latitude star - left the
+     * pivot out there, and every turn after it swung round a point off the galaxy, at
+     * an odd angle. So the pivot moves to where the line of sight through the place
+     * meets the plane: the picture does not move at all, only what it turns round.
+     * When that crossing is behind the camera or very far off (looking along or away
+     * from the plane), the camera still stays put and the pivot goes to the point on
+     * the plane under or over the place (below).
+     */
+    settleOnPlane(item) {
+        const p = item.position;
+        // near the Sun the local view's plane is the Sun's own, 65 ly up
+        const plane = p.distanceTo(SUN) < LOCAL_ENTER ? SUN.y : 0;
+        // already in the disk, for this zoom: stay on the place
+        if (Math.abs(p.y - plane) < Math.max(item.close * 3, 0.012)) {
+            this.controls.target.copy(p);
+            this.destination = p.clone();
+            return;
         }
+        const from = this.camera.position;
+        const dir = SCRATCH_VECTOR.copy(p).sub(from);
+        const reach = dir.length();
+        dir.normalize();
+        const t = Math.abs(dir.y) > 1e-4 ? (plane - from.y) / dir.y : -1;
+        if (t > reach * 0.5 && t < Math.max(reach * 12, 6)) {
+            const hit = from.clone().addScaledVector(dir, t);
+            this.controls.target.copy(hit);
+            this.destination = hit.clone();
+            return;
+        }
+        /*
+         * No crossing near enough (owner, 2026-11-27, second pass): the camera still
+         * stays exactly where the close-up left it, and the pivot goes to the point on
+         * the plane straight under or over the place. Only the aim moves, easing round
+         * over 0.9 s to face it (frame() runs this.aim), so from then on panning and
+         * turning are about the disk, from where you were.
+         */
+        const ground = new THREE.Vector3(p.x, plane, p.z);
+        this.destination = ground.clone();
+        this.aim = { from: this.controls.target.clone(), to: ground, start: performance.now(), duration: this.motion() ? 900 : 0 };
     }
 
     /*
@@ -1919,7 +2006,8 @@ export class GalaxyView {
      */
     updateLeader() {
         const svg = this.leader;
-        if (!svg || !this.detailItem) return;
+        // a hidden or zero-sized view has no geometry to draw against (it gave NaN paths)
+        if (!svg || !this.detailItem || !this.width || !this.height) return;
         const p = SCRATCH_VECTOR.copy(this.detailItem.position).project(this.camera);
         const shown = p.z < 1;
         svg.style.visibility = shown ? "visible" : "hidden";
@@ -2066,7 +2154,7 @@ export class GalaxyView {
         }
         for (const key of ["gas", "bulge", "bar"]) this.materials[key].uniforms.uScale.value = scale * this.post.softScale;
         // half the dot glyph's 9 px box (GalaxyStyles.css, "the dots")
-        this.iconHalf = 4.5;
+        this.iconHalf = 3.5;
         // label boxes are sized in vmin, so they change with the viewport
         for (const marker of this.markers) {
             marker.width = 0;
@@ -2112,7 +2200,7 @@ export class GalaxyView {
         if (this.flight) this.stepFlight(now);
         const dt = this.lastFrame ? Math.min((now - this.lastFrame) / 1000, 0.1) : 1 / 60;
         this.lastFrame = now;
-        this.flyByKeys(dt, now);
+        this.panByKeys(dt, now);
         // glide the view across when the full view opens or closes
         const wantShift = this.detailItem ? this.detailShift() : this.baseShift;
         if (Math.abs(wantShift - this.shift) > 0.5) {
@@ -2120,6 +2208,22 @@ export class GalaxyView {
             this.applyShift(instant ? wantShift : this.shift + (wantShift - this.shift) * 0.14);
         }
         const target = this.controls.target;
+        /*
+         * The pivot easing onto the plane after a close-up (settleOnPlane): the camera
+         * is held where it is - OrbitControls keeps the camera's offset only while the
+         * target is still, so the position is put back after the target moves.
+         */
+        if (this.aim) {
+            if (this.flight || this.detailItem) {
+                this.aim = null;
+            } else {
+                const k = this.aim.duration ? Math.min((now - this.aim.start) / this.aim.duration, 1) : 1;
+                const held = this.camera.position.clone();
+                target.lerpVectors(this.aim.from, this.aim.to, k * k * (3 - 2 * k));
+                this.camera.position.copy(held);
+                if (k >= 1) this.aim = null;
+            }
+        }
         /*
          * The zoom limit is set before the controls apply it, not after: set late it
          * belonged to the previous frame's pivot, so a cut landed at the old limit and
@@ -2132,7 +2236,7 @@ export class GalaxyView {
          * north - the way the galaxy itself turns. It costs nothing: the frame is drawn
          * every vsync anyway. Any touch, a flight or an open place stops it.
          */
-        this.controls.autoRotate = DISPLAY.turn === "slow" && !this.detailItem && !this.flight && this.motion() && now - this.lastInteraction > 20000;
+        this.controls.autoRotate = DISPLAY.turn === "slow" && !this.detailItem && !this.flight && this.motion() && now - this.lastInteraction > 5000;
         this.controls.autoRotateSpeed = -0.1;
         this.controls.update(dt);
         const cameraDistance = this.spherical().radius;
@@ -2384,7 +2488,8 @@ export class GalaxyView {
          * stays: below ~5 units the camera is inside the cloud itself, where rings
          * of fixed screen size would cover everything.
          */
-        const holeFade = smoothstep(3, 7, cameraDistance) * (1 - smoothstep(26, 46, cameraDistance)) * (1 - local);
+        // and not edge-on, where the rings stack up over the bulge and read as bubbles (owner, 2026-11-27)
+        const holeFade = smoothstep(3, 7, cameraDistance) * (1 - smoothstep(26, 46, cameraDistance)) * (1 - local) * smoothstep(0.12, 0.35, elevation);
         this.core.holePoints.visible = holeFade > 0.01;
         this.core.holeMaterial.uniforms.uOpacity.value = holeFade;
         /*
@@ -2553,15 +2658,17 @@ export class GalaxyView {
                     marker.iconOnly = true;
                     marker.side = 1;
                     marker.shift = 0;
+                    marker.reach = 0;
                     marker.keep = true;
                     continue;
                 }
                 const step = marker.height + 4;
                 let placed = false;
-                for (const [side, shift] of LABEL_SPOTS) {
+                for (const [side, shift, out] of LABEL_SPOTS) {
                     marker.side = side;
                     marker.shift = shift * step;
-                    marker.boxX = marker.screenX + (side * marker.width) / 2;
+                    marker.reach = out * LABEL_REACH;
+                    marker.boxX = marker.screenX + side * (marker.width / 2 + marker.reach);
                     marker.boxY = marker.screenY + marker.shift + marker.anchorShift;
                     // a label cut off by the edge of the screen is as bad as a hidden one
                     const inside = marker.boxX - marker.width / 2 > 4 && marker.boxX + marker.width / 2 < this.width - 4;
@@ -2579,6 +2686,7 @@ export class GalaxyView {
                 if (!placed) {
                     marker.side = 1;
                     marker.shift = 0;
+                    marker.reach = 0;
                     marker.boxX = marker.screenX + marker.width / 2;
                     marker.boxY = marker.screenY + marker.anchorShift;
                 }
@@ -2586,6 +2694,21 @@ export class GalaxyView {
                 if (marker.iconOnly) continue;
             }
             if (marker.keep) kept.push(marker);
+        }
+        /*
+         * Crowded dots (owner, 2026-11-27): a dot within 7 px of a more important one,
+         * and showing no name of its own, steps back to a faint speck. The candidates
+         * are already in priority order, so pages and named places win.
+         */
+        const dots = [];
+        for (const marker of candidates) {
+            marker.crowded = false;
+            if (marker.centered || !marker.keep) continue;
+            const nameless = marker.iconOnly || (marker.textFade ?? 1) < 0.05;
+            const x = marker.screenX;
+            const y = marker.screenY;
+            if (nameless && dots.some((d) => Math.abs(d[0] - x) < 7 && Math.abs(d[1] - y) < 7)) marker.crowded = true;
+            else dots.push([x, y]);
         }
         for (const marker of this.markers) marker.apply(Boolean(marker.candidate && marker.keep), this.iconHalf);
         if (this.detailItem) this.updateLeader();

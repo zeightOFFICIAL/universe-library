@@ -1,5 +1,19 @@
 // spots a link label tries, in order: [side, vertical steps]
-export const LABEL_SPOTS = [[1, 0], [-1, 0], [1, -1], [1, 1], [-1, -1], [-1, 1], [1, -2], [1, 2]];
+/*
+ * Where a label may sit, tried in order: [side, rows up or down, steps out]. Beside its
+ * dot first, then up or down on a stick, up to four rows. The sticks are always
+ * vertical (owner, 2026-11-27: like falling stars), so nothing steps out sideways;
+ * the third number stays for that, at 0.
+ */
+export const LABEL_SPOTS = [
+    [1, 0, 0], [-1, 0, 0],
+    [1, -1, 0], [1, 1, 0], [-1, -1, 0], [-1, 1, 0],
+    [1, -2, 0], [1, 2, 0], [-1, -2, 0], [-1, 2, 0],
+    [1, -3, 0], [1, 3, 0], [-1, -3, 0], [-1, 3, 0],
+    [1, -4, 0], [1, 4, 0], [-1, -4, 0], [-1, 4, 0],
+];
+// one step out, in pixels
+export const LABEL_REACH = 22;
 
 // a cluster card's icon sits this far below the card's top edge (margin + half the icon)
 const CLUSTER_ICON_TOP = 16.5;
@@ -253,6 +267,10 @@ export class Marker {
             this.el.style.setProperty("--text-fade", text.toFixed(2));
             this.drawnText = text;
         }
+        if (Boolean(this.crowded) !== this.drawnCrowded) {
+            this.el.classList.toggle("Crowded", Boolean(this.crowded));
+            this.drawnCrowded = Boolean(this.crowded);
+        }
         if (this.iconOnly !== this.drawnIconOnly) {
             this.el.classList.toggle("IconOnly", this.iconOnly);
             this.drawnIconOnly = this.iconOnly;
@@ -267,14 +285,22 @@ export class Marker {
         const x = left ? this.screenX + iconHalf - (this.width || 0) : this.screenX - iconHalf;
         const y = this.anchorTop === null ? "translate(0, -50%)" : `translate(0, -${this.anchorTop}px)`;
         this.el.style.transform = `translate(${x}px, ${this.screenY}px) ${y}`;
-        if (left !== this.drawnLeft || this.shift !== this.drawnShift) {
+        const reach = this.reach || 0;
+        if (left !== this.drawnLeft || this.shift !== this.drawnShift || reach !== this.drawnReach) {
             this.el.classList.toggle("Left", left);
-            this.el.classList.toggle("Displaced", this.shift !== 0);
+            this.el.classList.toggle("Displaced", this.shift !== 0 || reach !== 0);
+            // the text moves out and up or down; the stick runs from the dot to where it went
+            const dx = (left ? -1 : 1) * reach;
             this.el.style.setProperty("--label-shift", `${this.shift}px`);
-            this.el.style.setProperty("--leader", `${Math.abs(this.shift)}px`);
+            this.el.style.setProperty("--label-reach", `${dx}px`);
+            const length = Math.hypot(dx, this.shift);
+            this.el.style.setProperty("--leader", `${Math.max(length - 3, 0).toFixed(1)}px`);
+            // measured from straight down, clockwise, as CSS rotate() turns
+            this.el.style.setProperty("--leader-angle", `${((Math.atan2(-dx, this.shift) * 180) / Math.PI).toFixed(1)}deg`);
             this.el.classList.toggle("Above", this.shift < 0);
             this.drawnLeft = left;
             this.drawnShift = this.shift;
+            this.drawnReach = reach;
         }
     }
 }

@@ -21,7 +21,7 @@ import { truePosition } from "./util.js";
 export const NOW = 2026;
 
 // light-years out, then what was happening on Earth when the light now arriving set
-// off, worded to follow "it set off when ..." on the ring's label
+// off, worded to follow "we see it as it was when ..." on the ring's label
 export const HISTORY_RINGS = [
     [10, "LIGO first heard two black holes merge"],
     [57, "Apollo 11 landed on the Moon"],

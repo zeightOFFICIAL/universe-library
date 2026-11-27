@@ -50,8 +50,34 @@ export class Catalogue {
             });
             this.filterBar.appendChild(chip);
         }
+        /*
+         * A clear button inside the field (owner, 2026-11-26), shown while there is
+         * something to clear. The browser's own (Chromium only) is hidden in CSS.
+         */
+        const wrap = document.createElement("span");
+        wrap.className = "PanelSearchWrap";
+        this.search.replaceWith(wrap);
+        wrap.appendChild(this.search);
+        const clear = document.createElement("button");
+        clear.type = "button";
+        clear.className = "PanelSearchClear";
+        clear.hidden = true;
+        clear.setAttribute("aria-label", "Clear the search");
+        clear.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>';
+        wrap.appendChild(clear);
+        const showClear = () => {
+            clear.hidden = !this.search.value;
+        };
+        clear.addEventListener("click", () => {
+            this.search.value = "";
+            this.query = "";
+            showClear();
+            this.applyFilter();
+            this.search.focus();
+        });
         this.search.addEventListener("input", () => {
             this.query = this.search.value.trim().toLowerCase();
+            showClear();
             this.applyFilter();
         });
         // Escape clears the search before it does anything else
@@ -60,6 +86,7 @@ export class Catalogue {
                 event.stopPropagation();
                 this.search.value = "";
                 this.query = "";
+                showClear();
                 this.applyFilter();
             }
         });
