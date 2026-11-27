@@ -334,7 +334,31 @@ export function pickTint() {
     return STAR_TINTS[STAR_TINTS.length - 1];
 }
 
-export function buildGalaxyFromImage(image) {
+/*
+ * The build is sliced (2026-11-27): it hands the thread back to the browser about every
+ * 12 ms, so the page stays responsive and the loader keeps moving while a million stars
+ * are sampled - it used to block for 1-2 s on a laptop and several on a phone. The work
+ * and the order of the random draws are unchanged, so the star field is identical. A
+ * MessageChannel resumes it: unlike a timer, it is not throttled in a hidden tab.
+ */
+function slicer(onProgress) {
+    const channel = new MessageChannel();
+    let wake = null;
+    channel.port1.onmessage = () => wake && wake();
+    let last = performance.now();
+    return async (fraction) => {
+        if (performance.now() - last < 12) return;
+        onProgress(fraction);
+        await new Promise((resolve) => {
+            wake = resolve;
+            channel.port2.postMessage(0);
+        });
+        last = performance.now();
+    };
+}
+
+export async function buildGalaxyFromImage(image, onProgress = () => {}) {
+    const pause = slicer(onProgress);
     // the load's sub-steps, as "galaxy:" performance measures (see view.buildStarField)
     let mark = performance.now();
     const step = (name) => {
@@ -362,6 +386,7 @@ export function buildGalaxyFromImage(image) {
     const c = { r: 0, g: 0, b: 0 };
     const pixels = sampler.pixels;
     for (let i = 0; i < BACKDROP.stars; i++) {
+        if ((i & 8191) === 0) await pause((0.8 * i) / BACKDROP.stars);
         const index = sampler.pick();
         c.r = pixels[index * 4] / 255;
         c.g = pixels[index * 4 + 1] / 255;
@@ -535,6 +560,7 @@ export function buildGalaxyFromImage(image) {
      */
     step("haze");
     for (let i = 0; i < BACKDROP.thickDisk; i++) {
+        if ((i & 8191) === 0) await pause(0.85 + (0.08 * i) / BACKDROP.thickDisk);
         const index = sampler.pick();
         const c = pixelColor(sampler, index);
         const peak = Math.max(c.r, c.g, c.b);
@@ -547,6 +573,7 @@ export function buildGalaxyFromImage(image) {
     }
 
     for (let i = 0; i < BACKDROP.halo; i++) {
+        if ((i & 8191) === 0) await pause(0.93 + (0.05 * i) / BACKDROP.halo);
         // a flattened spheroid falling off with radius, out past the disk's rim
         const dir = new THREE.Vector3(gauss(), gauss() * 0.75, gauss()).normalize();
         const radius = 3 + Math.pow(rand(), 2.1) * 46;

@@ -117,9 +117,47 @@ export class Catalogue {
         });
     }
 
+    /*
+     * Rows only near the visible part of the list carry live figures (2026-11-27): a
+     * row's distance cells are built the first time it scrolls within 300 px of view,
+     * and only such rows are rewritten on each refresh. Before, all ~250 rows were
+     * filled and rewritten every 400 ms, about 3,500 elements nobody could see.
+     */
+    watchRows() {
+        this.watcher?.disconnect();
+        if (!("IntersectionObserver" in window)) return;
+        this.byRow = new WeakMap();
+        this.watcher = new IntersectionObserver(
+            (changes) => {
+                for (const change of changes) {
+                    const item = this.byRow.get(change.target);
+                    if (!item) continue;
+                    item.near = change.isIntersecting;
+                    if (item.near) this.fillDistances(item);
+                }
+            },
+            { root: this.list, rootMargin: "300px 0px" }
+        );
+    }
+
+    fillDistances(item) {
+        if (!this.distances || !item.distanceLine || item.row.hidden) return;
+        const values = this.distances(item.entry);
+        if (item.distanceLine.children.length !== values.length) item.distanceLine.innerHTML = "<span><b></b><i></i></span>".repeat(values.length);
+        const cells = item.distanceLine.children;
+        values.forEach(([label, value, wide], i) => {
+            // a wide figure takes the whole row
+            cells[i].classList.toggle("Wide", Boolean(wide));
+            const [name, figure] = cells[i].children;
+            if (name.textContent !== label) name.textContent = label;
+            if (figure.textContent !== value) figure.textContent = value;
+        });
+    }
+
     setEntries(entries) {
         this.list.textContent = "";
         this.order = "";
+        this.watchRows();
         this.rows = entries.map((entry) => {
             const row = document.createElement("div");
             row.className = `CatalogueRow Style-${entry.style}`;
@@ -169,7 +207,13 @@ export class Catalogue {
             // the buttons sit in the row's top corner; the name keeps clear of them
             row.classList.add(`Actions${Boolean(entry.fly) + Boolean(entry.href)}`);
             this.list.appendChild(row);
-            return { entry, row, distanceLine, seen: false, search: `${entry.name} ${entry.sub || ""} ${entry.search || ""}`.toLowerCase() };
+            // without an observer every row counts as near, as before
+            const item = { entry, row, distanceLine, seen: false, near: !this.watcher, search: `${entry.name} ${entry.sub || ""} ${entry.search || ""}`.toLowerCase() };
+            if (this.watcher) {
+                this.byRow.set(row, item);
+                this.watcher.observe(row);
+            }
+            return item;
         });
         this.applyFilter();
         this.refresh(true);
@@ -202,21 +246,7 @@ export class Catalogue {
     refresh(force = false) {
         if (this.panel.classList.contains("Folded") && !force) return;
         // the distances move with the view, so they are rewritten even when the order holds
-        if (this.distances) {
-            for (const item of this.rows) {
-                if (!item.distanceLine || item.row.hidden) continue;
-                const values = this.distances(item.entry);
-                if (item.distanceLine.children.length !== values.length) item.distanceLine.innerHTML = "<span><b></b><i></i></span>".repeat(values.length);
-                const cells = item.distanceLine.children;
-                values.forEach(([label, value, wide], i) => {
-                    // a wide figure takes the whole row
-                    cells[i].classList.toggle("Wide", Boolean(wide));
-                    const [name, figure] = cells[i].children;
-                    if (name.textContent !== label) name.textContent = label;
-                    if (figure.textContent !== value) figure.textContent = value;
-                });
-            }
-        }
+        if (this.distances) for (const item of this.rows) if (item.near) this.fillDistances(item);
         for (const item of this.rows) item.seen = Boolean(item.entry.inView?.());
         const sorted = [...this.rows].sort((a, b) => b.seen - a.seen || (a.entry.distance ?? Infinity) - (b.entry.distance ?? Infinity));
         const order = sorted.map((item) => `${item.entry.id}${item.seen ? "+" : ""}`).join("|");

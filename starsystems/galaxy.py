@@ -170,11 +170,13 @@ GALAXIES = [
      "l": 302.80, "b": -44.30, "d": 200_000, "display": 200_000, "size": 18_000,
      "inclination": 60.0, "pa": 45.0, "image": "smc.jpg", "imageScale": 1.8,
      "colors": ["#ffeccf", "#a8c8ff"]},
-    {"name": "Andromeda Galaxy", "alias": "M31", "kind": "spiral", "type": "spiral",
+    # M31 and M33 are drawn at well under half their distance, so at full strength they
+    # outshone the Milky Way seen from above (2026-11-27): turned down a little
+    {"name": "Andromeda Galaxy", "alias": "M31", "brightness": 0.75, "kind": "spiral", "type": "spiral",
      "l": 121.17, "b": -21.57, "d": 2_537_000, "display": 1_040_000, "size": 152_000,
      "inclination": 77.0, "pa": 38.0, "image": "m31.jpg", "imageScale": 1.9,
      "colors": ["#ffd9a0", "#a9c7ff"]},
-    {"name": "Triangulum Galaxy", "alias": "M33", "kind": "spiral", "type": "spiral",
+    {"name": "Triangulum Galaxy", "alias": "M33", "brightness": 0.85, "kind": "spiral", "type": "spiral",
      "l": 133.61, "b": -31.33, "d": 2_730_000, "display": 1_550_000, "size": 60_000,
      "inclination": 56.0, "pa": 23.0, "image": "m33.jpg", "imageScale": 1.9,
      "colors": ["#ffe6bb", "#93b9ff"]},

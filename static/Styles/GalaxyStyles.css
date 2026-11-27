@@ -1108,10 +1108,43 @@ div.CatalogueJump {
     text-transform: uppercase
 }
 
-/* always open on a wide screen, so the heading is only a heading there */
+/*
+ * The heading folds the legend (owner, 2026-11-27): open by default on a wide screen,
+ * shut to its heading with the chevron, remembered per browser (galaxyLegendShut).
+ */
 .LegendHead {
-    cursor: default;
-    pointer-events: none
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    width: 100%
+}
+
+.LegendHead:hover {
+    color: var(--galaxy-ink)
+}
+
+.LegendChevron {
+    fill: none;
+    flex: none;
+    height: 11px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.5;
+    transition: transform .25s var(--ul-ease-out);
+    width: 11px
+}
+
+.GalaxyLegend:not(.Open) .LegendChevron {
+    transform: rotate(180deg)
+}
+
+.GalaxyLegend:not(.Open) .LegendList {
+    display: none
+}
+
+.GalaxyLegend:not(.Open) .LegendHead {
+    padding-bottom: 0
 }
 
 .LegendHead:focus-visible {
@@ -2029,6 +2062,11 @@ button.GalaxyMember {
         letter-spacing: 0
     }
 
+    /* the phone's tab keeps its plus and minus */
+    .LegendChevron {
+        display: none
+    }
+
     .GalaxyLegend.Open .LegendHead::after {
         content: "  –"
     }
@@ -2471,6 +2509,31 @@ button.GalaxyMember {
 
 .DetailFigure.Fiction {
     border: 1px dashed rgba(199, 166, 255, .55)
+}
+
+/*
+ * Two looks (owner, 2026-11-27). A cover or a still from a story (fiction) keeps the
+ * bordered frame above. A real star or space object - a photograph of the sky -
+ * has no frame: it fades out at its edges into the panel, and its credit sits
+ * under it.
+ */
+.DetailFigure:not(.Fiction) {
+    background: none;
+    border: 0;
+    border-radius: 0;
+    overflow: visible
+}
+
+.DetailFigure:not(.Fiction) .DetailImage {
+    -webkit-mask-image: radial-gradient(ellipse 62% 60% at 50% 50%, #000 50%, transparent 100%);
+    mask-image: radial-gradient(ellipse 62% 60% at 50% 50%, #000 50%, transparent 100%)
+}
+
+.DetailFigure:not(.Fiction) .DetailCredit {
+    background: none;
+    margin-top: -6px;
+    padding: 0;
+    position: static
 }
 
 .DetailImage {
@@ -3214,7 +3277,15 @@ button.CatalogueOpen {
  * the panel's full width; the name and the in-view dot keep clear of them.
  */
 .CatalogueRow {
-    position: relative
+    position: relative;
+    /* rows out of the list's view skip layout and paint (2026-11-27) */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 96px
+}
+
+/* a row's figures arrive when it nears the view: its height is held for them, so nothing jumps */
+.CatalogueDistances:empty {
+    min-height: 50px
 }
 
 .CatalogueRow > .CatalogueOpen {

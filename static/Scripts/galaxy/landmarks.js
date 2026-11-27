@@ -53,12 +53,13 @@ const ARTISTIC = {
         envelope: [1.8, 2.4], envelopeAlpha: [0.045, 0.06],
         wisps: 4, spread: 0.035, size: [0.8, 1.4], alpha: [0.06, 0.09],
         knots: 2, knotSize: [0.25, 0.4], knotAlpha: [0.1, 0.15],
-        tints: ["#ff9d6b", "#7fd6ff", "#ff6f9a"], ring: 1.7, ringAlpha: 0.5,
+        // rings 45% fainter since 2026-11-27: close by they read as interface circles
+        tints: ["#ff9d6b", "#7fd6ff", "#ff6f9a"], ring: 1.7, ringAlpha: 0.28,
     },
     planetary: {
         envelope: [1.0, 1.3], envelopeAlpha: [0.05, 0.065],
         wisps: 2, spread: 0.01, size: [0.5, 0.7], alpha: [0.08, 0.11],
-        tints: ["#7de2c3", "#8fb8ff"], ring: 0.85, ringAlpha: 0.55,
+        tints: ["#7de2c3", "#8fb8ff"], ring: 0.85, ringAlpha: 0.3,
     },
     open: {
         envelope: [2.0, 2.6], envelopeAlpha: [0.04, 0.055],
@@ -179,7 +180,7 @@ export function buildDeepSky(objects, { seed = 20261123, amount = 1, cores: draw
  * see at any scale the map can show.
  */
 const OBJECT_LOOK = {
-    blackhole: { color: "#ffad66", size: 0.5, alpha: 0.9, ring: true },
+    blackhole: { color: "#ffad66", size: 0.5, alpha: 0.6, ring: true },
     neutron: { color: "#8ff0ff", size: 0.22, alpha: 0.95 },
     star: { color: "#ffe9a8", size: 0.35, alpha: 0.8 },
 };

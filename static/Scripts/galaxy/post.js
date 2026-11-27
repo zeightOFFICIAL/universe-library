@@ -103,14 +103,55 @@ export const COMPOSITE_FRAGMENT = /* glsl */ `
     uniform float uVignette;
     uniform vec3 uShadowTint;
     uniform float uSeed;
+    uniform vec2 uFlarePos;
+    uniform float uFlareAmount;
+    uniform vec3 uFlareTint;
+    uniform float uAspect;
     varying vec2 vUv;
 
     float hash(vec2 p) {
         return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
     }
 
+    #ifdef FLARE
+    /*
+     * A lens flare (owner, 2026-11-27), drawn, not sampled: the view finds the one
+     * bright source worth it - the galactic core, or a drawn star close up - and says
+     * where it is on screen and how strongly (uFlarePos, uFlareAmount). Here a row of
+     * soft-edged ghosts runs from it through the middle of the frame and beyond, in
+     * the house colours, with a thin halo ring round the source and a faint level
+     * streak through it. No texture reads: a few distances per pixel, and nothing at
+     * all while the amount is zero. Off in lite.
+     */
+    vec3 ghost(vec2 uv, vec2 at, float radius, vec3 tint) {
+        float d = length((uv - at) * vec2(uAspect, 1.0));
+        float disc = 1.0 - smoothstep(radius * 0.7, radius, d);
+        float rim = exp(-pow((d - radius * 0.92) / (radius * 0.06), 2.0));
+        return tint * (disc * 0.55 + rim * 0.45);
+    }
+    vec3 lensFlare(vec2 uv) {
+        vec2 axis = 0.5 - uFlarePos;
+        vec3 sum = vec3(0.0);
+        sum += ghost(uv, uFlarePos + axis * 0.55, 0.035, vec3(1.0, 0.7, 0.4)) * 0.5;
+        sum += ghost(uv, uFlarePos + axis * 0.9, 0.018, vec3(0.75, 0.55, 1.0)) * 0.7;
+        sum += ghost(uv, uFlarePos + axis * 1.3, 0.07, vec3(0.5, 0.72, 1.0)) * 0.18;
+        sum += ghost(uv, uFlarePos + axis * 1.65, 0.026, vec3(1.0, 0.85, 0.7)) * 0.55;
+        sum += ghost(uv, uFlarePos + axis * 2.1, 0.11, vec3(0.7, 0.5, 1.0)) * 0.07;
+        vec2 off = (uv - uFlarePos) * vec2(uAspect, 1.0);
+        float d = length(off);
+        // the halo, round on screen
+        sum += vec3(0.85, 0.75, 1.0) * exp(-pow((d - 0.3) / 0.009, 2.0)) * 0.07;
+        // a level streak through the source
+        sum += uFlareTint * exp(-abs(off.y) * 260.0) * exp(-abs(off.x) * 7.5) * 0.5;
+        return sum * uFlareTint;
+    }
+    #endif
+
     void main() {
         vec3 c = texture2D(tScene, vUv).rgb + texture2D(tBloom, vUv).rgb * uBloom;
+        #ifdef FLARE
+        if (uFlareAmount > 0.001) c += lensFlare(vUv) * uFlareAmount;
+        #endif
         c *= uExposure;
 
         /*
@@ -153,6 +194,9 @@ export const POST = {
     saturation: 1.16,
     vignette: 0.22,
     shadowTint: new THREE.Color(0.004, 0.005, 0.012),
+    // lens flare: the strongest it gets (view.updateFlare sets the amount each frame)
+    flare: 1.0,
+    flareOn: !LITE,
 };
 
 export class PostPipeline {
@@ -229,7 +273,16 @@ export class PostPipeline {
             uVignette: { value: POST.vignette },
             uShadowTint: { value: POST.shadowTint },
             uSeed: { value: 0 },
+            // the lens flare: where its source is (0..1 on screen), how strong, its colour
+            uFlarePos: { value: new THREE.Vector2(0.5, 0.5) },
+            uFlareAmount: { value: 0 },
+            uFlareTint: { value: new THREE.Color(1, 0.9, 0.8) },
+            uAspect: { value: 1 },
         });
+        if (!LITE) {
+            this.composite.defines = { FLARE: 1 };
+            this.composite.needsUpdate = true;
+        }
         this.quad = new THREE.Mesh(geometry, this.down);
         this.quad.frustumCulled = false;
         this.quadScene = new THREE.Scene();
@@ -239,6 +292,7 @@ export class PostPipeline {
 
     setSize(width, height) {
         if (!this.supported) return;
+        this.composite.uniforms.uAspect.value = width / Math.max(height, 1);
         this.scene.setSize(width, height);
         this.soft.setSize(Math.max(1, Math.round(width * SOFT_SCALE)), Math.max(1, Math.round(height * SOFT_SCALE)));
         let w = width;

@@ -1,48 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        {% load static %}
+        {% load static versioned %}
         {{ head| safe}}
-        <link rel="stylesheet" href="{% static 'Styles/Tokens.css' %}" charset="UTF-8">
-        <link rel="stylesheet" href="{% static 'Styles/UniverseStyles.css' %}" charset="UTF-8">
-        <link rel="stylesheet" href="{% static 'Styles/GalaxyStyles.css' %}" charset="UTF-8">
-        <script type="importmap">
-            {
-                "imports": {
-                    "three": "{% static 'Vendor/three/three.module.js' %}",
-                    "three/addons/": "{% static 'Vendor/three/addons/' %}"
-                }
-            }
-        </script>
+        <link rel="stylesheet" href="{% vstatic 'Styles/Tokens.css' %}" charset="UTF-8">
+        <link rel="stylesheet" href="{% vstatic 'Styles/UniverseStyles.css' %}" charset="UTF-8">
+        <link rel="stylesheet" href="{% vstatic 'Styles/GalaxyStyles.css' %}" charset="UTF-8">
+        {% galaxy_importmap %}
         <!--
             Every galaxy module asked for at once (2026-11-26). Without these the browser
             found them one import at a time - main, then view, then config... - so each
-            level cost a round trip, which on a phone over Wi-Fi added seconds. Keep the
-            list in step with static/Scripts/galaxy/.
+            level cost a round trip, which on a phone over Wi-Fi added seconds. The list is built
+            from static/Scripts/galaxy/ (templatetags/versioned.py), at versioned URLs.
         -->
-        <link rel="modulepreload" href="{% static 'Vendor/three/three.module.js' %}">
-        <link rel="modulepreload" href="{% static 'Vendor/three/addons/controls/OrbitControls.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/main.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/setup.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/view.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/config.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/util.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/units.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/shaders.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/dust.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/backdrop.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/starfield.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/structures.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/landmarks.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/local.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/post.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/markers.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/panels.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/overlays.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/hero.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/history.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/territories.js' %}">
-        <link rel="modulepreload" href="{% static 'Scripts/galaxy/regions.js' %}">
+        {% galaxy_preloads %}
     </head>
     <body>
         <div id="GALAXY_VIEW" class="GalaxyView"
@@ -171,7 +142,7 @@
             </nav>
             <div class="GalaxyLayerTip" id="GALAXY_LAYER_TIP" aria-hidden="true" hidden></div>
             <aside class="GalaxyLegend" id="GALAXY_LEGEND" aria-label="Legend">
-                <button type="button" class="LegendHead" aria-expanded="true" aria-controls="GALAXY_LEGEND_LIST">Legend</button>
+                <button type="button" class="LegendHead" aria-expanded="true" aria-controls="GALAXY_LEGEND_LIST"><span>Legend</span><svg class="LegendChevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 7.5 6 4.5l3 3"/></svg></button>
                 <ul class="LegendList" id="GALAXY_LEGEND_LIST"></ul>
             </aside>
             <div class="GalaxySettingsPanel">
@@ -247,6 +218,6 @@
             </button>
         </div>
         {{ galaxy|json_script:"GALAXY_DATA" }}
-        <script type="module" src="{% static 'Scripts/galaxy/main.js' %}"></script>
+        <script type="module" src="{% vstatic 'Scripts/galaxy/main.js' %}"></script>
     </body>
 </html>

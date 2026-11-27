@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { DATA, SUN, VIEW_SHIFT, LABEL_TEXT_DISTANCE, NARROW_WIDTH, FOV, GALAXY_RADIUS, ARMS, ORION_SPUR, THREE_KPC_ARMS, BACKDROP, QUALITY, LITE, EXTREME, PIXEL_RATIO, WHITE, LOCAL_RINGS_LY, LOCAL_ENTER, LOCAL_FULL, LOCAL_MIN_DISTANCE, GALAXY_MIN_DISTANCE, SUN_VIEW, DEEP_SKY_LABEL_DISTANCE, OVERVIEW, START, START_PORTRAIT, PIVOT, SOFT_LAYER, SCRATCH_VECTOR, SHOW_TERRITORIES, ORIGIN, EXTINCTION_RED, RAYCASTER, GALACTIC_PLANE, DEEP_SKY_STYLE } from "./config.js";
 import { pointsMaterial, glowSprite } from "./shaders.js";
-import { armPhase, armPoint, directionFromSun, truePosition, formatLy, smoothstep } from "./util.js";
+import { armPhase, armPoint, directionFromSun, truePosition, formatLy, smoothstep, chunkGeometry, releaseAfterUpload } from "./util.js";
 import { UNITS, UNIT_OPTIONS, DISPLAY, DISPLAY_OPTIONS, setUnits, setDisplay, LABEL_SIZE, motionAllowed, onUnitsChange, onDisplayChange, formatMass, solarMasses, formatStarSize, formatHorizon, solarRadii, schwarzschildKm, formatTemperature, formatLuminosity, formatSize, formatDistance } from "./units.js";
 import { buildBackdropVolume } from "./backdrop.js";
 import { buildGalaxyFromImage } from "./starfield.js";
@@ -10,11 +10,11 @@ import { buildBackdropStars, buildGalaxyDots, buildCore, buildBulgeGlow, buildAr
 import { buildDeepSky, buildGalaxies, buildStellarObjects } from "./landmarks.js";
 import { DUST, dustColumn, diskTransmission } from "./dust.js";
 import { buildLocal } from "./local.js";
-import { PostPipeline } from "./post.js";
+import { PostPipeline, POST } from "./post.js";
 import { LABEL_SPOTS, LABEL_REACH, Marker } from "./markers.js";
 import { Catalogue, ensureOneOpen } from "./panels.js";
 import { buildBearings, updateBearings, buildSectors, updateSectors, sectorName, buildDistanceRings, updateDistanceRings } from "./overlays.js";
-import { Hero, PHOTO_KINDS } from "./hero.js";
+import { Hero, PHOTO_KINDS, artColor } from "./hero.js";
 import { HISTORY_RINGS, RADIO_BUBBLE_LY, ARECIBO, ARECIBO_LY, yearOf, buildHistory, updateHistory } from "./history.js";
 import { buildTerritories, updateTerritories } from "./territories.js";
 import { buildHII, buildBar } from "./regions.js";
@@ -332,13 +332,11 @@ export class GalaxyView {
             const start = () => {
                 if (started) return;
                 started = true;
-                try {
-                    this.buildStarField(texture);
-                } catch (error) {
+                this.buildStarField(texture).catch((error) => {
                     // never leave the loader claiming to be working when it is not
                     this.setLoaderStep("Could not build the galaxy");
                     throw error;
-                }
+                });
             };
             requestAnimationFrame(() => requestAnimationFrame(start));
             setTimeout(start, 120);
@@ -367,7 +365,7 @@ export class GalaxyView {
         this.scene.add(this.local.group);
     }
 
-    buildStarField(texture) {
+    async buildStarField(texture) {
         {
             /*
              * Timings of the load's slow steps, read with
@@ -383,7 +381,9 @@ export class GalaxyView {
             this.backdrop = buildBackdropVolume(texture);
             this.scene.add(this.backdrop.group);
             step("backdrop");
-            const galaxy = buildGalaxyFromImage(texture.image);
+            // sliced: the page stays responsive, and the bar moves from 0.6 to 0.9 as it goes
+            this.building = true;
+            const galaxy = await buildGalaxyFromImage(texture.image, (f) => this.setLoaderProgress(0.6 + 0.3 * f)).finally(() => (this.building = false));
             step("star field");
             // the backdrop darkens its own lanes with the map the star field read
             for (const m of this.backdrop.materials) m.uniforms.uDust.value = galaxy.dustTexture;
@@ -416,7 +416,19 @@ export class GalaxyView {
                 this.scene.add(points);
             }
             for (const [key, order] of [["gas", 1], ["stars", 2], ["knots", 3]]) {
-                const points = new THREE.Points(galaxy[key].geometry(), this.materials[key]);
+                // the stars in chunks, so the ones out of view are not drawn (util.chunkGeometry)
+                if (key === "stars") {
+                    this.starChunks = chunkGeometry(galaxy.stars.geometry()).map((geometry) => {
+                        const points = new THREE.Points(releaseAfterUpload(geometry), this.materials.stars);
+                        points.renderOrder = order;
+                        this.scene.add(points);
+                        return points;
+                    });
+                    step("chunks");
+                    continue;
+                }
+                // the JavaScript copy goes once the GPU has it (util.releaseAfterUpload)
+                const points = new THREE.Points(releaseAfterUpload(galaxy[key].geometry()), this.materials[key]);
                 points.renderOrder = order;
                 points.frustumCulled = false;
                 if (key === "gas") points.layers.set(SOFT_LAYER);
@@ -477,6 +489,14 @@ export class GalaxyView {
             // a failed pre-compile only means the first frame does the work instead
         }
         performance.measure("galaxy:shaders", { start: compileStart, end: performance.now() });
+        /*
+         * One frame with culling off, behind the loader: every star chunk goes to the
+         * GPU now (and drops its JavaScript copy), instead of the first time each one
+         * turns into view, which would hitch mid-flight.
+         */
+        for (const points of this.starChunks || []) points.frustumCulled = false;
+        this.post.render(this.scene, this.camera);
+        for (const points of this.starChunks || []) points.frustumCulled = true;
         for (const hero of this.warmHeroes) this.scene.remove(hero.group);
         this.setLoaderProgress(1);
         this.setLoaderStep("Ready");
@@ -1423,14 +1443,27 @@ export class GalaxyView {
             }
             list.appendChild(this.legendRow(key));
         }
-        // open on a wide screen; a phone starts with the tab folded
-        const open = !window.matchMedia(`(max-width: ${NARROW_WIDTH}px)`).matches;
+        /*
+         * Open on a wide screen unless it was shut there before (owner, 2026-11-27:
+         * the legend can be hidden, open by default); a phone starts with the tab
+         * folded and does not remember.
+         */
+        const narrow = () => window.matchMedia(`(max-width: ${NARROW_WIDTH}px)`).matches;
+        let shut = false;
+        try {
+            shut = localStorage.getItem("galaxyLegendShut") === "1";
+        } catch (e) {}
+        const open = !narrow() && !shut;
         legend.classList.toggle("Open", open);
         head.setAttribute("aria-expanded", String(open));
         head.addEventListener("click", () => {
             const open = !legend.classList.contains("Open");
             legend.classList.toggle("Open", open);
             head.setAttribute("aria-expanded", String(open));
+            if (narrow()) return;
+            try {
+                localStorage.setItem("galaxyLegendShut", open ? "0" : "1");
+            } catch (e) {}
         });
     }
 
@@ -1488,6 +1521,16 @@ export class GalaxyView {
      */
     visit(item) {
         if (!item) return;
+        /*
+         * Where Back returns to (owner, 2026-11-27): the view as it was when the place
+         * was clicked - pivot, distance, angle and its anchor. Going from one open
+         * place straight to another keeps the first view, so Back always lands where
+         * the close-ups began.
+         */
+        if (!this.detailItem && !this.flight?.open) {
+            const s = this.spherical();
+            this.returnView = { target: this.controls.target.clone(), distance: s.radius, polar: s.phi, azimuth: s.theta, anchor: this.destination?.clone() ?? null };
+        }
         this.showLayers(item.layers);
         // the object is drawn from the start, so it grows out of the sky on the way in
         this.hero.show(item);
@@ -1951,7 +1994,15 @@ export class GalaxyView {
         this.root.classList.remove("DetailOpen");
         this.controls.enabled = true;
         this.canvas.focus({ preventScroll: true });
-        if (back) this.settleOnPlane(item);
+        // Back: fly to the view the place was clicked from (visit stored it)
+        if (back && this.returnView) {
+            const view = this.returnView;
+            this.returnView = null;
+            this.flyTo({ target: view.target, distance: view.distance, polar: view.polar, azimuth: view.azimuth }, 1400, { anchor: Boolean(view.anchor) });
+            this.destination = view.anchor;
+        } else if (back) {
+            this.settleOnPlane(item);
+        }
     }
 
     /*
@@ -2184,6 +2235,9 @@ export class GalaxyView {
     frame(now) {
         if (!this.running) return;
         requestAnimationFrame((t) => this.frame(t));
+        // nothing is drawn behind the loader while the star field builds: each frame
+        // took the slices' time and tripled the build
+        if (this.building) return;
         /*
          * A still view is drawn at half the rate (owner, 2026-11-26: full detail kept
          * the laptop's graphics at full load). While anything moves - a drag, the
@@ -2194,6 +2248,8 @@ export class GalaxyView {
          * faster than 60 fps: a 120 Hz laptop screen doubled the load for no visible gain.
          */
         const still = !this.flight && !this.keys.size && now - (this.lastMove || 0) > 500;
+        // a clock that ran ahead (a hand-driven frame from the console) must never freeze the view
+        if (now < (this.lastDrawn || 0)) this.lastDrawn = 0;
         if (now - (this.lastDrawn || 0) < (still ? 30 : 14)) return;
         this.lastDrawn = now;
 
@@ -2370,7 +2426,16 @@ export class GalaxyView {
          * HII regions: a faint pink bead from across the galaxy, a lit cloud close in.
          * Their knots take the stars' close-up gain, halved.
          */
+        /*
+         * Edge-on, the hard points in the plane - star-forming knots, HII knots, the
+         * filler's clusters - step back to 0.3 (owner, 2026-11-27): they lie along
+         * the mid-plane, and as bright sprites they filled in exactly the dark lane an
+         * edge-on spiral shows. From 9 degrees up they are back in full.
+         */
+        this.edgeQuiet = 1 - 0.7 * (1 - smoothstep(0.03, 0.15, elevation));
         this.materials.hii.uniforms.uOpacity.value = 0.85;
+        this.materials.knots.uniforms.uOpacity.value = this.edgeQuiet;
+        this.materials.hiiKnots.uniforms.uOpacity.value = this.edgeQuiet;
         this.materials.hiiKnots.uniforms.uGain.value = 1 + 1.2 * (1 - smoothstep(10, 80, cameraDistance));
 
         /*
@@ -2537,10 +2602,11 @@ export class GalaxyView {
         if (this.scatteredPoints) {
             this.scatteredPoints.visible = local < 0.999;
             // the unnamed objects' centre dots, at half strength like the named ones (DOT_BRIGHTNESS)
-            this.materials.scattered.uniforms.uOpacity.value = 0.5 * (1 - local) * (1 - 0.6 * wide);
+            const quiet = this.edgeQuiet ?? 1;
+            this.materials.scattered.uniforms.uOpacity.value = 0.5 * (1 - local) * (1 - 0.6 * wide) * quiet;
             this.scatteredArt.group.visible = local < 0.999;
-            for (const m of this.scatteredArt.materials) m.uniforms.uOpacity.value = 1 - local;
-            this.scatteredArt.materials[4].uniforms.uOpacity.value = (1 - local) * (1 - 0.9 * wide);
+            for (const m of this.scatteredArt.materials) m.uniforms.uOpacity.value = (1 - local) * quiet;
+            this.scatteredArt.materials[4].uniforms.uOpacity.value = (1 - local) * (1 - 0.9 * wide) * quiet;
         }
         this.galaxyGroup.group.visible = true;
         /*
@@ -2726,7 +2792,43 @@ export class GalaxyView {
             : `${label} · ${formatLy(Math.round(probe.length() * 1000))} from core · ${formatLy(Math.round(fromSun))} from Sol`) + (sector ? ` · Sector ${sector}` : "");
         this.updateCoords(probe);
 
+        this.updateFlare(cameraDistance, elevation, local);
         this.post.render(this.scene, this.camera);
+    }
+
+    /*
+     * The lens flare's source (post.js draws it): a drawn star while one is open, else
+     * the galactic core. The core's flare fades when it is off screen, edge-on behind
+     * the dust, from inside the bulge (it fills the view there) and in the local view;
+     * nothing else makes one, so it stays an accent rather than a filter.
+     */
+    updateFlare(cameraDistance, elevation, local) {
+        const u = this.post.composite?.uniforms;
+        if (!u?.uFlareAmount) return;
+        let amount = 0;
+        let source = null;
+        const hero = this.detailItem?.hero;
+        if (!POST.flareOn) {
+            amount = 0;
+        } else if (this.detailItem) {
+            if (hero?.type === "star") {
+                source = this.detailItem.position;
+                u.uFlareTint.value.copy(artColor(hero.stars?.[0]?.t ?? 5800)).lerp(WHITE, 0.35);
+                amount = POST.flare * 0.8 * (this.hero.fade ?? 1);
+            }
+        } else {
+            source = ORIGIN;
+            u.uFlareTint.value.setRGB(1, 0.86, 0.68);
+            // measured from the camera to the core itself: inside the bulge it fills the view
+            amount = POST.flare * 0.4 * smoothstep(0.04, 0.2, elevation) * smoothstep(5, 14, this.camera.position.length()) * (1 - 0.7 * local);
+        }
+        if (source && amount > 0.001) {
+            const p = SCRATCH_VECTOR.copy(source).project(this.camera);
+            const edge = Math.max(Math.abs(p.x), Math.abs(p.y));
+            amount *= p.z < 1 ? 1 - smoothstep(0.85, 1.1, edge) : 0;
+            u.uFlarePos.value.set(p.x * 0.5 + 0.5, p.y * 0.5 + 0.5);
+        }
+        u.uFlareAmount.value = amount;
     }
 
     /*

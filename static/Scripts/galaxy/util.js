@@ -98,3 +98,84 @@ export class Layer {
         return g;
     }
 }
+
+/*
+ * Frustum culling for the star field (2026-11-27). The field was one object of two
+ * million points, so it was always "in view" and every star went through the vertex
+ * shader - the per-star dust maths - even with the camera down among the Sun's
+ * neighbours, where most of the disk is behind or beside it. Split into chunks with
+ * their own bounds, three.js skips each chunk that lies wholly outside the view, as a
+ * game does. The disk is cut into columns `cell` kly square; whatever lies more than
+ * `disk` kly off the plane (the thick disk's and the halo's outliers) goes into eight
+ * octant chunks instead, so a column's bounds stay tight. The blending is additive,
+ * so drawing order does not matter and the picture is unchanged. Costs: one draw
+ * call per chunk, about 70 for the stars.
+ */
+export function chunkGeometry(geometry, { cell = 12, disk = 1.6 } = {}) {
+    const p = geometry.attributes.position.array;
+    const count = geometry.attributes.position.count;
+    // a dense grid of chunk ids: columns across +-120 kly, then eight halo octants
+    const side = Math.ceil(240 / cell);
+    const ids = new Int32Array(side * side + 8).fill(-1);
+    const chunkOf = new Uint16Array(count);
+    const slot = new Uint32Array(count);
+    const fill = [];
+    for (let i = 0; i < count; i++) {
+        const x = p[i * 3];
+        const y = p[i * 3 + 1];
+        const z = p[i * 3 + 2];
+        let key;
+        if (y > disk || y < -disk) key = side * side + (x > 0 ? 1 : 0) + (y > 0 ? 2 : 0) + (z > 0 ? 4 : 0);
+        else {
+            const cx = Math.min(Math.max(Math.floor(x / cell) + (side >> 1), 0), side - 1);
+            const cz = Math.min(Math.max(Math.floor(z / cell) + (side >> 1), 0), side - 1);
+            key = cx * side + cz;
+        }
+        let id = ids[key];
+        if (id < 0) {
+            id = ids[key] = fill.length;
+            fill.push(0);
+        }
+        chunkOf[i] = id;
+        slot[i] = fill[id]++;
+    }
+    // pass 2: each attribute copied straight across, one typed array at a time
+    const geometries = fill.map(() => new THREE.BufferGeometry());
+    for (const [name, source] of Object.entries(geometry.attributes)) {
+        const n = source.itemSize;
+        const from = source.array;
+        const into = fill.map((size) => new from.constructor(size * n));
+        if (n === 1) {
+            for (let i = 0; i < count; i++) into[chunkOf[i]][slot[i]] = from[i];
+        } else {
+            for (let i = 0; i < count; i++) {
+                const to = into[chunkOf[i]];
+                const a = slot[i] * 3;
+                const b = i * 3;
+                to[a] = from[b];
+                to[a + 1] = from[b + 1];
+                to[a + 2] = from[b + 2];
+            }
+        }
+        into.forEach((array, id) => geometries[id].setAttribute(name, new THREE.BufferAttribute(array, n)));
+    }
+    for (const g of geometries) g.computeBoundingSphere();
+    return geometries;
+}
+
+/*
+ * Memory (2026-11-27): once a big point cloud is on the GPU, its JavaScript copy is
+ * dead weight - about 80 MB for the full star field. This drops each attribute's array
+ * after its first upload (three.js's own pattern). Bounds must be computed before, and
+ * nothing may read or update these arrays afterwards; a lost WebGL context cannot be
+ * restored from them, which the page does not try to do anyway.
+ */
+export function releaseAfterUpload(geometry) {
+    if (!geometry.boundingSphere) geometry.computeBoundingSphere();
+    for (const attribute of Object.values(geometry.attributes)) {
+        attribute.onUpload(function () {
+            this.array = null;
+        });
+    }
+    return geometry;
+}

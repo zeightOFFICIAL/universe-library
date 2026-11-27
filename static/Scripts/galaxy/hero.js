@@ -134,6 +134,9 @@ const STAR_FRAGMENT = /* glsl */ `
     uniform vec3 uColor;
     uniform float uTime;
     uniform float uDisc;
+    // 1 for a star; a spacecraft's small light has no spikes and a short glow
+    uniform float uSpikes;
+    uniform float uGlow;
     uniform float uOpacity;
     uniform float uSeed;
     varying vec2 vUv;
@@ -153,9 +156,9 @@ const STAR_FRAGMENT = /* glsl */ `
         }
         float out_ = max(d - 1.0, 0.0);
         // the corona and the glow of the light scattered in the eye: stars glow (owner, 2026-11-27)
-        float glow = 0.95 * exp(-out_ * 2.4) + 0.26 * exp(-out_ * 0.55);
+        float glow = (0.95 * exp(-out_ * 2.4) + 0.26 * exp(-out_ * 0.55)) * uGlow;
         float a = atan(vUv.y, vUv.x) + 0.35;
-        float spikes = pow(abs(cos(a * 2.0)), 600.0) * exp(-out_ * 0.6) * 0.4;
+        float spikes = pow(abs(cos(a * 2.0)), 600.0) * exp(-out_ * 0.6) * 0.4 * uSpikes;
         col += uColor * (glow + spikes) * smoothstep(0.96, 1.04, d);
         col *= 1.0 - smoothstep(0.82, 1.0, r);
         // the disc is solid: nothing behind it shows through (premultiplied, see material())
@@ -297,9 +300,10 @@ const NEBULA_FRAGMENT = /* glsl */ `
 
 /*
  * A photograph of the place, for what is too complex to draw well (owner, 2026-11-26):
- * nebulae, planetary nebulae and remnants with a picture on disk. Cropped to a square,
- * its sky lifted to true black, and faded out to a soft round edge, so it sits in the
- * galaxy rather than on it. Added light, like everything else in the scene.
+ * nebulae, planetary nebulae and remnants with a picture on disk. Cropped to a square
+ * and shown as it is, inside a soft round vignette (owner, 2026-11-27: not keyed into
+ * the galaxy any more - the dark-sky-to-transparent trick ate the faint gas). The
+ * picture is solid; only the vignette lets the galaxy back in at the edge.
  */
 const PHOTO_FRAGMENT = /* glsl */ `
     uniform sampler2D uMap;
@@ -311,14 +315,11 @@ const PHOTO_FRAGMENT = /* glsl */ `
         vec2 crop = uAspect > 1.0 ? vec2(1.0 / uAspect, 1.0) : vec2(1.0, uAspect);
         vec2 uv = 0.5 + vUv * 0.5 * crop;
         vec3 col = texture2D(uMap, uv).rgb;
-        // the photo's own sky to black, so its square never shows
-        col = max(col - 0.045, 0.0) / 0.955;
         float r = length(vUv);
-        float vignette = 1.0 - smoothstep(0.42, 0.98, r);
+        float vignette = 1.0 - smoothstep(0.5, 0.98, r);
         float fade = vignette * vignette * uOpacity * uReady;
-        // the lit gas is solid; the photo's dark sky lets the galaxy through
-        float solid = smoothstep(0.03, 0.35, max(col.r, max(col.g, col.b)));
-        gl_FragColor = vec4(col * fade, solid * fade);
+        // premultiplied: the picture covers what is behind it, as much as the vignette lets it
+        gl_FragColor = vec4(col * fade, fade);
     }
 `;
 
@@ -403,10 +404,10 @@ export class Hero {
         return mesh;
     }
 
-    star(color, disc, offset, seed) {
+    star(color, disc, offset, seed, { spikes = 1, glow = 1 } = {}) {
         // the quad reaches out to the corona's faint edge: 9 star radii
         const half = disc * 9;
-        this.billboard(this.material(STAR_FRAGMENT, { uColor: { value: color }, uDisc: { value: 1 / 9 }, uSeed: { value: seed } }), half, offset);
+        this.billboard(this.material(STAR_FRAGMENT, { uColor: { value: color }, uDisc: { value: 1 / 9 }, uSeed: { value: seed }, uSpikes: { value: spikes }, uGlow: { value: glow } }), half, offset);
     }
 
     points(count, place, size) {
@@ -555,15 +556,20 @@ export class Hero {
             // a spacecraft, a station, a message: a small cube with a light on it
             const color = new THREE.Color(hero.color || "#ffffff");
             const cube = new THREE.LineSegments(
-                new THREE.EdgesGeometry(new THREE.BoxGeometry(size, size, size)),
+                // a unit cube scaled down: EdgesGeometry merges corners to 4 decimals, so a
+                // cube built at its real size (a few 1e-7 units) collapsed to nothing
+                new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
                 new THREE.LineBasicMaterial({ color: color.clone().multiplyScalar(1.6), transparent: true, opacity: 0, depthTest: false, depthWrite: false })
             );
+            cube.scale.setScalar(size);
             cube.frustumCulled = false;
             cube.renderOrder = 12;
             cube.userData.spin = true;
             this.materials.push(cube.material);
             this.group.add(cube);
-            this.star(color, size * 0.12, 0, seed);
+            // a small light on it, not a star: no spikes, a short glow (owner, 2026-11-27:
+            // with the stars' spikes the Voyagers looked like pulsars)
+            this.star(color, size * 0.08, 0, seed, { spikes: 0, glow: 0.25 });
         }
         this.finishShow();
     }

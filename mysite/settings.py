@@ -14,6 +14,11 @@ SECRET_KEY = config("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DEBUG", default=True, cast=bool)
 
+# Set PUBLIC_SITE=True in .env before the site is published beyond the owner's own
+# use: images held under fair use (stills and covers from stories, for reference) are
+# then left out of the galaxy page. Public-domain and free-licence images stay.
+PUBLIC_SITE = config("PUBLIC_SITE", default=False, cast=bool)
+
 # "*" lets other devices on the LAN reach the dev server; narrow it in .env for anything public
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="*", cast=Csv())
 

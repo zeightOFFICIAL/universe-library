@@ -26,14 +26,15 @@ export const DUST = {
     // than as an eclipse. laneDepth is the optical depth per unit of mid-plane column
     laneHeight: 0.34,
     // the lane's strength on the soft layers, relative to the stars
-    softLane: 1.0,
+    // 1.0 until 2026-11-27, when the edge-on glitter was quieted and the lane could show
+    softLane: 1.25,
     /*
      * Retuned for HDR. These were raised step by step to cut through a band that
      * was clipping at two and a half times white, where a lane that only halved the
      * light did not show at all. Nothing clips now, so a lane that takes four fifths
      * of the mid-plane is already a dark lane.
      */
-    laneDepth: 0.1,
+    laneDepth: 0.13,
     laneFloor: 2.3,
     // the arm lanes: far stronger per unit column, because a lane is dense
     // 6.2 until 2026-11-25, when the owner asked for more dust

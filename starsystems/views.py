@@ -72,7 +72,10 @@ def with_images(entries):
     for entry in entries:
         slug = image_slug(entry)
         source = IMAGE_SOURCES.get(slug)
-        # an image is used only when it is on disk and we know whose it is
+        # an image is used only when it is on disk and we know whose it is; a public
+        # site (settings.PUBLIC_SITE) leaves out what is only held under fair use
+        if source and settings.PUBLIC_SITE and source["license"].lower().startswith("fair use"):
+            source = None
         if source and (INFO_IMAGE_DIR / f"{slug}.jpg").is_file():
             entry = dict(entry, image=f"{slug}.jpg", imageCredit=short_credit(source), imageSource=source["page"])
         found.append(entry)
